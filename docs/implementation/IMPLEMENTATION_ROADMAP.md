@@ -1,0 +1,987 @@
+# Implementation Roadmap
+
+## Purpose
+
+This document defines the phased implementation strategy for AegisFlow.
+
+The roadmap exists to:
+- break implementation into manageable milestones
+- prioritize delivery of end-to-end workflow slices
+- preserve architectural integrity
+- avoid premature over-engineering
+- support iterative platform evolution
+- guide AI-assisted development workflows
+
+The implementation strategy intentionally prioritizes:
+- vertical slices over isolated infrastructure
+- executable workflows over theoretical completeness
+- observable systems over hidden complexity
+- operational realism over excessive abstraction
+
+---
+
+# Current Implementation Status
+
+## Completed Phases
+
+The following phases have been completed in the local implementation:
+
+- Phase 0 — Repository Bootstrap
+- Phase 1 — Local Runtime Foundation
+- Phase 2 — Workflow Engine MVP
+
+---
+
+## Current Runtime Capability
+
+The platform currently supports:
+- local Docker Compose runtime startup
+- Postgres-backed workflow persistence
+- Redpanda/Kafka-compatible event infrastructure availability
+- Redis availability for future ephemeral coordination
+- gateway-api service startup
+- health and readiness endpoints
+- workflow creation
+- workflow retrieval
+- workflow creation state transition persistence
+- Temporal workflow execution
+- deterministic workflow state progression
+- workflow timeline retrieval
+- workflow event outbox persistence
+- Redpanda/Kafka workflow event publication
+- structured JSON logging for workflow creation
+- correlation ID propagation
+
+---
+
+## Current Implementation Boundary
+
+The current implementation includes the Phase 2 workflow orchestration foundation.
+
+The platform does not yet implement:
+- LangGraph agent execution
+- tool-runtime mediation
+- human review UI
+- approval workflows
+- distributed tracing
+- AI evaluation
+
+These capabilities remain assigned to later roadmap phases.
+
+Current workflow orchestration supports deterministic progression from `NEW` through `HUMAN_REVIEW_REQUIRED`.
+
+Human approval and completion actions remain assigned to later phases.
+
+---
+
+# Phase Completion Log
+
+## Phase 1 — Local Runtime Foundation
+
+Status: Completed
+
+Completion date: 2026-05-10
+
+Completed deliverables:
+- Docker Compose stack for Postgres, Redpanda, Redis, and gateway-api
+- FastAPI gateway-api service
+- Alembic migration support
+- workflow_records persistence table
+- workflow_state_transitions persistence table
+- `GET /health`
+- `GET /ready`
+- `POST /api/v1/workflows`
+- `GET /api/v1/workflows/{workflow_id}`
+- correlation ID middleware using `X-Correlation-ID`
+- structured JSON workflow creation logs
+- containerized test execution
+
+Validation completed:
+- Docker Compose build completed successfully
+- local runtime stack started successfully
+- Postgres container reported healthy
+- Redpanda container reported healthy
+- Redis container reported healthy
+- Alembic migration executed successfully
+- health endpoint returned `ok`
+- readiness endpoint confirmed database connectivity
+- workflow creation persisted a `MORTGAGE_EXCEPTION_REVIEW` workflow in `NEW` state
+- workflow retrieval returned the persisted workflow
+- workflow creation persisted a `workflow_created` state transition
+- structured 404 response returned for missing workflow lookup
+- gateway-api pytest suite passed with 5 tests
+
+---
+
+## Phase 2 — Workflow Engine MVP
+
+Status: Completed
+
+Implementation started: 2026-05-10
+
+Completion date: 2026-05-10
+
+Completed deliverables:
+- Temporal local runtime infrastructure
+- Temporal UI local runtime
+- workflow-engine worker service
+- deterministic Mortgage Exception Review workflow execution
+- progression from `NEW` to `HUMAN_REVIEW_REQUIRED`
+- workflow state transition persistence
+- workflow timeline persistence
+- workflow event outbox persistence
+- Redpanda/Kafka workflow event publication
+- workflow timeline API endpoint
+- Temporal workflow metadata on workflow records
+- gateway-api startup integration with Temporal
+
+Explicit non-scope:
+- LangGraph agent execution
+- tool-runtime mediation
+- approval UI
+- approve/reject actions
+- AI evaluation
+- distributed tracing stack
+
+Validation completed:
+- Docker Compose build completed successfully
+- local runtime stack started successfully with Postgres, Redpanda, Redis, Temporal, Temporal UI, gateway-api, and workflow-engine
+- Alembic migration `20260510_0002` executed successfully
+- workflow-engine worker connected to Temporal task queue `aegisflow-workflows`
+- workflow creation started a Temporal workflow
+- workflow advanced to `HUMAN_REVIEW_REQUIRED`
+- all state transitions were persisted
+- workflow timeline API returned ordered entries
+- workflow event outbox records were created
+- workflow event outbox records were marked `PUBLISHED`
+- Redpanda topic `workflow-events` was created
+- gateway-api pytest suite passed with 6 tests
+- workflow-engine pytest suite passed with 2 tests
+
+---
+
+# Implementation Philosophy
+
+## Build Vertical Slices First
+
+The platform should evolve through:
+- end-to-end operational slices
+
+Avoid implementing isolated infrastructure without executable workflow value.
+
+Each phase should produce:
+- demonstrable operational capability
+- observable workflow behavior
+- replayable execution paths
+
+---
+
+## Start as a Modular Monolith
+
+The initial implementation should prioritize:
+- architectural clarity
+- operational simplicity
+- development velocity
+
+Avoid premature:
+- microservice fragmentation
+- infrastructure complexity
+- orchestration sprawl
+
+Clear service boundaries should exist logically before they become physically distributed.
+
+---
+
+## Workflow Engine First
+
+The workflow engine is the operational core of the platform.
+
+Early implementation effort should prioritize:
+- workflow orchestration
+- event propagation
+- replayability
+- observability
+- governance
+
+before advanced AI sophistication.
+
+---
+
+## AI Is an Augmentation Layer
+
+Initial AI functionality should remain:
+- constrained
+- deterministic where practical
+- observable
+- replayable
+
+Avoid early investment in:
+- autonomous planning
+- uncontrolled agent systems
+- excessive framework abstraction
+
+---
+
+# Phase 0 — Repository Bootstrap
+
+# Objective
+
+Establish foundational repository structure and development environment.
+
+---
+
+# Goals
+
+Create:
+- monorepo structure
+- documentation structure
+- local infrastructure skeleton
+- development tooling baseline
+
+---
+
+# Deliverables
+
+## Repository Structure
+
+```text
+/apps
+/packages
+/prompts
+/docs
+/infrastructure
+/tests
+/scripts
+```
+
+---
+
+## Initial Services
+
+Create placeholders for:
+- gateway-api
+- workflow-engine
+- agent-runtime
+- operator-console
+
+---
+
+## Infrastructure Bootstrap
+
+Create:
+- Docker Compose skeleton
+- environment variable templates
+- VS Code settings
+- bootstrap scripts
+
+---
+
+## Documentation Integration
+
+Ensure all generated architecture docs exist within:
+- `/docs`
+
+---
+
+# Success Criteria
+
+The repository should:
+- build locally
+- support local infrastructure startup
+- contain coherent documentation structure
+- support AI-assisted engineering workflows
+
+---
+
+# Phase 1 — Local Runtime Foundation
+
+# Objective
+
+Establish runnable local platform infrastructure.
+
+---
+
+# Goals
+
+Implement:
+- API service
+- persistence layer
+- event infrastructure
+- structured logging
+- health endpoints
+
+---
+
+# Deliverables
+
+## Infrastructure
+
+Stand up:
+- Postgres
+- Redpanda/Kafka
+- Redis (optional initially)
+
+---
+
+## Core Services
+
+Implement:
+- gateway-api
+- basic workflow persistence
+- health endpoints
+- structured logging
+- correlation IDs
+
+---
+
+## Initial API Endpoints
+
+Examples:
+
+```text
+GET /health
+POST /api/v1/workflows
+GET /api/v1/workflows/{workflow_id}
+```
+
+---
+
+# Success Criteria
+
+The platform should:
+- create workflows
+- persist workflow state
+- retrieve workflow state
+- emit basic telemetry
+
+---
+
+# Phase 2 — Workflow Engine MVP
+
+# Objective
+
+Implement deterministic workflow orchestration.
+
+---
+
+# Goals
+
+Implement:
+- workflow state machine
+- event propagation
+- orchestration lifecycle
+- workflow timelines
+
+---
+
+# Deliverables
+
+## Workflow States
+
+Initial states:
+
+```text
+NEW
+INTAKE_IN_PROGRESS
+DOCUMENT_ANALYSIS_PENDING
+RISK_REVIEW_PENDING
+HUMAN_REVIEW_REQUIRED
+COMPLETED
+FAILED
+```
+
+---
+
+## Workflow Features
+
+Implement:
+- workflow persistence
+- state transitions
+- workflow timeline storage
+- workflow event emission
+
+---
+
+## Initial Events
+
+Examples:
+- workflow.created
+- workflow.state_changed
+- workflow.completed
+
+---
+
+# Success Criteria
+
+Workflows should:
+- move through states deterministically
+- emit events
+- maintain timelines
+- remain replayable
+
+---
+
+# Phase 3 — Agent Runtime MVP
+
+# Objective
+
+Introduce governed AI execution into workflows.
+
+---
+
+# Goals
+
+Implement:
+- basic agent runtime
+- prompt execution
+- structured outputs
+- agent telemetry
+
+---
+
+# Deliverables
+
+## Initial Agents
+
+Implement:
+- Intake Agent
+- Document Analysis Agent
+
+---
+
+## Prompt Infrastructure
+
+Create:
+- versioned prompt files
+- prompt loading mechanism
+- prompt metadata tracking
+
+---
+
+## Structured Output Enforcement
+
+All agent outputs should:
+- validate against schemas
+- support replayability
+- emit telemetry
+
+---
+
+# Success Criteria
+
+The workflow engine should:
+- invoke agents
+- receive structured outputs
+- advance workflow state using agent results
+
+---
+
+# Phase 4 — Tool Runtime MVP
+
+# Objective
+
+Introduce governed AI-to-system interaction.
+
+---
+
+# Goals
+
+Implement:
+- tool registry
+- tool execution framework
+- schema validation
+- integration mediation
+
+---
+
+# Deliverables
+
+## Initial Tools
+
+Examples:
+- borrower_profile_lookup
+- document_fetch
+- fraud_signal_lookup
+
+---
+
+## Tool Features
+
+Implement:
+- input validation
+- output validation
+- execution telemetry
+- permission checks
+
+---
+
+## Mock Integrations
+
+Use mocked enterprise systems initially.
+
+---
+
+# Success Criteria
+
+Agents should:
+- invoke approved tools
+- receive validated results
+- emit auditable execution records
+
+---
+
+# Phase 5 — Human Review UI
+
+# Objective
+
+Implement operational governance interfaces.
+
+---
+
+# Goals
+
+Implement:
+- operator console
+- approval workflows
+- escalation handling
+- workflow visibility
+
+---
+
+# Deliverables
+
+## Operator Console Features
+
+Implement:
+- workflow dashboard
+- workflow detail pages
+- approval queue
+- escalation queue
+- timeline visualization
+
+---
+
+## Human Review Features
+
+Implement:
+- approve/reject actions
+- comments
+- override support
+- escalation resolution
+
+---
+
+# Success Criteria
+
+Operators should:
+- review workflows
+- approve/reject execution
+- inspect workflow history
+- resolve escalations
+
+---
+
+# Phase 6 — Observability Integration
+
+# Objective
+
+Implement production-grade observability.
+
+---
+
+# Goals
+
+Implement:
+- distributed tracing
+- metrics
+- structured logs
+- operational dashboards
+
+---
+
+# Deliverables
+
+## Observability Stack
+
+Examples:
+- OpenTelemetry
+- Grafana
+- Tempo
+- Loki
+
+---
+
+## Telemetry Features
+
+Track:
+- workflow execution
+- agent execution
+- tool invocation
+- retry behavior
+- escalation frequency
+- token usage
+
+---
+
+## Correlation Propagation
+
+Ensure:
+- correlation IDs propagate across services
+
+---
+
+# Success Criteria
+
+The platform should:
+- expose distributed traces
+- support operational debugging
+- visualize workflow execution
+
+---
+
+# Phase 7 — AI Evaluation Layer
+
+# Objective
+
+Implement measurable AI quality validation.
+
+---
+
+# Goals
+
+Implement:
+- evaluation pipelines
+- hallucination detection
+- replay evaluation
+- regression testing
+
+---
+
+# Deliverables
+
+## Evaluation Features
+
+Implement:
+- LLM-as-judge pipelines
+- structured output validation
+- evaluation persistence
+- replay scoring
+
+---
+
+## Evaluation Metrics
+
+Track:
+- hallucination rate
+- extraction accuracy
+- escalation correctness
+- operator override frequency
+
+---
+
+# Success Criteria
+
+All AI outputs should:
+- receive evaluation scoring
+- support replay validation
+- remain measurable over time
+
+---
+
+# Phase 8 — Replay and Failure Recovery
+
+# Objective
+
+Implement enterprise-grade replay and recovery capabilities.
+
+---
+
+# Goals
+
+Implement:
+- workflow replay
+- retry orchestration
+- dead-letter handling
+- recovery tooling
+
+---
+
+# Deliverables
+
+## Replay Features
+
+Implement:
+- deterministic replay
+- historical reconstruction
+- replay-safe execution
+
+---
+
+## Failure Handling Features
+
+Implement:
+- dead-letter queues
+- retry scheduling
+- escalation fallback
+- workflow recovery tooling
+
+---
+
+# Success Criteria
+
+The platform should:
+- replay workflows safely
+- recover from transient failures
+- preserve operational history
+
+---
+
+# Phase 9 — Service Separation and Hardening
+
+# Objective
+
+Evolve logical service boundaries into deployable runtime services.
+
+---
+
+# Goals
+
+Separate:
+- tool-runtime
+- audit-service
+- evaluation-service
+- policy-engine
+
+where operational pressure justifies separation.
+
+---
+
+# Deliverables
+
+## Service Hardening
+
+Implement:
+- service isolation
+- deployment boundaries
+- independent scaling
+- contract enforcement
+
+---
+
+## Infrastructure Improvements
+
+Implement:
+- container orchestration
+- infrastructure-as-code
+- deployment pipelines
+
+---
+
+# Success Criteria
+
+Services should:
+- deploy independently
+- scale independently
+- preserve observability
+- maintain replay compatibility
+
+---
+
+# Phase 10 — Public Demo and Portfolio Readiness
+
+# Objective
+
+Prepare the platform for:
+- demonstrations
+- portfolio usage
+- interview walkthroughs
+- public presentation
+
+---
+
+# Goals
+
+Implement:
+- polished documentation
+- architecture diagrams
+- seeded workflows
+- demo datasets
+- deployment automation
+
+---
+
+# Deliverables
+
+## Demo Features
+
+Provide:
+- deterministic demo workflows
+- replay demonstrations
+- observability dashboards
+- escalation scenarios
+
+---
+
+## Portfolio Assets
+
+Create:
+- architecture diagrams
+- walkthrough videos
+- deployment instructions
+- workflow screenshots
+
+---
+
+# Success Criteria
+
+The platform should:
+- demonstrate enterprise-grade orchestration
+- support operational walkthroughs
+- showcase observability and governance
+- function as a portfolio-ready AI systems platform
+
+---
+
+# Recommended Initial Service Focus
+
+# Initial Implementation Scope
+
+Only implement these services initially:
+
+```text
+gateway-api
+workflow-engine
+agent-runtime
+operator-console
+```
+
+Avoid implementing all planned services immediately.
+
+---
+
+# Early Development Philosophy
+
+The first implementation goal is:
+- one complete observable workflow
+
+not:
+- complete platform coverage
+
+---
+
+# Initial Workflow Recommendation
+
+Recommended first workflow:
+
+```text
+Mortgage Exception Review
+```
+
+---
+
+# Recommended Initial Happy Path
+
+```text
+API Request
+    ↓
+Workflow Created
+    ↓
+Agent Execution
+    ↓
+Tool Invocation
+    ↓
+Human Review
+    ↓
+Workflow Completion
+```
+
+---
+
+# Engineering Priorities by Phase
+
+# Early Priorities
+
+Prioritize:
+- workflow correctness
+- replayability
+- observability
+- deterministic orchestration
+
+---
+
+# Mid-Stage Priorities
+
+Prioritize:
+- evaluation
+- governance
+- fault isolation
+- scalability
+
+---
+
+# Late-Stage Priorities
+
+Prioritize:
+- deployment hardening
+- scaling
+- production-readiness
+- public demonstrations
+
+---
+
+# Anti-Goals
+
+Avoid:
+- premature Kubernetes complexity
+- excessive microservice fragmentation
+- autonomous agent experimentation
+- over-engineered infrastructure
+- unnecessary framework abstraction
+
+---
+
+# Architectural Constraints
+
+## Constraint 1 — Workflow Engine Owns State
+
+Workflow state transitions must remain centralized.
+
+---
+
+## Constraint 2 — Replayability Is Mandatory
+
+All phases should preserve deterministic replay capability.
+
+---
+
+## Constraint 3 — Observability Must Exist Early
+
+Telemetry should be added early rather than retrofitted later.
+
+---
+
+## Constraint 4 — AI Systems Must Remain Governed
+
+AI functionality should remain:
+- constrained
+- observable
+- auditable
+
+through all implementation phases.
+
+---
+
+# Final Principle
+
+The AegisFlow implementation strategy exists to evolve the platform incrementally from a minimal executable workflow system into a fully observable, governed, replayable enterprise AI orchestration platform.
+
+The roadmap prioritizes:
+- executable workflows
+- deterministic orchestration
+- operational observability
+- replayability
+- governance
+- AI safety
+- iterative delivery
+
+over premature complexity or uncontrolled platform expansion.

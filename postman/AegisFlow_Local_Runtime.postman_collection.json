@@ -1,0 +1,381 @@
+{
+  "info": {
+    "_postman_id": "b2f6a0d7-fb72-4d7f-b8c1-6f5ce1df50a1",
+    "name": "AegisFlow Local Runtime",
+    "description": "Manual test collection for the AegisFlow local runtime. Start the Docker Compose stack before running these requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "correlationId",
+      "value": "postman-manual-test",
+      "type": "string"
+    },
+    {
+      "key": "actorId",
+      "value": "postman-operator",
+      "type": "string"
+    },
+    {
+      "key": "workflowId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "temporalWorkflowId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "temporalRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "workflowPollCount",
+      "value": "0",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"health returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"service is healthy\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.service).to.eql(\"gateway-api\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ready",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/ready",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "ready"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"ready returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"database is ready\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.checks.database).to.eql(\"ok\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Mortgage Exception Review Workflow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflow_type\": \"MORTGAGE_EXCEPTION_REVIEW\",\n  \"priority\": \"HIGH\",\n  \"metadata\": {\n    \"case_reference\": \"MORT-POSTMAN-001\",\n    \"channel\": \"postman\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow created\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"workflowId\", json.workflow_id);",
+              "pm.collectionVariables.set(\"temporalWorkflowId\", json.temporal_workflow_id || \"\");",
+              "pm.collectionVariables.set(\"temporalRunId\", json.temporal_run_id || \"\");",
+              "pm.collectionVariables.set(\"workflowPollCount\", \"0\");",
+              "",
+              "pm.test(\"workflow response has identifiers\", function () {",
+              "  pm.expect(json.workflow_id).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(json.correlation_id).to.eql(pm.collectionVariables.get(\"correlationId\"));",
+              "  pm.expect(json.temporal_workflow_id).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(json.temporal_run_id).to.be.a(\"string\").and.not.empty;",
+              "});",
+              "",
+              "pm.test(\"workflow starts in NEW state\", function () {",
+              "  pm.expect(json.state).to.eql(\"NEW\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow ID matches collection variable\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Poll Until Human Review Required",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow poll returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const currentState = json.state;",
+              "const pollCount = parseInt(pm.collectionVariables.get(\"workflowPollCount\") || \"0\", 10);",
+              "",
+              "if (currentState !== \"HUMAN_REVIEW_REQUIRED\" && pollCount < 10) {",
+              "  pm.collectionVariables.set(\"workflowPollCount\", String(pollCount + 1));",
+              "  postman.setNextRequest(\"Poll Until Human Review Required\");",
+              "} else {",
+              "  pm.collectionVariables.set(\"workflowPollCount\", \"0\");",
+              "}",
+              "",
+              "pm.test(\"workflow reaches HUMAN_REVIEW_REQUIRED\", function () {",
+              "  pm.expect(currentState).to.eql(\"HUMAN_REVIEW_REQUIRED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow Timeline",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/timeline",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "timeline"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"timeline retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const entryTypes = json.entries.map((entry) => entry.entry_type);",
+              "const states = json.entries.map((entry) => entry.state).filter(Boolean);",
+              "",
+              "pm.test(\"timeline belongs to workflow\", function () {",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "});",
+              "",
+              "pm.test(\"timeline includes workflow creation\", function () {",
+              "  pm.expect(entryTypes).to.include(\"WORKFLOW_CREATED\");",
+              "});",
+              "",
+              "pm.test(\"timeline includes Phase 2 states\", function () {",
+              "  pm.expect(states).to.include(\"NEW\");",
+              "  pm.expect(states).to.include(\"INTAKE_IN_PROGRESS\");",
+              "  pm.expect(states).to.include(\"DOCUMENT_ANALYSIS_PENDING\");",
+              "  pm.expect(states).to.include(\"RISK_REVIEW_PENDING\");",
+              "  pm.expect(states).to.include(\"HUMAN_REVIEW_REQUIRED\");",
+              "});",
+              "",
+              "pm.test(\"timeline includes published events\", function () {",
+              "  pm.expect(entryTypes).to.include(\"EVENT_PUBLISHED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Missing Workflow Returns 404",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "postman-missing-workflow"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/00000000-0000-0000-0000-000000000000",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "00000000-0000-0000-0000-000000000000"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"missing workflow returns 404\", function () {",
+              "  pm.response.to.have.status(404);",
+              "});",
+              "",
+              "pm.test(\"missing workflow has structured error\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.error).to.eql(\"workflow_not_found\");",
+              "  pm.expect(json.correlation_id).to.eql(\"postman-missing-workflow\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

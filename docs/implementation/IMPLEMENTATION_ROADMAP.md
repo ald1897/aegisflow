@@ -630,6 +630,12 @@ The workflow engine should:
 
 Introduce governed AI-to-system interaction.
 
+Detailed continuous implementation planning is tracked in:
+
+```text
+docs/implementation/PHASE_4_IMPLEMENTATION_PLAN.md
+```
+
 ---
 
 # Goals

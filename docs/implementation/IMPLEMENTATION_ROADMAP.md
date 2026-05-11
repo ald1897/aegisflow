@@ -22,13 +22,110 @@ The implementation strategy intentionally prioritizes:
 
 # Current Implementation Status
 
+## Business Implementation View
+
+This section summarizes the roadmap in business terms for mortgage leadership and non-technical stakeholders.
+
+### Initial State
+
+Before implementation, AegisFlow existed as an architecture and operating model for governed mortgage workflow orchestration.
+
+At this stage, the business had:
+- a defined target workflow: Mortgage Exception Review
+- documented expectations for auditability, human approval, workflow control, and AI governance
+- planned platform components for workflow orchestration, agent execution, event streaming, persistence, and observability
+
+The business did not yet have:
+- a runnable workflow platform
+- persisted mortgage review cases
+- automated workflow state progression
+- durable workflow execution history
+- a working local demonstration of governed mortgage operations
+
+Business meaning:
+- the concept was defined, but not yet executable
+- risk controls were documented, but not yet enforced by runtime behavior
+- mortgage exception review was a target process, not yet a working system capability
+
+---
+
+### Current State
+
+AegisFlow now has an executable local foundation for Mortgage Exception Review workflow orchestration.
+
+The platform can currently:
+- accept a new mortgage exception review workflow request
+- persist the workflow as an auditable system record
+- assign correlation and workflow identifiers for traceability
+- start durable Temporal workflow execution
+- advance the workflow through controlled operational states
+- stop at `HUMAN_REVIEW_REQUIRED`
+- record workflow timeline entries
+- publish workflow events for downstream operational visibility
+- support manual validation through Postman
+
+Current business capability:
+- AegisFlow can demonstrate the controlled intake and routing backbone for mortgage exception review cases.
+- The platform can show how a case moves from creation to required human review with durable state history.
+- The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action.
+
+Current business boundary:
+- AegisFlow is not yet performing AI-based document analysis.
+- AegisFlow is not yet making approval, denial, underwriting, or exception decisions.
+- AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
+- AegisFlow does not yet provide an operator-facing review console.
+
+Business meaning:
+- the platform has moved from design into a working operational prototype
+- the current implementation proves the control framework, not the final business automation
+- the system is ready for the next layer of governed AI assistance and human review tooling
+
+---
+
+### Future State
+
+Future phases will expand AegisFlow from a workflow orchestration foundation into a governed AI-assisted mortgage operations platform.
+
+Planned future capability includes:
+- AI-assisted intake and document review
+- governed tool access to approved mortgage data sources
+- structured AI outputs that must be validated before use
+- operator review queues for human approval and exception handling
+- approval and rejection actions with audit history
+- workflow completion after human decisioning
+- production-grade observability for operational oversight
+- AI evaluation and replay-based quality measurement
+- failure recovery and replay tooling
+- service hardening for production-style deployment boundaries
+
+Future business value:
+- reduce manual coordination across exception review workflows
+- improve consistency in case routing and review preparation
+- strengthen audit readiness for regulated mortgage operations
+- make AI assistance measurable, reviewable, and subordinate to business controls
+- provide leadership visibility into workflow status, bottlenecks, escalations, and review outcomes
+
+Future business boundary:
+- AI agents will assist with analysis and preparation, not act as autonomous decision makers.
+- Human approval will remain required for critical mortgage actions.
+- PostgreSQL will remain the authoritative system record for operational data.
+- Temporal workflow history will preserve durable workflow execution context.
+- Events will support visibility and integration, not replace the system of record.
+
+Business meaning:
+- the target future state is governed operational leverage, not uncontrolled automation
+- AegisFlow should help mortgage teams review cases faster, with better traceability and stronger controls
+- the platform will prioritize auditability, explainability, and human accountability as capabilities expand
+
+---
+
 ## Completed Phases
 
 The following phases have been completed in the local implementation:
 
-- Phase 0 — Repository Bootstrap
-- Phase 1 — Local Runtime Foundation
-- Phase 2 — Workflow Engine MVP
+- Phase 0 - Repository Bootstrap
+- Phase 1 - Local Runtime Foundation
+- Phase 2 - Workflow Engine MVP
 
 ---
 
@@ -76,7 +173,7 @@ Human approval and completion actions remain assigned to later phases.
 
 # Phase Completion Log
 
-## Phase 1 — Local Runtime Foundation
+## Phase 1 - Local Runtime Foundation
 
 Status: Completed
 
@@ -113,7 +210,7 @@ Validation completed:
 
 ---
 
-## Phase 2 — Workflow Engine MVP
+## Phase 2 - Workflow Engine MVP
 
 Status: Completed
 
@@ -222,7 +319,7 @@ Avoid early investment in:
 
 ---
 
-# Phase 0 — Repository Bootstrap
+# Phase 0 - Repository Bootstrap
 
 # Objective
 
@@ -293,7 +390,7 @@ The repository should:
 
 ---
 
-# Phase 1 — Local Runtime Foundation
+# Phase 1 - Local Runtime Foundation
 
 # Objective
 
@@ -356,7 +453,7 @@ The platform should:
 
 ---
 
-# Phase 2 — Workflow Engine MVP
+# Phase 2 - Workflow Engine MVP
 
 # Objective
 
@@ -421,7 +518,7 @@ Workflows should:
 
 ---
 
-# Phase 3 — Agent Runtime MVP
+# Phase 3 - Agent Runtime MVP
 
 # Objective
 
@@ -476,7 +573,7 @@ The workflow engine should:
 
 ---
 
-# Phase 4 — Tool Runtime MVP
+# Phase 4 - Tool Runtime MVP
 
 # Objective
 
@@ -530,7 +627,7 @@ Agents should:
 
 ---
 
-# Phase 5 — Human Review UI
+# Phase 5 - Human Review UI
 
 # Objective
 
@@ -581,7 +678,7 @@ Operators should:
 
 ---
 
-# Phase 6 — Observability Integration
+# Phase 6 - Observability Integration
 
 # Objective
 
@@ -639,7 +736,7 @@ The platform should:
 
 ---
 
-# Phase 7 — AI Evaluation Layer
+# Phase 7 - AI Evaluation Layer
 
 # Objective
 
@@ -688,7 +785,7 @@ All AI outputs should:
 
 ---
 
-# Phase 8 — Replay and Failure Recovery
+# Phase 8 - Replay and Failure Recovery
 
 # Objective
 
@@ -736,7 +833,7 @@ The platform should:
 
 ---
 
-# Phase 9 — Service Separation and Hardening
+# Phase 9 - Service Separation and Hardening
 
 # Objective
 
@@ -787,7 +884,7 @@ Services should:
 
 ---
 
-# Phase 10 — Public Demo and Portfolio Readiness
+# Phase 10 - Public Demo and Portfolio Readiness
 
 # Objective
 
@@ -883,15 +980,15 @@ Mortgage Exception Review
 
 ```text
 API Request
-    ↓
+    ->
 Workflow Created
-    ↓
+    ->
 Agent Execution
-    ↓
+    ->
 Tool Invocation
-    ↓
+    ->
 Human Review
-    ↓
+    ->
 Workflow Completion
 ```
 
@@ -942,25 +1039,25 @@ Avoid:
 
 # Architectural Constraints
 
-## Constraint 1 — Workflow Engine Owns State
+## Constraint 1 - Workflow Engine Owns State
 
 Workflow state transitions must remain centralized.
 
 ---
 
-## Constraint 2 — Replayability Is Mandatory
+## Constraint 2 - Replayability Is Mandatory
 
 All phases should preserve deterministic replay capability.
 
 ---
 
-## Constraint 3 — Observability Must Exist Early
+## Constraint 3 - Observability Must Exist Early
 
 Telemetry should be added early rather than retrofitted later.
 
 ---
 
-## Constraint 4 — AI Systems Must Remain Governed
+## Constraint 4 - AI Systems Must Remain Governed
 
 AI functionality should remain:
 - constrained

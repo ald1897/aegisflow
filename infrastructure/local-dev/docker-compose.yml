@@ -1,0 +1,140 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegisflow-postgres
+    environment:
+      POSTGRES_DB: aegisflow
+      POSTGRES_USER: aegisflow
+      POSTGRES_PASSWORD: aegisflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - aegisflow-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegisflow -d aegisflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redpanda:
+    image: redpandadata/redpanda:v24.1.9
+    container_name: aegisflow-redpanda
+    command:
+      - redpanda
+      - start
+      - --smp
+      - "1"
+      - --memory
+      - 512M
+      - --reserve-memory
+      - 0M
+      - --overprovisioned
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - INTERNAL://0.0.0.0:9092,OUTSIDE://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - INTERNAL://redpanda:9092,OUTSIDE://localhost:19092
+    ports:
+      - "9092:9092"
+      - "19092:19092"
+      - "9644:9644"
+    volumes:
+      - aegisflow-redpanda-data:/var/lib/redpanda/data
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -E 'Healthy:.+true'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: aegisflow-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  gateway-api:
+    build:
+      context: ../../apps/gateway-api
+    container_name: aegisflow-gateway-api
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegisflow:aegisflow@postgres:5432/aegisflow
+      SERVICE_NAME: gateway-api
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TASK_QUEUE: aegisflow-workflows
+      ENABLE_TEMPORAL_START: "true"
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_WORKFLOW_EVENTS_TOPIC: workflow-events
+      ENABLE_EVENT_PUBLISHING: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+      redis:
+        condition: service_started
+      temporal:
+        condition: service_started
+
+  temporal:
+    image: temporalio/auto-setup:1.24.2
+    container_name: aegisflow-temporal
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: aegisflow
+      POSTGRES_PWD: aegisflow
+      POSTGRES_SEEDS: postgres
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  temporal-ui:
+    image: temporalio/ui:2.31.2
+    container_name: aegisflow-temporal-ui
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8088:8080"
+    depends_on:
+      temporal:
+        condition: service_started
+
+  workflow-engine:
+    build:
+      context: ../../apps/workflow-engine
+    container_name: aegisflow-workflow-engine
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegisflow:aegisflow@postgres:5432/aegisflow
+      SERVICE_NAME: workflow-engine
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TASK_QUEUE: aegisflow-workflows
+      KAFKA_BOOTSTRAP_SERVERS: redpanda:9092
+      KAFKA_WORKFLOW_EVENTS_TOPIC: workflow-events
+      ENABLE_EVENT_PUBLISHING: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_started
+      temporal:
+        condition: service_started
+
+volumes:
+  aegisflow-postgres-data:
+  aegisflow-redpanda-data:

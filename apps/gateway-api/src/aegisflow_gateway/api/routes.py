@@ -1,0 +1,135 @@
+import logging
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Request, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from aegisflow_gateway.api.schemas import (
+    HealthResponse,
+    ReadyResponse,
+    WorkflowCreateRequest,
+    WorkflowResponse,
+    WorkflowTimelineEntryResponse,
+    WorkflowTimelineResponse,
+)
+from aegisflow_gateway.config import Settings, get_settings
+from aegisflow_gateway.persistence.database import check_database, get_session
+from aegisflow_gateway.persistence.models import WorkflowRecord, WorkflowTimelineEntry
+from aegisflow_gateway.services.events import WorkflowEventPublisher
+from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
+from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowService
+
+router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+def workflow_to_response(workflow: WorkflowRecord) -> WorkflowResponse:
+    return WorkflowResponse(
+        workflow_id=UUID(workflow.workflow_id),
+        workflow_type=workflow.workflow_type,
+        state=workflow.state,
+        priority=workflow.priority,
+        correlation_id=workflow.correlation_id,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
+        temporal_workflow_id=workflow.temporal_workflow_id,
+        temporal_run_id=workflow.temporal_run_id,
+        started_at=workflow.started_at,
+        completed_at=workflow.completed_at,
+        failed_at=workflow.failed_at,
+        metadata=workflow.workflow_metadata,
+    )
+
+
+def timeline_entry_to_response(entry: WorkflowTimelineEntry) -> WorkflowTimelineEntryResponse:
+    return WorkflowTimelineEntryResponse(
+        timeline_entry_id=UUID(entry.timeline_entry_id),
+        workflow_id=UUID(entry.workflow_id),
+        entry_type=entry.entry_type,
+        message=entry.message,
+        state=entry.state,
+        correlation_id=entry.correlation_id,
+        created_by=entry.created_by,
+        created_at=entry.created_at,
+        metadata=entry.entry_metadata,
+    )
+
+
+@router.get("/health", response_model=HealthResponse)
+async def health(settings: Settings = Depends(get_settings)) -> HealthResponse:
+    return HealthResponse(
+        status="ok",
+        service=settings.service_name,
+        environment=settings.environment,
+    )
+
+
+@router.get("/ready", response_model=ReadyResponse)
+async def ready(settings: Settings = Depends(get_settings)) -> ReadyResponse:
+    await check_database()
+    return ReadyResponse(
+        status="ok",
+        service=settings.service_name,
+        checks={"database": "ok"},
+    )
+
+
+@router.post(
+    "/api/v1/workflows",
+    response_model=WorkflowResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_workflow(
+    payload: WorkflowCreateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+) -> WorkflowResponse:
+    service = WorkflowService(session)
+    workflow = await service.create_workflow(
+        payload,
+        correlation_id=request.state.correlation_id,
+        actor_id=request.headers.get("X-Actor-ID", "system"),
+    )
+
+    if settings.enable_event_publishing:
+        publisher = WorkflowEventPublisher(settings)
+        await publisher.publish_event_by_id(session, f"{workflow.workflow_id}:workflow.created")
+
+    if settings.enable_temporal_start:
+        starter = TemporalWorkflowStarter(settings)
+        temporal_workflow_id, temporal_run_id = await starter.start_mortgage_exception_review(
+            workflow_id=UUID(workflow.workflow_id),
+            correlation_id=request.state.correlation_id,
+        )
+        workflow = await service.update_temporal_metadata(
+            UUID(workflow.workflow_id),
+            temporal_workflow_id=temporal_workflow_id,
+            temporal_run_id=temporal_run_id,
+        )
+
+    logger.info("workflow created", extra={"workflow_id": workflow.workflow_id})
+    return workflow_to_response(workflow)
+
+
+@router.get("/api/v1/workflows/{workflow_id}", response_model=WorkflowResponse)
+async def get_workflow(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowResponse:
+    service = WorkflowService(session)
+    workflow = await service.get_workflow(workflow_id)
+    return workflow_to_response(workflow)
+
+
+@router.get("/api/v1/workflows/{workflow_id}/timeline", response_model=WorkflowTimelineResponse)
+async def get_workflow_timeline(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowTimelineResponse:
+    service = WorkflowService(session)
+    entries = await service.list_timeline_entries(workflow_id)
+    return WorkflowTimelineResponse(
+        workflow_id=workflow_id,
+        entries=[timeline_entry_to_response(entry) for entry in entries],
+    )

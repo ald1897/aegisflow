@@ -1,0 +1,29 @@
+from functools import lru_cache
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    service_name: str = "gateway-api"
+    environment: str = "local"
+    api_title: str = "AegisFlow Gateway API"
+    api_version: str = "0.1.0"
+    database_url: str = Field(
+        default="postgresql+asyncpg://aegisflow:aegisflow@localhost:5432/aegisflow",
+        validation_alias="DATABASE_URL",
+    )
+    temporal_address: str = Field(default="localhost:7233", validation_alias="TEMPORAL_ADDRESS")
+    temporal_task_queue: str = Field(default="aegisflow-workflows", validation_alias="TEMPORAL_TASK_QUEUE")
+    enable_temporal_start: bool = Field(default=False, validation_alias="ENABLE_TEMPORAL_START")
+    kafka_bootstrap_servers: str = Field(default="localhost:19092", validation_alias="KAFKA_BOOTSTRAP_SERVERS")
+    kafka_workflow_events_topic: str = Field(default="workflow-events", validation_alias="KAFKA_WORKFLOW_EVENTS_TOPIC")
+    enable_event_publishing: bool = Field(default=False, validation_alias="ENABLE_EVENT_PUBLISHING")
+    log_level: str = "INFO"
+
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()

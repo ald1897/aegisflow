@@ -64,3 +64,28 @@ class WorkflowTimelineEntryResponse(BaseModel):
 class WorkflowTimelineResponse(BaseModel):
     workflow_id: UUID
     entries: list[WorkflowTimelineEntryResponse]
+
+
+class AgentExecutionRecordResponse(BaseModel):
+    agent_execution_id: UUID
+    workflow_id: UUID
+    agent_id: str
+    prompt_id: str
+    prompt_version: str
+    model_name: str
+    status: str
+    validation_status: str
+    confidence_score: float
+    requires_human_review: bool
+    output: dict[str, Any]
+    metadata: dict[str, Any]
+    correlation_id: str
+    created_by: str
+    started_at: datetime
+    completed_at: datetime | None
+    created_at: datetime
+
+
+class WorkflowAgentExecutionsResponse(BaseModel):
+    workflow_id: UUID
+    executions: list[AgentExecutionRecordResponse]

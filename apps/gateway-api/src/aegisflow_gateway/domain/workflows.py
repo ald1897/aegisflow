@@ -26,11 +26,15 @@ class WorkflowEventType(StrEnum):
     created = "workflow.created"
     state_changed = "workflow.state_changed"
     failed = "workflow.failed"
+    agent_execution_completed = "agent.execution_completed"
+    agent_execution_failed = "agent.execution_failed"
 
 
 class TimelineEntryType(StrEnum):
     workflow_created = "WORKFLOW_CREATED"
     state_transition = "STATE_TRANSITION"
+    agent_execution_completed = "AGENT_EXECUTION_COMPLETED"
+    agent_execution_failed = "AGENT_EXECUTION_FAILED"
     event_published = "EVENT_PUBLISHED"
     event_publish_failed = "EVENT_PUBLISH_FAILED"
 

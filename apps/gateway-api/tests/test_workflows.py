@@ -10,12 +10,14 @@ from sqlalchemy.pool import StaticPool
 from aegisflow_gateway.main import create_app
 from aegisflow_gateway.persistence.database import get_session
 from aegisflow_gateway.persistence.models import (
+    AgentExecutionRecord,
     Base,
     WorkflowEventOutbox,
     WorkflowRecord,
     WorkflowStateTransition,
     WorkflowTimelineEntry,
 )
+from aegisflow_gateway.persistence.models import utc_now
 
 
 @pytest.fixture
@@ -144,3 +146,52 @@ async def test_get_workflow_timeline_returns_ordered_entries(client: AsyncClient
     assert body["entries"][0]["entry_type"] == "WORKFLOW_CREATED"
     assert body["entries"][0]["state"] == "NEW"
     assert body["entries"][0]["correlation_id"] == "timeline-test"
+
+
+async def test_get_workflow_agent_executions_returns_persisted_records(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "agent-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    now = utc_now()
+    async with session_factory() as session:
+        session.add(
+            AgentExecutionRecord(
+                agent_execution_id="00000000-0000-0000-0000-000000000001",
+                workflow_id=workflow_id,
+                agent_id="intake_agent",
+                prompt_id="intake-agent",
+                prompt_version="1",
+                model_name="deterministic-langgraph-local-v1",
+                status="COMPLETED",
+                validation_status="VALIDATED",
+                confidence_score=0.91,
+                requires_human_review=False,
+                input_metadata={"workflow_id": workflow_id},
+                output_payload={"recommended_next_state": "DOCUMENT_ANALYSIS_PENDING"},
+                execution_metadata={"workflow_state": "INTAKE_IN_PROGRESS"},
+                error_message=None,
+                correlation_id="agent-test",
+                created_by="workflow-engine",
+                started_at=now,
+                completed_at=now,
+                created_at=now,
+            )
+        )
+        await session.commit()
+
+    response = await client.get(f"/api/v1/workflows/{workflow_id}/agent-executions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow_id"] == workflow_id
+    assert len(body["executions"]) == 1
+    assert body["executions"][0]["agent_id"] == "intake_agent"
+    assert body["executions"][0]["validation_status"] == "VALIDATED"

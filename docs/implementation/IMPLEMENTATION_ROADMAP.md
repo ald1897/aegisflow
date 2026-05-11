@@ -59,6 +59,8 @@ The platform can currently:
 - assign correlation and workflow identifiers for traceability
 - start durable Temporal workflow execution
 - advance the workflow through controlled operational states
+- invoke governed intake and document analysis agents
+- persist validated agent execution records
 - stop at `HUMAN_REVIEW_REQUIRED`
 - record workflow timeline entries
 - publish workflow events for downstream operational visibility
@@ -66,11 +68,11 @@ The platform can currently:
 
 Current business capability:
 - AegisFlow can demonstrate the controlled intake and routing backbone for mortgage exception review cases.
-- The platform can show how a case moves from creation to required human review with durable state history.
+- The platform can show how a case moves from creation through governed AI-assisted intake and document analysis to required human review with durable state history.
 - The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action.
 
 Current business boundary:
-- AegisFlow is not yet performing AI-based document analysis.
+- AegisFlow performs local deterministic document analysis simulation for workflow demonstration, not production document interpretation.
 - AegisFlow is not yet making approval, denial, underwriting, or exception decisions.
 - AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
 - AegisFlow does not yet provide an operator-facing review console.
@@ -78,7 +80,7 @@ Current business boundary:
 Business meaning:
 - the platform has moved from design into a working operational prototype
 - the current implementation proves the control framework, not the final business automation
-- the system is ready for the next layer of governed AI assistance and human review tooling
+- the system is ready for governed tool mediation and human review tooling
 
 ---
 
@@ -126,6 +128,7 @@ The following phases have been completed in the local implementation:
 - Phase 0 - Repository Bootstrap
 - Phase 1 - Local Runtime Foundation
 - Phase 2 - Workflow Engine MVP
+- Phase 3 - Agent Runtime MVP
 
 ---
 
@@ -143,6 +146,9 @@ The platform currently supports:
 - workflow creation state transition persistence
 - Temporal workflow execution
 - deterministic workflow state progression
+- governed LangGraph agent execution
+- structured agent output validation
+- agent execution record persistence
 - workflow timeline retrieval
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
@@ -153,10 +159,9 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 2 workflow orchestration foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation.
 
 The platform does not yet implement:
-- LangGraph agent execution
 - tool-runtime mediation
 - human review UI
 - approval workflows
@@ -165,7 +170,7 @@ The platform does not yet implement:
 
 These capabilities remain assigned to later roadmap phases.
 
-Current workflow orchestration supports deterministic progression from `NEW` through `HUMAN_REVIEW_REQUIRED`.
+Current workflow orchestration supports deterministic progression from `NEW` through `HUMAN_REVIEW_REQUIRED`, including governed intake and document analysis agent execution.
 
 Human approval and completion actions remain assigned to later phases.
 
@@ -254,6 +259,52 @@ Validation completed:
 - Redpanda topic `workflow-events` was created
 - gateway-api pytest suite passed with 6 tests
 - workflow-engine pytest suite passed with 2 tests
+
+---
+
+## Phase 3 - Agent Runtime MVP
+
+Status: Completed
+
+Implementation started: 2026-05-11
+
+Completion date: 2026-05-11
+
+Completed deliverables:
+- agent-runtime FastAPI service
+- LangGraph-backed deterministic agent execution graph
+- Intake Agent registration
+- Document Analysis Agent registration
+- versioned prompt assets under `/prompts`
+- prompt loading mechanism
+- structured Pydantic output validation
+- agent execution metadata persistence
+- `agent_execution_records` persistence table
+- workflow-engine activity for governed agent execution
+- Mortgage Exception Review workflow integration with intake and document analysis agents
+- workflow timeline entries for agent execution completion
+- `agent.execution_completed` event outbox records
+- gateway-api workflow agent execution retrieval endpoint
+- Postman requests for agent-runtime and workflow agent execution validation
+
+Explicit non-scope:
+- external model provider integration
+- autonomous agent planning
+- unrestricted tool access
+- tool-runtime mediation
+- production document OCR or document parsing
+- approval UI
+- approve/reject actions
+- AI evaluation scoring
+
+Validation completed:
+- agent-runtime pytest suite passed with 5 tests
+- gateway-api pytest suite passed with 7 tests
+- workflow-engine pytest suite passed with 2 tests
+- Postman collection JSON validated successfully
+- local end-to-end workflow validation reached `HUMAN_REVIEW_REQUIRED`
+- timeline contained `AGENT_EXECUTION_COMPLETED` entries
+- persisted agent execution records contained `intake_agent` and `document_analysis_agent` with `VALIDATED` status
 
 ---
 

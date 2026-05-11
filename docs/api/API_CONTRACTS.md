@@ -108,3 +108,55 @@ All APIs should use versioned base paths.
 /api/v1/workflows
 /api/v1/approvals
 /api/v1/audit
+```
+
+---
+
+# Implemented Local API Surface
+
+The current local implementation exposes the following operational endpoints.
+
+## gateway-api
+
+```text
+GET /health
+GET /ready
+POST /api/v1/workflows
+GET /api/v1/workflows/{workflow_id}
+GET /api/v1/workflows/{workflow_id}/timeline
+GET /api/v1/workflows/{workflow_id}/agent-executions
+```
+
+The gateway-api remains the primary API surface for workflow initiation and operational query access.
+
+The `agent-executions` endpoint returns persisted agent execution records associated with a workflow. It must not expose unrestricted prompt input, sensitive borrower payloads, secrets, or internal persistence entities directly.
+
+---
+
+## agent-runtime
+
+```text
+GET /health
+GET /ready
+GET /api/v1/agents
+POST /api/v1/agents/{agent_id}/executions
+```
+
+The agent-runtime API is an internal service boundary used by workflow-engine activities.
+
+It is not intended as an unrestricted public AI execution interface.
+
+Agent execution requests must:
+- include `workflow_id`
+- include `correlation_id`
+- identify the current workflow state
+- use a registered agent identifier
+- produce schema-validated structured output
+
+Agent execution responses must:
+- identify the agent
+- identify the prompt version
+- identify the model or deterministic execution profile
+- expose validation status
+- expose confidence metadata
+- preserve whether human review is required

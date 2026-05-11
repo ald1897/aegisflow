@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -50,6 +50,10 @@ class WorkflowRecord(Base):
         cascade="all, delete-orphan",
     )
     outbox_events: Mapped[list["WorkflowEventOutbox"]] = relationship(
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
+    agent_executions: Mapped[list["AgentExecutionRecord"]] = relationship(
         back_populates="workflow",
         cascade="all, delete-orphan",
     )
@@ -119,7 +123,39 @@ class WorkflowEventOutbox(Base):
     workflow: Mapped[WorkflowRecord] = relationship(back_populates="outbox_events")
 
 
+class AgentExecutionRecord(Base):
+    __tablename__ = "agent_execution_records"
+
+    agent_execution_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    validation_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
+    requires_human_review: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    input_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    output_payload: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    execution_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    workflow: Mapped[WorkflowRecord] = relationship(back_populates="agent_executions")
+
+
 Index("ix_workflow_timeline_entries_workflow_id", WorkflowTimelineEntry.workflow_id)
 Index("ix_workflow_timeline_entries_created_at", WorkflowTimelineEntry.created_at)
 Index("ix_workflow_event_outbox_workflow_id", WorkflowEventOutbox.workflow_id)
 Index("ix_workflow_event_outbox_publish_status", WorkflowEventOutbox.publish_status)
+Index("ix_agent_execution_records_workflow_id", AgentExecutionRecord.workflow_id)
+Index("ix_agent_execution_records_agent_id", AgentExecutionRecord.agent_id)

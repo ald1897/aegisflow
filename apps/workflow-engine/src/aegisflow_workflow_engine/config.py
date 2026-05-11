@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = Field(default="localhost:19092", validation_alias="KAFKA_BOOTSTRAP_SERVERS")
     kafka_workflow_events_topic: str = Field(default="workflow-events", validation_alias="KAFKA_WORKFLOW_EVENTS_TOPIC")
     enable_event_publishing: bool = Field(default=True, validation_alias="ENABLE_EVENT_PUBLISHING")
+    agent_runtime_url: str = Field(default="http://localhost:8010", validation_alias="AGENT_RUNTIME_URL")
+    enable_agent_runtime: bool = Field(default=True, validation_alias="ENABLE_AGENT_RUNTIME")
     log_level: str = "INFO"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

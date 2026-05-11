@@ -12,6 +12,11 @@
       "type": "string"
     },
     {
+      "key": "agentRuntimeUrl",
+      "value": "http://localhost:8010",
+      "type": "string"
+    },
+    {
       "key": "correlationId",
       "value": "postman-manual-test",
       "type": "string"
@@ -114,6 +119,79 @@
       ]
     },
     {
+      "name": "Agent Runtime Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{agentRuntimeUrl}}/health",
+          "host": [
+            "{{agentRuntimeUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"agent runtime health returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"agent runtime is healthy\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.service).to.eql(\"agent-runtime\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Registered Agents",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{agentRuntimeUrl}}/api/v1/agents",
+          "host": [
+            "{{agentRuntimeUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "agents"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"registered agents returned\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Phase 3 agents are registered\", function () {",
+              "  const json = pm.response.json();",
+              "  const agentIds = json.agents.map((agent) => agent.agent_id);",
+              "  pm.expect(agentIds).to.include(\"intake_agent\");",
+              "  pm.expect(agentIds).to.include(\"document_analysis_agent\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Create Mortgage Exception Review Workflow",
       "request": {
         "method": "POST",
@@ -133,7 +211,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"workflow_type\": \"MORTGAGE_EXCEPTION_REVIEW\",\n  \"priority\": \"HIGH\",\n  \"metadata\": {\n    \"case_reference\": \"MORT-POSTMAN-001\",\n    \"channel\": \"postman\"\n  }\n}"
+          "raw": "{\n  \"workflow_type\": \"MORTGAGE_EXCEPTION_REVIEW\",\n  \"priority\": \"HIGH\",\n  \"metadata\": {\n    \"case_reference\": \"MORT-POSTMAN-001\",\n    \"channel\": \"postman\",\n    \"documents\": [\"income_verification\"]\n  }\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v1/workflows",
@@ -326,8 +404,66 @@
               "  pm.expect(states).to.include(\"HUMAN_REVIEW_REQUIRED\");",
               "});",
               "",
+              "pm.test(\"timeline includes Phase 3 agent executions\", function () {",
+              "  pm.expect(entryTypes).to.include(\"AGENT_EXECUTION_COMPLETED\");",
+              "});",
+              "",
               "pm.test(\"timeline includes published events\", function () {",
               "  pm.expect(entryTypes).to.include(\"EVENT_PUBLISHED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow Agent Executions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/agent-executions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "agent-executions"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"agent executions retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Phase 3 agent executions are persisted\", function () {",
+              "  const json = pm.response.json();",
+              "  const agentIds = json.executions.map((execution) => execution.agent_id);",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(agentIds).to.include(\"intake_agent\");",
+              "  pm.expect(agentIds).to.include(\"document_analysis_agent\");",
+              "});",
+              "",
+              "pm.test(\"agent outputs are validated\", function () {",
+              "  const json = pm.response.json();",
+              "  json.executions.forEach((execution) => {",
+              "    pm.expect(execution.validation_status).to.eql(\"VALIDATED\");",
+              "    pm.expect(execution.output).to.be.an(\"object\");",
+              "  });",
               "});"
             ]
           }

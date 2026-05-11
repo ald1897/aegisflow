@@ -12,7 +12,9 @@ The local runtime currently provides:
 - Temporal UI
 - `gateway-api` with workflow creation and retrieval
 - `workflow-engine` with deterministic workflow progression
+- `agent-runtime` with governed LangGraph agent execution
 - workflow timeline retrieval
+- workflow agent execution retrieval
 - workflow event outbox publishing
 - structured JSON logging
 - correlation ID propagation
@@ -27,6 +29,12 @@ The Gateway API listens on:
 
 ```text
 http://localhost:8000
+```
+
+The Agent Runtime listens on:
+
+```text
+http://localhost:8010
 ```
 
 Temporal UI listens on:
@@ -47,14 +55,18 @@ Use the default collection variable:
 
 ```text
 baseUrl = http://localhost:8000
+agentRuntimeUrl = http://localhost:8010
 ```
 
 Recommended request order:
 - `Health`
+- `Agent Runtime Health`
+- `List Registered Agents`
 - `Ready`
 - `Create Mortgage Exception Review Workflow`
 - `Poll Until Human Review Required`
 - `Get Workflow Timeline`
+- `Get Workflow Agent Executions`
 - `Missing Workflow Returns 404`
 
 After creation, the Temporal worker advances the workflow to:

@@ -12,6 +12,7 @@ from aegisflow_gateway.domain.workflows import (
     WorkflowState,
 )
 from aegisflow_gateway.persistence.models import (
+    AgentExecutionRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
     WorkflowStateTransition,
@@ -118,5 +119,14 @@ class WorkflowService:
             select(WorkflowTimelineEntry)
             .where(WorkflowTimelineEntry.workflow_id == str(workflow_id))
             .order_by(WorkflowTimelineEntry.created_at.asc(), WorkflowTimelineEntry.timeline_entry_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_agent_executions(self, workflow_id: UUID) -> list[AgentExecutionRecord]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(AgentExecutionRecord)
+            .where(AgentExecutionRecord.workflow_id == str(workflow_id))
+            .order_by(AgentExecutionRecord.created_at.asc(), AgentExecutionRecord.agent_execution_id.asc())
         )
         return list(result.scalars().all())

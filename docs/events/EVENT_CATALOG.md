@@ -108,3 +108,56 @@ All events should follow:
 
 ```text
 <domain>.<entity>.<action>
+```
+
+---
+
+# Implemented Local Events
+
+The current local implementation emits workflow and agent execution events through the `workflow-events` topic.
+
+## Workflow Events
+
+```text
+workflow.created
+workflow.state_changed
+workflow.failed
+```
+
+Workflow events represent durable workflow lifecycle facts.
+
+---
+
+## Agent Execution Events
+
+Currently emitted on successful governed agent execution:
+
+```text
+agent.execution_completed
+```
+
+Reserved for future failure handling:
+
+```text
+agent.execution_failed
+```
+
+Agent execution events represent governed AI execution facts.
+
+They must include:
+- `event_id`
+- `event_type`
+- `event_version`
+- `workflow_id`
+- `correlation_id`
+- agent identifier
+- agent execution identifier
+- prompt identifier
+- prompt version
+- validation status
+- confidence score
+- human review requirement
+
+Agent execution events must not be interpreted as final business decisions.
+
+They describe validated agent output produced inside a workflow. Workflow state progression remains owned by the workflow engine, and critical mortgage actions still require human review.

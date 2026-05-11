@@ -5,8 +5,10 @@ from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aegisflow_gateway.api.schemas import (
+    AgentExecutionRecordResponse,
     HealthResponse,
     ReadyResponse,
+    WorkflowAgentExecutionsResponse,
     WorkflowCreateRequest,
     WorkflowResponse,
     WorkflowTimelineEntryResponse,
@@ -14,7 +16,7 @@ from aegisflow_gateway.api.schemas import (
 )
 from aegisflow_gateway.config import Settings, get_settings
 from aegisflow_gateway.persistence.database import check_database, get_session
-from aegisflow_gateway.persistence.models import WorkflowRecord, WorkflowTimelineEntry
+from aegisflow_gateway.persistence.models import AgentExecutionRecord, WorkflowRecord, WorkflowTimelineEntry
 from aegisflow_gateway.services.events import WorkflowEventPublisher
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
 from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowService
@@ -52,6 +54,28 @@ def timeline_entry_to_response(entry: WorkflowTimelineEntry) -> WorkflowTimeline
         created_by=entry.created_by,
         created_at=entry.created_at,
         metadata=entry.entry_metadata,
+    )
+
+
+def agent_execution_to_response(execution: AgentExecutionRecord) -> AgentExecutionRecordResponse:
+    return AgentExecutionRecordResponse(
+        agent_execution_id=UUID(execution.agent_execution_id),
+        workflow_id=UUID(execution.workflow_id),
+        agent_id=execution.agent_id,
+        prompt_id=execution.prompt_id,
+        prompt_version=execution.prompt_version,
+        model_name=execution.model_name,
+        status=execution.status,
+        validation_status=execution.validation_status,
+        confidence_score=execution.confidence_score,
+        requires_human_review=execution.requires_human_review,
+        output=execution.output_payload,
+        metadata=execution.execution_metadata,
+        correlation_id=execution.correlation_id,
+        created_by=execution.created_by,
+        started_at=execution.started_at,
+        completed_at=execution.completed_at,
+        created_at=execution.created_at,
     )
 
 
@@ -132,4 +156,20 @@ async def get_workflow_timeline(
     return WorkflowTimelineResponse(
         workflow_id=workflow_id,
         entries=[timeline_entry_to_response(entry) for entry in entries],
+    )
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/agent-executions",
+    response_model=WorkflowAgentExecutionsResponse,
+)
+async def get_workflow_agent_executions(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowAgentExecutionsResponse:
+    service = WorkflowService(session)
+    executions = await service.list_agent_executions(workflow_id)
+    return WorkflowAgentExecutionsResponse(
+        workflow_id=workflow_id,
+        executions=[agent_execution_to_response(execution) for execution in executions],
     )

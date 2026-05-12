@@ -497,21 +497,21 @@ Completion criteria:
 
 ## Workstream 3 - Persistence And Events
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add Alembic migration for `tool_invocation_records`
-- add persistence models to gateway-api and workflow-engine as needed
-- add tool invocation timeline entry type
-- add tool invocation event types
-- persist tool invocation records
-- add outbox records for completed and failed tool invocations
+- add Alembic migration for `tool_invocation_records` - Complete
+- add persistence models to gateway-api and workflow-engine as needed - Complete
+- add tool invocation timeline entry type - Complete
+- add tool invocation event types - Complete
+- persist tool invocation records - Complete
+- add outbox records for completed and failed tool invocations - Complete
 
 Completion criteria:
-- tool invocation records are queryable by workflow
-- tool invocation completion emits an outbox event
-- timeline includes tool invocation entries
-- writes are idempotent for retry-safe execution
+- tool invocation records are queryable by workflow - Met
+- tool invocation completion emits an outbox event - Met
+- timeline includes tool invocation entries - Met
+- writes are idempotent for retry-safe execution - Met
 
 ---
 
@@ -733,6 +733,31 @@ Completed workstreams:
 
 Next step:
 - implement Workstream 3: Persistence And Events
+
+## 2026-05-12 - Workstream 3
+
+Status:
+- added Alembic migration `20260512_0004` for `tool_invocation_records`
+- added gateway-api and workflow-engine persistence models for tool invocation records
+- added tool invocation event types `tool.invocation_completed` and `tool.invocation_failed`
+- added tool invocation timeline entry types `TOOL_INVOCATION_COMPLETED` and `TOOL_INVOCATION_FAILED`
+- added workflow-engine `record_tool_invocation` activity for idempotent record, timeline, and outbox creation
+- added workflow service query support for tool invocation records by workflow
+- applied the migration successfully against local Postgres
+- validated the local table shape in Postgres
+- validated gateway-api automated tests with 8 passing tests
+- validated workflow-engine automated tests with 4 passing tests
+
+Completed workstream:
+- Workstream 3 - Persistence And Events
+
+Boundary:
+- agent-runtime does not yet invoke tool-runtime during workflow execution
+- gateway-api does not yet expose the workflow tool invocation retrieval endpoint
+- end-to-end workflow production of tool invocation records remains assigned to Workstreams 4, 5, and 6
+
+Next step:
+- implement Workstream 4: Agent Runtime Integration
 
 ---
 

@@ -123,10 +123,9 @@ POST /api/v1/tools/{tool_id}/invocations
 The tool-runtime is an internal mediation boundary. It does not mutate workflow state, approve mortgage actions, expose arbitrary tools, or call production mortgage systems.
 
 Current Phase 4 limitation:
-- tool invocations are not yet persisted in Postgres
-- tool invocation events are not yet emitted through the outbox model
 - agent-runtime does not yet invoke tool-runtime during workflow execution
 - gateway-api does not yet expose workflow tool invocation history
+- normal workflow execution does not yet produce tool invocation records
 
 ---
 
@@ -164,6 +163,7 @@ Implemented persistence tables include:
 - `workflow_timeline_entries`
 - `workflow_event_outbox`
 - `agent_execution_records`
+- `tool_invocation_records`
 
 Current persisted data includes:
 - workflow identity
@@ -182,6 +182,17 @@ Current persisted data includes:
 - agent validation status
 - agent confidence score
 - agent output metadata
+- tool invocation identity
+- tool permission status
+- tool input validation status
+- tool output validation status
+- tool execution metadata
+
+Current tool invocation persistence boundary:
+- workflow-engine can idempotently record tool invocation results
+- tool invocation records can produce workflow timeline entries
+- tool invocation records can produce workflow event outbox records
+- agent-runtime integration with tool-runtime is not yet implemented
 
 ---
 
@@ -199,6 +210,12 @@ Current event types:
 - `workflow.created`
 - `workflow.state_changed`
 - `agent.execution_completed`
+- `tool.invocation_completed`
+- `tool.invocation_failed`
+
+Current tool invocation event boundary:
+- tool invocation events are supported by the workflow-engine recording activity
+- tool invocation events are not yet produced by the standard Mortgage Exception Review workflow path
 
 Event publication status is tracked in:
 
@@ -217,8 +234,6 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- workflow-integrated tool invocation persistence
-- tool invocation event publication
 - agent-runtime tool usage during workflow execution
 - workflow tool invocation retrieval API
 - human approval UI

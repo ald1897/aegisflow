@@ -12,12 +12,14 @@ from aegisflow_gateway.persistence.database import get_session
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
     Base,
+    ToolInvocationRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
     WorkflowStateTransition,
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.persistence.models import utc_now
+from aegisflow_gateway.services.workflows import WorkflowService
 
 
 @pytest.fixture
@@ -195,3 +197,50 @@ async def test_get_workflow_agent_executions_returns_persisted_records(
     assert len(body["executions"]) == 1
     assert body["executions"][0]["agent_id"] == "intake_agent"
     assert body["executions"][0]["validation_status"] == "VALIDATED"
+
+
+async def test_tool_invocation_records_are_queryable_by_workflow(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "tool-query-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    now = utc_now()
+    async with session_factory() as session:
+        session.add(
+            ToolInvocationRecord(
+                tool_invocation_id="00000000-0000-0000-0000-000000000002",
+                workflow_id=workflow_id,
+                correlation_id="tool-query-test",
+                agent_execution_id=None,
+                agent_id="intake_agent",
+                tool_id="borrower_profile_lookup",
+                status="COMPLETED",
+                permission_status="AUTHORIZED",
+                input_validation_status="VALIDATED",
+                output_validation_status="VALIDATED",
+                input_metadata={"case_reference_present": True},
+                output_payload={"profile_status": "FOUND"},
+                execution_metadata={"replay_safe": True},
+                error_message=None,
+                created_by="workflow-engine",
+                started_at=now,
+                completed_at=now,
+                created_at=now,
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        invocations = await service.list_tool_invocations(UUID(workflow_id))
+
+    assert len(invocations) == 1
+    assert invocations[0].tool_id == "borrower_profile_lookup"
+    assert invocations[0].permission_status == "AUTHORIZED"

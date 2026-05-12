@@ -57,6 +57,10 @@ class WorkflowRecord(Base):
         back_populates="workflow",
         cascade="all, delete-orphan",
     )
+    tool_invocations: Mapped[list["ToolInvocationRecord"]] = relationship(
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
 
 
 class WorkflowStateTransition(Base):
@@ -153,9 +157,46 @@ class AgentExecutionRecord(Base):
     workflow: Mapped[WorkflowRecord] = relationship(back_populates="agent_executions")
 
 
+class ToolInvocationRecord(Base):
+    __tablename__ = "tool_invocation_records"
+
+    tool_invocation_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    agent_execution_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("agent_execution_records.agent_execution_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    agent_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    permission_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    input_validation_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    output_validation_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    input_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    output_payload: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    execution_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    workflow: Mapped[WorkflowRecord] = relationship(back_populates="tool_invocations")
+
+
 Index("ix_workflow_timeline_entries_workflow_id", WorkflowTimelineEntry.workflow_id)
 Index("ix_workflow_timeline_entries_created_at", WorkflowTimelineEntry.created_at)
 Index("ix_workflow_event_outbox_workflow_id", WorkflowEventOutbox.workflow_id)
 Index("ix_workflow_event_outbox_publish_status", WorkflowEventOutbox.publish_status)
 Index("ix_agent_execution_records_workflow_id", AgentExecutionRecord.workflow_id)
 Index("ix_agent_execution_records_agent_id", AgentExecutionRecord.agent_id)
+Index("ix_tool_invocation_records_workflow_id", ToolInvocationRecord.workflow_id)
+Index("ix_tool_invocation_records_agent_id", ToolInvocationRecord.agent_id)
+Index("ix_tool_invocation_records_agent_execution_id", ToolInvocationRecord.agent_execution_id)
+Index("ix_tool_invocation_records_tool_id", ToolInvocationRecord.tool_id)

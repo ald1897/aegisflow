@@ -16,12 +16,16 @@ class WorkflowEventType(StrEnum):
     failed = "workflow.failed"
     agent_execution_completed = "agent.execution_completed"
     agent_execution_failed = "agent.execution_failed"
+    tool_invocation_completed = "tool.invocation_completed"
+    tool_invocation_failed = "tool.invocation_failed"
 
 
 class TimelineEntryType(StrEnum):
     state_transition = "STATE_TRANSITION"
     agent_execution_completed = "AGENT_EXECUTION_COMPLETED"
     agent_execution_failed = "AGENT_EXECUTION_FAILED"
+    tool_invocation_completed = "TOOL_INVOCATION_COMPLETED"
+    tool_invocation_failed = "TOOL_INVOCATION_FAILED"
     event_published = "EVENT_PUBLISHED"
     event_publish_failed = "EVENT_PUBLISH_FAILED"
 

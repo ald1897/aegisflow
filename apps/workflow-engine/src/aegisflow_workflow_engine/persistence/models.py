@@ -113,3 +113,34 @@ class AgentExecutionRecord(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ToolInvocationRecord(Base):
+    __tablename__ = "tool_invocation_records"
+
+    tool_invocation_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    agent_execution_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("agent_execution_records.agent_execution_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    agent_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    tool_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    permission_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    input_validation_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    output_validation_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    input_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    output_payload: Mapped[dict] = mapped_column(json_type, nullable=False)
+    execution_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

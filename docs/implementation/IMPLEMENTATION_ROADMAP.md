@@ -155,6 +155,9 @@ The platform currently supports:
 - tool input and output schema validation
 - agent-to-tool permission enforcement
 - deterministic mock tool execution
+- tool invocation persistence table
+- workflow-engine tool invocation recording activity
+- tool invocation timeline and outbox event support
 - structured agent output validation
 - agent execution record persistence
 - workflow timeline retrieval
@@ -167,10 +170,9 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation and the initial Phase 4 tool-runtime service boundary.
+The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, and Phase 4 persistence support for tool invocation records.
 
 The platform does not yet implement:
-- workflow-integrated tool invocation persistence
 - agent-runtime tool usage during workflow execution
 - workflow tool invocation retrieval
 - human review UI
@@ -337,11 +339,13 @@ Completed deliverables:
 - input and output schema validation
 - deterministic synthetic and masked tool outputs
 - replay-safe invocation telemetry metadata
+- `tool_invocation_records` persistence table
+- workflow-engine tool invocation recording activity
+- tool invocation timeline entry support
+- `tool.invocation_completed` and `tool.invocation_failed` outbox event support
+- idempotent tool invocation record writes
 
-Explicit non-scope for completed increment:
-- tool invocation persistence
-- workflow timeline entries for tool invocation activity
-- tool invocation outbox events
+Explicit non-scope for completed increments:
 - agent-runtime integration with tool-runtime
 - gateway-api workflow tool invocation retrieval
 - real mortgage system connectivity
@@ -354,9 +358,13 @@ Validation completed:
 - tool registry endpoint returned approved tool definitions
 - borrower profile lookup invocation completed with authorized access and validated input/output
 - tool-runtime pytest suite passed with 7 tests
+- Alembic migration `20260512_0004` applied successfully against local Postgres
+- local Postgres table validation confirmed `tool_invocation_records`
+- gateway-api pytest suite passed with 8 tests
+- workflow-engine pytest suite passed with 4 tests
 
 Next deliverable:
-- Workstream 3 - Persistence And Events
+- Workstream 4 - Agent Runtime Integration
 
 ---
 

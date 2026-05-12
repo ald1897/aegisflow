@@ -13,6 +13,7 @@ from aegisflow_gateway.domain.workflows import (
 )
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
+    ToolInvocationRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
     WorkflowStateTransition,
@@ -128,5 +129,14 @@ class WorkflowService:
             select(AgentExecutionRecord)
             .where(AgentExecutionRecord.workflow_id == str(workflow_id))
             .order_by(AgentExecutionRecord.created_at.asc(), AgentExecutionRecord.agent_execution_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_tool_invocations(self, workflow_id: UUID) -> list[ToolInvocationRecord]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(ToolInvocationRecord)
+            .where(ToolInvocationRecord.workflow_id == str(workflow_id))
+            .order_by(ToolInvocationRecord.created_at.asc(), ToolInvocationRecord.tool_invocation_id.asc())
         )
         return list(result.scalars().all())

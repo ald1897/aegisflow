@@ -114,7 +114,7 @@ All events should follow:
 
 # Implemented Local Events
 
-The current local implementation emits workflow and agent execution events through the `workflow-events` topic.
+The current local implementation emits workflow, agent execution, and supported tool invocation events through the `workflow-events` topic.
 
 ## Workflow Events
 
@@ -161,3 +161,39 @@ They must include:
 Agent execution events must not be interpreted as final business decisions.
 
 They describe validated agent output produced inside a workflow. Workflow state progression remains owned by the workflow engine, and critical mortgage actions still require human review.
+
+---
+
+## Tool Invocation Events
+
+Supported by the workflow-engine tool invocation recording activity:
+
+```text
+tool.invocation_completed
+tool.invocation_failed
+```
+
+Tool invocation events represent governed tool execution facts.
+
+They must include:
+- `event_id`
+- `event_type`
+- `event_version`
+- `workflow_id`
+- `correlation_id`
+- tool invocation identifier
+- agent identifier
+- agent execution identifier when available
+- tool identifier
+- execution status
+- permission status
+- input validation status
+- output validation status
+
+Tool invocation events must not be interpreted as business decisions.
+
+They describe whether an approved tool invocation completed or failed inside a governed workflow context. Tool results provide supporting operational context only. Workflow state progression remains owned by the workflow engine, and critical mortgage actions still require human review.
+
+Current implementation boundary:
+- tool invocation event records can be written through the outbox model
+- standard Mortgage Exception Review execution does not yet invoke tools through agent-runtime

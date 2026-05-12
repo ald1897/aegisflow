@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and initial Phase 5 persistence capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5 human review capabilities:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -18,7 +18,11 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and init
 - approved tool registry and schema validation
 - deterministic mock tool execution
 - workflow-integrated tool invocation persistence
-- approval record persistence foundation
+- approval record persistence
+- operator review queue
+- workflow review context retrieval
+- approval and rejection submission through gateway-api
+- operator-console review and decision workflow
 
 ---
 
@@ -335,13 +339,11 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- human approval UI
-- gateway approve/reject APIs
-- operator-accessible workflow completion after human review
 - distributed tracing stack
 - AI evaluation
 - authentication and RBAC
 - advanced replay tooling
+- production mortgage system update actions
 
 ---
 
@@ -370,6 +372,12 @@ The collection includes:
 - workflow timeline retrieval
 - workflow agent execution retrieval
 - workflow tool invocation retrieval
+- human review queue retrieval
+- workflow review context retrieval
+- workflow approval record retrieval
+- workflow approval submission
+- workflow rejection submission
+- separate approval and rejection workflow validation
 - missing workflow error validation
 
 The collection uses `http://localhost:8000` as the default `baseUrl`.
@@ -387,6 +395,9 @@ The collection automatically captures:
 - `workflowId`
 - `temporalWorkflowId`
 - `temporalRunId`
+- `lastDecision`
+- `approvalId`
+- `rejectionApprovalId`
 
 ---
 
@@ -667,7 +678,143 @@ Expected result:
 
 ---
 
-## 16. Validate Missing Workflow Behavior
+## 16. Retrieve Human Review Queue
+
+Run the Postman request:
+
+```text
+Get Human Review Queue
+```
+
+Expected result:
+- HTTP status is `200`
+- the response includes the captured `workflowId`
+- the workflow state is `HUMAN_REVIEW_REQUIRED`
+
+---
+
+## 17. Retrieve Workflow Review Context
+
+Run the Postman request:
+
+```text
+Get Workflow Review Context
+```
+
+Expected result:
+- HTTP status is `200`
+- the workflow ID matches the captured `workflowId`
+- the workflow state is `HUMAN_REVIEW_REQUIRED`
+- timeline entries are present
+- agent execution records are present
+- tool invocation records are present
+- approvals are returned as an array
+
+---
+
+## 18. Approve The Workflow
+
+Run the Postman request:
+
+```text
+Approve Workflow
+```
+
+Expected result:
+- HTTP status is `201`
+- the decision is `APPROVED`
+- `reviewed_by` matches the Postman `actorId` variable
+- `metadata.review_channel` is `postman`
+- the workflow state is `COMPLETED`
+
+The request test script stores the approval identifier as the `approvalId` collection variable.
+
+---
+
+## 19. Validate Persisted Approval Record
+
+Run the Postman request:
+
+```text
+Get Workflow Approvals
+```
+
+Expected result:
+- HTTP status is `200`
+- the response includes an `APPROVED` approval record
+- `reviewed_by` matches the Postman `actorId` variable
+- `metadata.review_channel` is `postman`
+
+---
+
+## 20. Create A Separate Workflow For Rejection
+
+Run the Postman request:
+
+```text
+Create Mortgage Exception Review Workflow For Rejection
+```
+
+Expected result:
+- HTTP status is `201`
+- a new `workflow_id` is present
+- `state` is initially `NEW`
+
+The request test script replaces the `workflowId` collection variable with the newly created workflow.
+
+---
+
+## 21. Poll The Rejection Workflow To Human Review
+
+Run the Postman request:
+
+```text
+Poll Rejection Workflow Until Human Review Required
+```
+
+Expected final result:
+- HTTP status is `200`
+- `workflow_id` matches the current `workflowId`
+- `state` becomes `HUMAN_REVIEW_REQUIRED`
+
+---
+
+## 22. Reject The Separate Workflow
+
+Run the Postman request:
+
+```text
+Reject Workflow
+```
+
+Expected result:
+- HTTP status is `201`
+- the decision is `REJECTED`
+- `reviewed_by` matches the Postman `actorId` variable
+- `metadata.review_channel` is `postman`
+- the workflow state is `COMPLETED`
+
+The request test script stores the rejection approval identifier as the `rejectionApprovalId` collection variable.
+
+---
+
+## 23. Validate Persisted Rejection Record
+
+Run the Postman request:
+
+```text
+Get Rejection Workflow Approvals
+```
+
+Expected result:
+- HTTP status is `200`
+- the response includes a `REJECTED` approval record
+- `reviewed_by` matches the Postman `actorId` variable
+- `metadata.review_channel` is `postman`
+
+---
+
+## 24. Validate Missing Workflow Behavior
 
 Run the Postman request:
 
@@ -681,12 +828,13 @@ Expected result:
 
 ---
 
-## 17. Run The Collection
+## 25. Run The Collection
 
 The collection can be run end-to-end in Postman Collection Runner.
 
 Recommended request order:
 - `Health`
+- `Ready`
 - `Agent Runtime Health`
 - `List Registered Agents`
 - `Tool Runtime Health`
@@ -695,17 +843,24 @@ Recommended request order:
 - `Invoke Borrower Profile Lookup`
 - `Invoke Document Fetch`
 - `Invoke Fraud Signal Lookup`
-- `Ready`
 - `Create Mortgage Exception Review Workflow`
 - `Poll Until Human Review Required`
 - `Get Workflow Timeline`
 - `Get Workflow Agent Executions`
 - `Get Workflow Tool Invocations`
+- `Get Human Review Queue`
+- `Get Workflow Review Context`
+- `Approve Workflow`
+- `Get Workflow Approvals`
+- `Create Mortgage Exception Review Workflow For Rejection`
+- `Poll Rejection Workflow Until Human Review Required`
+- `Reject Workflow`
+- `Get Rejection Workflow Approvals`
 - `Missing Workflow Returns 404`
 
 ---
 
-## 18. Open Temporal UI
+## 26. Open Temporal UI
 
 Open:
 
@@ -721,7 +876,7 @@ Expected:
 
 ---
 
-## 19. Manual Validation Coverage
+## 27. Manual Validation Coverage
 
 The Postman collection validates:
 - gateway health and readiness
@@ -739,6 +894,11 @@ The Postman collection validates:
 - workflow timeline retrieval
 - workflow agent execution retrieval
 - workflow tool invocation retrieval
+- human review queue retrieval
+- workflow review context aggregation
+- approval decision submission
+- rejection decision submission
+- persisted approval record retrieval
 - missing workflow error behavior
 
 Direct Postgres, Redpanda, and Temporal history inspection is not required for routine manual API testing.

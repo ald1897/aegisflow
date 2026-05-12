@@ -182,6 +182,7 @@ The platform currently supports:
 - operator-console human review queue screen
 - operator-console workflow review detail workspace
 - operator-console approval and rejection form submission
+- Postman validation for human review queue, review context, approval submission, rejection submission, and persisted approval records
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -191,12 +192,12 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the initial Phase 5 human review API foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the Phase 5 human review foundation.
 
 Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- Postman coverage for approval and rejection paths
+- Phase 5 final documentation closeout
 - distributed tracing
 - AI evaluation
 

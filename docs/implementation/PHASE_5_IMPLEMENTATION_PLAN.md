@@ -480,22 +480,22 @@ Completion criteria:
 
 ## Workstream 6 - Postman And Manual Validation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- update Postman collection with human review queue request
-- update Postman collection with review context request
-- update Postman collection with approval retrieval request
-- update Postman collection with approve workflow request
-- update Postman collection with reject workflow request
-- update manual validation documentation
+- update Postman collection with human review queue request - Complete
+- update Postman collection with review context request - Complete
+- update Postman collection with approval retrieval request - Complete
+- update Postman collection with approve workflow request - Complete
+- update Postman collection with reject workflow request - Complete
+- update manual validation documentation - Complete
 
 Completion criteria:
-- Postman can create a workflow and poll to `HUMAN_REVIEW_REQUIRED`
-- Postman can retrieve review context
-- Postman can approve a reviewable workflow
-- Postman can reject a separate reviewable workflow
-- Postman can validate persisted approval records
+- Postman can create a workflow and poll to `HUMAN_REVIEW_REQUIRED` - Met
+- Postman can retrieve review context - Met
+- Postman can approve a reviewable workflow - Met
+- Postman can reject a separate reviewable workflow - Met
+- Postman can validate persisted approval records - Met
 
 ---
 
@@ -776,6 +776,31 @@ Boundary:
 
 Next step:
 - implement Workstream 6: Postman And Manual Validation
+
+## 2026-05-12 - Workstream 6
+
+Status:
+- expanded the Postman collection with human review queue retrieval
+- expanded the Postman collection with workflow review context retrieval
+- expanded the Postman collection with workflow approval record retrieval
+- added Postman approval submission for a reviewable workflow
+- added Postman rejection submission for a separate reviewable workflow
+- added dedicated rejection workflow polling and approval retrieval requests for Collection Runner execution
+- added collection variables for last decision, approval ID, and rejection approval ID
+- updated current functionality manual validation steps to use Postman for approval and rejection testing
+- validated Postman collection JSON structure
+- validated live local API smoke path for review queue retrieval, review context retrieval, approval submission, approval retrieval, rejection submission, and rejection approval retrieval
+
+Completed workstream:
+- Workstream 6 - Postman And Manual Validation
+
+Boundary:
+- Postman validation covers local gateway-api review APIs and workflow-engine-owned decision execution
+- production authentication and RBAC remain out of scope
+- production mortgage system update actions remain out of scope
+
+Next step:
+- implement Workstream 7: Documentation And Roadmap Updates
 
 ---
 

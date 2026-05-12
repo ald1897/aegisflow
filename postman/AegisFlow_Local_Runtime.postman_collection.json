@@ -50,6 +50,21 @@
       "key": "workflowPollCount",
       "value": "0",
       "type": "string"
+    },
+    {
+      "key": "lastDecision",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "approvalId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rejectionApprovalId",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -790,6 +805,437 @@
               "    pm.expect(invocation.output_validation_status).to.eql(\"VALIDATED\");",
               "    pm.expect(invocation.output).to.be.an(\"object\");",
               "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Human Review Queue",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/reviews/human-review-queue",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "reviews",
+            "human-review-queue"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"human review queue retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"queue includes current reviewable workflow\", function () {",
+              "  const json = pm.response.json();",
+              "  const workflowId = pm.collectionVariables.get(\"workflowId\");",
+              "  const matchingItem = json.items.find((item) => item.workflow_id === workflowId);",
+              "  pm.expect(json.count).to.be.at.least(1);",
+              "  pm.expect(matchingItem).to.exist;",
+              "  pm.expect(matchingItem.state).to.eql(\"HUMAN_REVIEW_REQUIRED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow Review Context",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/review-context",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "review-context"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow review context retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"review context contains governed workflow evidence\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(json.workflow.state).to.eql(\"HUMAN_REVIEW_REQUIRED\");",
+              "  pm.expect(json.timeline).to.be.an(\"array\").and.not.empty;",
+              "  pm.expect(json.agent_executions).to.be.an(\"array\").and.not.empty;",
+              "  pm.expect(json.tool_invocations).to.be.an(\"array\").and.not.empty;",
+              "  pm.expect(json.approvals).to.be.an(\"array\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Approve Workflow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"APPROVED\",\n  \"decision_reason\": \"exception_review_completed\",\n  \"comment\": \"Postman validation approval for prepared mortgage exception review workflow.\",\n  \"metadata\": {\n    \"review_channel\": \"postman\",\n    \"validation_scope\": \"phase_5_workstream_6\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/approvals",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "approvals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow approval accepted\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"lastDecision\", \"APPROVED\");",
+              "pm.collectionVariables.set(\"approvalId\", json.approval.approval_id);",
+              "",
+              "pm.test(\"approval response records human decision\", function () {",
+              "  pm.expect(json.workflow.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(json.workflow.state).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.approval.decision).to.eql(\"APPROVED\");",
+              "  pm.expect(json.approval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "  pm.expect(json.approval.metadata.review_channel).to.eql(\"postman\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow Approvals",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/approvals",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "approvals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow approvals retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"approval retrieval returns persisted decision records\", function () {",
+              "  const json = pm.response.json();",
+              "  const lastDecision = pm.collectionVariables.get(\"lastDecision\");",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(json.approvals).to.be.an(\"array\");",
+              "",
+              "  if (lastDecision) {",
+              "    const matchingApproval = json.approvals.find((approval) => approval.decision === lastDecision);",
+              "    pm.expect(matchingApproval).to.exist;",
+              "    pm.expect(matchingApproval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "    pm.expect(matchingApproval.metadata.review_channel).to.eql(\"postman\");",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Mortgage Exception Review Workflow For Rejection",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflow_type\": \"MORTGAGE_EXCEPTION_REVIEW\",\n  \"priority\": \"HIGH\",\n  \"metadata\": {\n    \"case_reference\": \"MORT-POSTMAN-REJECT-001\",\n    \"channel\": \"postman\",\n    \"documents\": [\"income_verification\", \"bank_statement\"]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"rejection workflow created\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"workflowId\", json.workflow_id);",
+              "pm.collectionVariables.set(\"temporalWorkflowId\", json.temporal_workflow_id || \"\");",
+              "pm.collectionVariables.set(\"temporalRunId\", json.temporal_run_id || \"\");",
+              "pm.collectionVariables.set(\"workflowPollCount\", \"0\");",
+              "pm.collectionVariables.set(\"lastDecision\", \"\");",
+              "",
+              "pm.test(\"rejection workflow starts in NEW state\", function () {",
+              "  pm.expect(json.workflow_id).to.be.a(\"string\").and.not.empty;",
+              "  pm.expect(json.state).to.eql(\"NEW\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Poll Rejection Workflow Until Human Review Required",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"rejection workflow poll returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "const currentState = json.state;",
+              "const pollCount = parseInt(pm.collectionVariables.get(\"workflowPollCount\") || \"0\", 10);",
+              "",
+              "if (currentState !== \"HUMAN_REVIEW_REQUIRED\" && pollCount < 10) {",
+              "  pm.collectionVariables.set(\"workflowPollCount\", String(pollCount + 1));",
+              "  postman.setNextRequest(\"Poll Rejection Workflow Until Human Review Required\");",
+              "} else {",
+              "  pm.collectionVariables.set(\"workflowPollCount\", \"0\");",
+              "}",
+              "",
+              "pm.test(\"rejection workflow reaches HUMAN_REVIEW_REQUIRED\", function () {",
+              "  pm.expect(currentState).to.eql(\"HUMAN_REVIEW_REQUIRED\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject Workflow",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"decision\": \"REJECTED\",\n  \"decision_reason\": \"exception_review_incomplete\",\n  \"comment\": \"Postman validation rejection for a separate reviewable mortgage exception workflow.\",\n  \"metadata\": {\n    \"review_channel\": \"postman\",\n    \"validation_scope\": \"phase_5_workstream_6\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/approvals",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "approvals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"workflow rejection accepted\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "const json = pm.response.json();",
+              "pm.collectionVariables.set(\"lastDecision\", \"REJECTED\");",
+              "pm.collectionVariables.set(\"rejectionApprovalId\", json.approval.approval_id);",
+              "",
+              "pm.test(\"rejection response records human decision\", function () {",
+              "  pm.expect(json.workflow.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(json.workflow.state).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.approval.decision).to.eql(\"REJECTED\");",
+              "  pm.expect(json.approval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "  pm.expect(json.approval.metadata.review_channel).to.eql(\"postman\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Rejection Workflow Approvals",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/approvals",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "approvals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"rejection workflow approvals retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"rejection approval retrieval returns persisted decision record\", function () {",
+              "  const json = pm.response.json();",
+              "  const approvalId = pm.collectionVariables.get(\"rejectionApprovalId\");",
+              "  const matchingApproval = json.approvals.find((approval) => approval.approval_id === approvalId);",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(matchingApproval).to.exist;",
+              "  pm.expect(matchingApproval.decision).to.eql(\"REJECTED\");",
+              "  pm.expect(matchingApproval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "  pm.expect(matchingApproval.metadata.review_channel).to.eql(\"postman\");",
               "});"
             ]
           }

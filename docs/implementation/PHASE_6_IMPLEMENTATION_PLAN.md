@@ -494,22 +494,22 @@ Completion criteria:
 
 ## Workstream 6 - Dashboards And Operational Views
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- create Grafana datasource provisioning for Prometheus and trace backend
-- create initial workflow operations dashboard
-- create service health and latency dashboard
-- create agent and tool execution dashboard
-- create approval decision dashboard
-- add dashboard import/provisioning files to local infrastructure
-- optionally add operator-console links to Grafana or trace views if stable URLs are available
+- create Grafana datasource provisioning for Prometheus and trace backend - Complete
+- create initial workflow operations dashboard - Complete
+- create service health and latency dashboard - Complete
+- create agent and tool execution dashboard - Complete
+- create approval decision dashboard - Complete
+- add dashboard import/provisioning files to local infrastructure - Complete
+- optionally add operator-console links to Grafana or trace views if stable URLs are available - Deferred
 
 Completion criteria:
-- Grafana starts with provisioned datasources
-- dashboards load without manual setup
-- dashboards show API, workflow, agent, tool, and approval telemetry after a local workflow run
-- dashboards avoid borrower-specific or sensitive data
+- Grafana starts with provisioned datasources - Met
+- dashboards load without manual setup - Met
+- dashboards show API, workflow, agent, tool, and approval telemetry after a local workflow run - Met
+- dashboards avoid borrower-specific or sensitive data - Met
 
 ---
 
@@ -853,6 +853,35 @@ Boundary:
 
 Next step:
 - implement Workstream 6: Dashboards And Operational Views
+
+## 2026-05-12 - Workstream 6
+
+Status:
+- added Grafana dashboard provider provisioning under local observability infrastructure
+- added `AegisFlow - Workflow Operations` dashboard for workflow creation, completion, human review, state transitions, activity latency, and event publication telemetry
+- added `AegisFlow - Service Health And Latency` dashboard for scrape health, HTTP request rate, HTTP p95 latency, HTTP error rate, and trace inspection guidance
+- added `AegisFlow - Agent And Tool Execution` dashboard for agent executions, tool invocations, validation failures, authorization failures, execution rates, and execution latency
+- added `AegisFlow - Approval Decisions` dashboard for approval and rejection decision counts, decision rate, decision latency, and terminal workflow transition telemetry
+- updated local observability README with provisioned dashboard names and telemetry-label boundaries
+- validated dashboard JSON parsing locally
+- restarted Grafana with dashboard provisioning enabled
+- validated Grafana datasource provisioning for Prometheus and Jaeger
+- validated Grafana API lists all four AegisFlow dashboards in the `AegisFlow` folder
+- executed a local intake agent request through agent-runtime to tool-runtime
+- validated dashboard Prometheus queries for service, agent, and tool telemetry return data
+
+Completed workstream:
+- Workstream 6 - Dashboards And Operational Views
+
+Boundary:
+- operator-console links to Grafana and trace views are deferred because stable per-workflow trace URLs require a later UI integration decision
+- dashboards use low-cardinality labels only and avoid borrower-specific values, raw document contents, prompt content, comments, workflow IDs, approval IDs, and trace IDs as metric labels
+- dashboards are operational telemetry views only and do not replace PostgreSQL workflow, approval, timeline, or event records
+- log enrichment and local diagnostics remain assigned to Workstream 7
+- Postman observability validation and final documentation closeout remain assigned to Workstream 8
+
+Next step:
+- implement Workstream 7: Logs And Local Diagnostics
 
 ---
 

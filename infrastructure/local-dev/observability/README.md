@@ -37,13 +37,27 @@ Password: aegisflow
 
 ---
 
+## Provisioned Dashboards
+
+Grafana provisions the AegisFlow dashboards into the `AegisFlow` folder.
+
+Current local dashboards:
+- `AegisFlow - Workflow Operations`
+- `AegisFlow - Service Health And Latency`
+- `AegisFlow - Agent And Tool Execution`
+- `AegisFlow - Approval Decisions`
+
+The dashboards use Prometheus metrics and the provisioned Jaeger datasource.
+
+Dashboard panels intentionally aggregate by low-cardinality operational dimensions such as service, route, workflow state, agent, tool, decision, and status. They do not use borrower values, workflow IDs, approval IDs, trace IDs, operator IDs, prompt content, document content, or comments as metric labels.
+
+---
+
 ## Current Boundary
 
-Workstream 1 starts the observability infrastructure only.
+Phase 6 currently includes local observability infrastructure, Python service tracing, Prometheus metrics, and provisioned Grafana dashboards.
 
-Application service instrumentation is intentionally assigned to later Phase 6 workstreams.
-
-Until those workstreams are implemented:
-- Prometheus will show infrastructure and collector metrics
-- Jaeger will be reachable but may not contain AegisFlow service traces
-- Grafana will have datasource provisioning but no Phase 6 dashboards
+Current remaining Phase 6 work:
+- structured log enrichment and local diagnostics
+- Postman and manual observability validation documentation
+- final Phase 6 roadmap and current functionality closeout

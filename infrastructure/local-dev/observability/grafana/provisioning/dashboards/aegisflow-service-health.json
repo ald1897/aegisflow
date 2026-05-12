@@ -1,0 +1,188 @@
+{
+  "uid": "aegisflow-service-health",
+  "title": "AegisFlow - Service Health And Latency",
+  "tags": ["aegisflow", "phase-6", "services"],
+  "timezone": "browser",
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "version": 1,
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Scrape Health",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"gateway-api|workflow-engine|agent-runtime|tool-runtime|otel-collector|jaeger\"}",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "HTTP Request Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_requests_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_requests_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_requests_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\"))",
+          "legendFormat": "{{service}} {{status_class}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "HTTP Latency p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 6
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_gateway_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_agent_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_tool_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\")))",
+          "legendFormat": "{{service}} {{route}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "HTTP Error Rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_errors_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_errors_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_errors_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\"))",
+          "legendFormat": "{{service}} {{status_class}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "text",
+      "title": "Trace Inspection",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Use the provisioned Jaeger datasource in Explore to inspect cross-service traces. Local Jaeger UI is available at http://localhost:16686.\n\nKeep trace search scoped to service names, operation names, correlation IDs, or workflow IDs. Do not add borrower-specific values as metric labels."
+      }
+    }
+  ]
+}

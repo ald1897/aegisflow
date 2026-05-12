@@ -426,23 +426,23 @@ Completion criteria:
 
 ## Workstream 3 - gateway-api Instrumentation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- instrument FastAPI request handling
-- include correlation ID in trace attributes and logs
-- expose Prometheus metrics endpoint or compatible metrics export
-- instrument Temporal workflow start calls
-- instrument approval decision dispatch calls
-- instrument event publication calls
-- add tests for correlation ID preservation where practical
+- instrument FastAPI request handling - Complete
+- include correlation ID in trace attributes and logs - Complete
+- expose Prometheus metrics endpoint or compatible metrics export - Complete
+- instrument Temporal workflow start calls - Complete
+- instrument approval decision dispatch calls - Complete
+- instrument event publication calls - Complete
+- add tests for correlation ID preservation where practical - Complete
 
 Completion criteria:
-- gateway-api emits request traces
-- workflow creation requests include correlation metadata
-- approval and rejection requests include bounded operator decision telemetry
-- gateway-api metrics are visible in Prometheus
-- existing gateway-api tests continue to pass
+- gateway-api emits request traces - Met
+- workflow creation requests include correlation metadata - Met
+- approval and rejection requests include bounded operator decision telemetry - Met
+- gateway-api metrics are visible in Prometheus - Met
+- existing gateway-api tests continue to pass - Met
 
 ---
 
@@ -736,6 +736,40 @@ Boundary:
 
 Next step:
 - implement Workstream 3: gateway-api Instrumentation
+
+## 2026-05-12 - Workstream 3
+
+Status:
+- added gateway HTTP telemetry middleware for request spans and request metrics
+- added `/metrics` endpoint for Prometheus-compatible gateway metrics
+- added gateway HTTP request counters, latency histograms, and error counters
+- added workflow creation counter with low-cardinality workflow type and status labels
+- added Temporal workflow start spans and metrics for Mortgage Exception Review workflow creation
+- added Temporal human review decision dispatch spans and metrics for approval and rejection decisions
+- added Kafka workflow event publication spans and metrics for gateway-published events
+- added trace ID enrichment to gateway structured logs where an active span is available
+- added correlation ID as bounded request and operation span metadata
+- added Prometheus scrape configuration for `gateway-api`
+- added gateway metrics endpoint test coverage
+- rebuilt the gateway-api image with the Prometheus client dependency
+- validated gateway-api automated tests against the rebuilt image
+- validated local gateway-api health after recreating the service container
+- validated local `/metrics` output includes gateway request metrics
+- validated Prometheus reports the `gateway-api` scrape target as `up`
+- validated Jaeger contains gateway-api request spans
+
+Completed workstream:
+- Workstream 3 - gateway-api Instrumentation
+
+Boundary:
+- gateway instrumentation is limited to API, Temporal dispatch, approval decision dispatch, and gateway-published event boundaries
+- workflow-engine Temporal activity instrumentation remains assigned to Workstream 4
+- agent-runtime and tool-runtime execution instrumentation remains assigned to Workstream 5
+- metrics use low-cardinality labels and do not include workflow IDs, trace IDs, approval IDs, borrower values, prompts, or document contents
+- traces include workflow and approval identifiers where operationally useful, but telemetry remains non-authoritative
+
+Next step:
+- implement Workstream 4: workflow-engine And Temporal Instrumentation
 
 ---
 

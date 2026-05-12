@@ -5,6 +5,7 @@ from typing import Any
 
 from aegisflow_gateway.config import Settings
 from aegisflow_gateway.telemetry.correlation import get_correlation_id
+from aegisflow_gateway.telemetry.tracing import current_trace_id
 
 
 class JsonFormatter(logging.Formatter):
@@ -25,6 +26,9 @@ class JsonFormatter(logging.Formatter):
         correlation_id = get_correlation_id()
         if correlation_id:
             payload["correlation_id"] = correlation_id
+        trace_id = current_trace_id()
+        if trace_id:
+            payload["trace_id"] = trace_id
         if hasattr(record, "workflow_id"):
             payload["workflow_id"] = record.workflow_id
         if record.exc_info:

@@ -62,6 +62,16 @@ async def test_health_returns_service_status(client: AsyncClient) -> None:
     assert response.headers["x-correlation-id"]
 
 
+async def test_metrics_endpoint_exposes_gateway_metrics(client: AsyncClient) -> None:
+    await client.get("/health")
+
+    response = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "aegisflow_gateway_http_requests_total" in response.text
+
+
 async def test_create_workflow_persists_new_workflow_and_transition(
     client: AsyncClient,
     app_context: tuple[object, async_sessionmaker[AsyncSession]],

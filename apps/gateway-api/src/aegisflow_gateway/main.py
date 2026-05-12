@@ -8,7 +8,7 @@ from aegisflow_gateway.config import get_settings
 from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowReviewActionError
 from aegisflow_gateway.telemetry.correlation import CorrelationIdMiddleware
 from aegisflow_gateway.telemetry.logging import configure_logging
-from aegisflow_gateway.telemetry.tracing import configure_telemetry
+from aegisflow_gateway.telemetry.tracing import GatewayTelemetryMiddleware, configure_telemetry
 
 
 def create_app() -> FastAPI:
@@ -22,8 +22,16 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_allowed_origins,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Accept", "Content-Type", "X-Actor-ID", "X-Correlation-ID"],
+        allow_headers=[
+            "Accept",
+            "Content-Type",
+            "traceparent",
+            "tracestate",
+            "X-Actor-ID",
+            "X-Correlation-ID",
+        ],
     )
+    app.add_middleware(GatewayTelemetryMiddleware)
     app.add_middleware(CorrelationIdMiddleware)
     app.include_router(router)
 

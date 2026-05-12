@@ -1,12 +1,20 @@
 from collections.abc import MutableMapping
+from time import perf_counter
 
 from opentelemetry import propagate, trace
+from opentelemetry.context import attach, detach
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import Span, SpanKind, Status, StatusCode
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from aegisflow_gateway.config import Settings
+from aegisflow_gateway.telemetry.correlation import CORRELATION_ID_HEADER
+from aegisflow_gateway.telemetry.metrics import record_http_request
 
 _configured = False
 
@@ -38,5 +46,72 @@ def inject_trace_context(headers: MutableMapping[str, str] | None = None) -> dic
     return carrier
 
 
+def current_trace_id() -> str | None:
+    span_context = trace.get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return None
+    return f"{span_context.trace_id:032x}"
+
+
 def _traces_endpoint(base_endpoint: str) -> str:
     return f"{base_endpoint.rstrip('/')}/v1/traces"
+
+
+class GatewayTelemetryMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next) -> Response:
+        context = propagate.extract(dict(request.headers))
+        token = attach(context)
+        route = "unmatched"
+        status_code = 500
+        start_time = perf_counter()
+        try:
+            tracer = trace.get_tracer(__name__)
+            with tracer.start_as_current_span(
+                f"{request.method} {request.url.path}",
+                kind=SpanKind.SERVER,
+            ) as span:
+                _set_request_span_attributes(span, request)
+                response = await call_next(request)
+                status_code = response.status_code
+                route = _route_path(request)
+                span.update_name(f"{request.method} {route}")
+                span.set_attribute("http.route", route)
+                span.set_attribute("http.status_code", status_code)
+                correlation_id = getattr(request.state, "correlation_id", None)
+                if correlation_id:
+                    span.set_attribute("correlation_id", correlation_id)
+                if status_code >= 500:
+                    span.set_status(Status(StatusCode.ERROR))
+                return response
+        except Exception as exc:
+            span = trace.get_current_span()
+            if span.is_recording():
+                route = _route_path(request)
+                span.set_attribute("http.route", route)
+                span.record_exception(exc)
+                span.set_status(Status(StatusCode.ERROR))
+            raise
+        finally:
+            record_http_request(
+                method=request.method,
+                route=route,
+                status_code=status_code,
+                duration_seconds=perf_counter() - start_time,
+            )
+            detach(token)
+
+
+def _set_request_span_attributes(span: Span, request: Request) -> None:
+    span.set_attribute("http.method", request.method)
+    span.set_attribute("url.path", request.url.path)
+    span.set_attribute("http.scheme", request.url.scheme)
+    span.set_attribute("network.protocol.version", request.scope.get("http_version", "unknown"))
+    incoming_correlation_id = request.headers.get(CORRELATION_ID_HEADER)
+    if incoming_correlation_id:
+        span.set_attribute("correlation_id", incoming_correlation_id)
+
+
+def _route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    route_path = getattr(route, "path", None)
+    return route_path or "unmatched"

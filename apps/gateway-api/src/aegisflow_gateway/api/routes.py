@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Header, Request, status
+from fastapi import APIRouter, Depends, Header, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aegisflow_gateway.api.schemas import (
@@ -36,6 +36,7 @@ from aegisflow_gateway.persistence.models import (
 from aegisflow_gateway.services.events import WorkflowEventPublisher
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
 from aegisflow_gateway.services.workflows import WorkflowReviewActionError, WorkflowService
+from aegisflow_gateway.telemetry.metrics import record_workflow_creation, render_prometheus_metrics
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -165,6 +166,12 @@ async def ready(settings: Settings = Depends(get_settings)) -> ReadyResponse:
     )
 
 
+@router.get("/metrics", include_in_schema=False)
+async def metrics() -> Response:
+    content, media_type = render_prometheus_metrics()
+    return Response(content=content, media_type=media_type)
+
+
 @router.post(
     "/api/v1/workflows",
     response_model=WorkflowResponse,
@@ -177,11 +184,16 @@ async def create_workflow(
     settings: Settings = Depends(get_settings),
 ) -> WorkflowResponse:
     service = WorkflowService(session)
-    workflow = await service.create_workflow(
-        payload,
-        correlation_id=request.state.correlation_id,
-        actor_id=request.headers.get("X-Actor-ID", "system"),
-    )
+    try:
+        workflow = await service.create_workflow(
+            payload,
+            correlation_id=request.state.correlation_id,
+            actor_id=request.headers.get("X-Actor-ID", "system"),
+        )
+        record_workflow_creation(workflow_type=payload.workflow_type.value, status="created")
+    except Exception:
+        record_workflow_creation(workflow_type=payload.workflow_type.value, status="failed")
+        raise
 
     if settings.enable_event_publishing:
         publisher = WorkflowEventPublisher(settings)

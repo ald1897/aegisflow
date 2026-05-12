@@ -46,3 +46,9 @@ scrape_configs:
     static_configs:
       - targets:
           - tool-runtime:8020
+
+  - job_name: evaluation-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - evaluation-service:8040

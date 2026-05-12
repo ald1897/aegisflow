@@ -134,6 +134,26 @@ services:
     ports:
       - "8020:8020"
 
+  evaluation-service:
+    build:
+      context: ../../apps/evaluation-service
+    container_name: aegisflow-evaluation-service
+    environment:
+      DATABASE_URL: postgresql+asyncpg://aegisflow:aegisflow@postgres:5432/aegisflow
+      SERVICE_NAME: evaluation-service
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+      ENABLE_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      METRICS_PORT: "8040"
+    ports:
+      - "8040:8040"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
   temporal:
     image: temporalio/auto-setup:1.24.2
     container_name: aegisflow-temporal

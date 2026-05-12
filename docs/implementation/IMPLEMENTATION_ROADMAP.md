@@ -174,6 +174,12 @@ The platform currently supports:
 - workflow-engine human review decision integration activity
 - approved and rejected workflow state transitions
 - approval decision timeline and outbox event support
+- gateway human review queue retrieval
+- gateway workflow review context retrieval
+- gateway workflow approval record retrieval
+- gateway approval and rejection decision submission
+- operator-console local frontend foundation
+- operator-console human review queue screen
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -183,13 +189,13 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the initial Phase 5 approval persistence foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the initial Phase 5 human review API foundation.
 
-Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, and workflow-engine decision transitions through approved or rejected completion paths. Gateway approval APIs and the operator-console are not yet implemented.
+Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the initial operator-console review queue screen.
 
 The platform does not yet implement:
-- human review UI
-- gateway approval workflows
+- workflow detail review UI
+- operator-console approval and rejection form submission
 - distributed tracing
 - AI evaluation
 
@@ -197,7 +203,7 @@ These capabilities remain assigned to later roadmap phases.
 
 Current workflow orchestration supports deterministic progression from `NEW` through `HUMAN_REVIEW_REQUIRED`, including governed intake and document analysis agent execution.
 
-Human approval and completion actions remain assigned to later phases.
+Human approval and completion actions are now available through gateway APIs and workflow-engine-owned decision execution. Operator-facing queue visibility is available locally; full workflow review and decision submission UI remains assigned to Phase 5 follow-on workstreams.
 
 ---
 

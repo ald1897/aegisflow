@@ -11,6 +11,7 @@ from aegisflow_gateway.main import create_app
 from aegisflow_gateway.persistence.database import get_session
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
+    ApprovalRecord,
     Base,
     ToolInvocationRecord,
     WorkflowEventOutbox,
@@ -19,6 +20,7 @@ from aegisflow_gateway.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.persistence.models import utc_now
+from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
 
 
 @pytest.fixture
@@ -255,3 +257,267 @@ async def test_get_workflow_tool_invocations_returns_structured_404(client: Asyn
 
     assert response.status_code == 404
     assert response.json()["error"] == "workflow_not_found"
+
+
+async def test_get_human_review_queue_returns_reviewable_workflows(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    review_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "review-queue-test"},
+        json={"priority": "HIGH", "metadata": {"case_reference": "MORT-REVIEW"}},
+    )
+    completed_response = await client.post("/api/v1/workflows", json={})
+    review_workflow_id = review_response.json()["workflow_id"]
+    completed_workflow_id = completed_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        review_workflow = await session.get(WorkflowRecord, review_workflow_id)
+        completed_workflow = await session.get(WorkflowRecord, completed_workflow_id)
+        assert review_workflow is not None
+        assert completed_workflow is not None
+        review_workflow.state = "HUMAN_REVIEW_REQUIRED"
+        completed_workflow.state = "COMPLETED"
+        await session.commit()
+
+    response = await client.get("/api/v1/reviews/human-review-queue")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 1
+    assert body["items"][0]["workflow_id"] == review_workflow_id
+    assert body["items"][0]["state"] == "HUMAN_REVIEW_REQUIRED"
+    assert body["items"][0]["priority"] == "HIGH"
+    assert body["items"][0]["metadata"] == {"case_reference": "MORT-REVIEW"}
+
+
+async def test_get_workflow_approvals_returns_persisted_records(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "approval-query-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    now = utc_now()
+    async with session_factory() as session:
+        session.add(
+            ApprovalRecord(
+                approval_id="00000000-0000-0000-0000-000000000301",
+                workflow_id=workflow_id,
+                correlation_id="approval-query-test",
+                decision="APPROVED",
+                decision_reason="exception_review_completed",
+                comment="Operator approved the prepared exception review.",
+                reviewed_by="operator-1",
+                reviewed_at=now,
+                approval_metadata={"review_channel": "operator_console"},
+                created_at=now,
+            )
+        )
+        await session.commit()
+
+    response = await client.get(f"/api/v1/workflows/{workflow_id}/approvals")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow_id"] == workflow_id
+    assert len(body["approvals"]) == 1
+    assert body["approvals"][0]["decision"] == "APPROVED"
+    assert body["approvals"][0]["reviewed_by"] == "operator-1"
+    assert body["approvals"][0]["metadata"] == {"review_channel": "operator_console"}
+
+
+async def test_get_workflow_review_context_aggregates_review_records(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "review-context-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    now = utc_now()
+    async with session_factory() as session:
+        workflow = await session.get(WorkflowRecord, workflow_id)
+        assert workflow is not None
+        workflow.state = "HUMAN_REVIEW_REQUIRED"
+        session.add(
+            AgentExecutionRecord(
+                agent_execution_id="00000000-0000-0000-0000-000000000401",
+                workflow_id=workflow_id,
+                agent_id="document_analysis_agent",
+                prompt_id="document-analysis-agent",
+                prompt_version="1",
+                model_name="deterministic-langgraph-local-v1",
+                status="COMPLETED",
+                validation_status="VALIDATED",
+                confidence_score=0.87,
+                requires_human_review=True,
+                input_metadata={"workflow_id": workflow_id},
+                output_payload={"recommended_next_state": "RISK_REVIEW_PENDING"},
+                execution_metadata={"workflow_state": "DOCUMENT_ANALYSIS_PENDING"},
+                error_message=None,
+                correlation_id="review-context-test",
+                created_by="workflow-engine",
+                started_at=now,
+                completed_at=now,
+                created_at=now,
+            )
+        )
+        session.add(
+            ToolInvocationRecord(
+                tool_invocation_id="00000000-0000-0000-0000-000000000402",
+                workflow_id=workflow_id,
+                correlation_id="review-context-test",
+                agent_execution_id="00000000-0000-0000-0000-000000000401",
+                agent_id="document_analysis_agent",
+                tool_id="document_fetch",
+                status="COMPLETED",
+                permission_status="AUTHORIZED",
+                input_validation_status="VALIDATED",
+                output_validation_status="VALIDATED",
+                input_metadata={"requested_document_types": ["income"]},
+                output_payload={"missing_document_types": ["income"]},
+                execution_metadata={"replay_safe": True},
+                error_message=None,
+                created_by="workflow-engine",
+                started_at=now,
+                completed_at=now,
+                created_at=now,
+            )
+        )
+        await session.commit()
+
+    response = await client.get(f"/api/v1/workflows/{workflow_id}/review-context")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow"]["workflow_id"] == workflow_id
+    assert body["workflow"]["state"] == "HUMAN_REVIEW_REQUIRED"
+    assert len(body["timeline"]) == 1
+    assert body["agent_executions"][0]["agent_id"] == "document_analysis_agent"
+    assert body["tool_invocations"][0]["tool_id"] == "document_fetch"
+    assert body["approvals"] == []
+
+
+async def test_create_workflow_approval_dispatches_temporal_decision_workflow(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "approval-create-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        workflow = await session.get(WorkflowRecord, workflow_id)
+        assert workflow is not None
+        workflow.state = "HUMAN_REVIEW_REQUIRED"
+        await session.commit()
+
+    async def fake_apply_human_review_decision(
+        self: TemporalWorkflowStarter,
+        payload: dict,
+    ) -> dict:
+        now = utc_now()
+        async with session_factory() as session:
+            workflow = await session.get(WorkflowRecord, payload["workflow_id"])
+            assert workflow is not None
+            workflow.state = "COMPLETED"
+            workflow.completed_at = now
+            session.add(
+                ApprovalRecord(
+                    approval_id=payload["approval_id"],
+                    workflow_id=payload["workflow_id"],
+                    correlation_id=payload["correlation_id"],
+                    decision=payload["decision"],
+                    decision_reason=payload["decision_reason"],
+                    comment=payload["comment"],
+                    reviewed_by=payload["reviewed_by"],
+                    reviewed_at=now,
+                    approval_metadata=payload["approval_metadata"],
+                    created_at=now,
+                )
+            )
+            await session.commit()
+        return {
+            "workflow_id": payload["workflow_id"],
+            "approval_id": payload["approval_id"],
+            "decision": payload["decision"],
+            "state": "COMPLETED",
+            "idempotent": False,
+        }
+
+    monkeypatch.setattr(
+        TemporalWorkflowStarter,
+        "apply_human_review_decision",
+        fake_apply_human_review_decision,
+    )
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/approvals",
+        headers={"X-Actor-ID": "operator-1"},
+        json={
+            "decision": "APPROVED",
+            "decision_reason": "exception_review_completed",
+            "comment": "Reviewed prepared case context and approved completion.",
+            "metadata": {"review_channel": "operator_console"},
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["workflow"]["state"] == "COMPLETED"
+    assert body["approval"]["decision"] == "APPROVED"
+    assert body["approval"]["reviewed_by"] == "operator-1"
+    assert body["approval"]["metadata"]["review_channel"] == "operator_console"
+    assert body["decision_result"]["state"] == "COMPLETED"
+
+
+async def test_create_workflow_approval_requires_actor_id(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/approvals",
+        json={
+            "decision": "APPROVED",
+            "decision_reason": "exception_review_completed",
+            "comment": "Reviewed prepared case context.",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "actor_required"
+
+
+async def test_create_workflow_approval_rejects_non_reviewable_workflow(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/approvals",
+        headers={"X-Actor-ID": "operator-1"},
+        json={
+            "decision": "REJECTED",
+            "decision_reason": "exception_review_incomplete",
+            "comment": "Required support is incomplete.",
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "workflow_not_reviewable"

@@ -213,6 +213,22 @@ Critical workflow decisions must require:
 - auditable approvals
 - explicit authorization checks
 
+## Implemented Local Human Review Controls
+
+The local Phase 5 gateway implementation requires `X-Actor-ID` for approval and rejection submission.
+
+Current enforced controls:
+- only workflows in `HUMAN_REVIEW_REQUIRED` are accepted for human review decisions
+- approval and rejection requests must include a decision reason and comment
+- gateway-api routes decision execution through workflow-engine-owned Temporal decision workflow
+- approval records preserve reviewing operator identity and decision metadata
+- gateway-api returns structured errors for missing actor identity and non-reviewable workflows
+
+Current local boundary:
+- production identity provider integration is not yet implemented
+- production RBAC policy enforcement is not yet implemented
+- operator-console approval submission is not yet implemented
+
 ---
 
 # AI Security Model

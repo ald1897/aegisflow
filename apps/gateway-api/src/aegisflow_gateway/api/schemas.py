@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from aegisflow_gateway.domain.workflows import WorkflowPriority, WorkflowState, WorkflowType
+from aegisflow_gateway.domain.workflows import ApprovalDecision, WorkflowPriority, WorkflowState, WorkflowType
 
 
 class WorkflowCreateRequest(BaseModel):
@@ -115,3 +115,58 @@ class ToolInvocationRecordResponse(BaseModel):
 class WorkflowToolInvocationsResponse(BaseModel):
     workflow_id: UUID
     invocations: list[ToolInvocationRecordResponse]
+
+
+class ApprovalRecordResponse(BaseModel):
+    approval_id: UUID
+    workflow_id: UUID
+    decision: ApprovalDecision
+    decision_reason: str
+    comment: str
+    reviewed_by: str
+    reviewed_at: datetime
+    metadata: dict[str, Any]
+    correlation_id: str
+    created_at: datetime
+
+
+class WorkflowApprovalsResponse(BaseModel):
+    workflow_id: UUID
+    approvals: list[ApprovalRecordResponse]
+
+
+class HumanReviewQueueItemResponse(BaseModel):
+    workflow_id: UUID
+    workflow_type: WorkflowType
+    state: WorkflowState
+    priority: WorkflowPriority
+    correlation_id: str
+    created_at: datetime
+    updated_at: datetime
+    metadata: dict[str, Any]
+
+
+class HumanReviewQueueResponse(BaseModel):
+    items: list[HumanReviewQueueItemResponse]
+    count: int
+
+
+class WorkflowReviewContextResponse(BaseModel):
+    workflow: WorkflowResponse
+    timeline: list[WorkflowTimelineEntryResponse]
+    agent_executions: list[AgentExecutionRecordResponse]
+    tool_invocations: list[ToolInvocationRecordResponse]
+    approvals: list[ApprovalRecordResponse]
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: ApprovalDecision
+    decision_reason: str = Field(min_length=1, max_length=255)
+    comment: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ApprovalDecisionResponse(BaseModel):
+    workflow: WorkflowResponse
+    approval: ApprovalRecordResponse
+    decision_result: dict[str, Any]

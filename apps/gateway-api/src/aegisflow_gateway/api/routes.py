@@ -1,16 +1,24 @@
 import logging
-from uuid import UUID
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aegisflow_gateway.api.schemas import (
     AgentExecutionRecordResponse,
+    ApprovalDecisionRequest,
+    ApprovalDecisionResponse,
+    ApprovalRecordResponse,
     HealthResponse,
+    HumanReviewQueueItemResponse,
+    HumanReviewQueueResponse,
     ReadyResponse,
     ToolInvocationRecordResponse,
+    WorkflowApprovalsResponse,
     WorkflowAgentExecutionsResponse,
     WorkflowCreateRequest,
+    WorkflowReviewContextResponse,
     WorkflowResponse,
     WorkflowToolInvocationsResponse,
     WorkflowTimelineEntryResponse,
@@ -20,13 +28,14 @@ from aegisflow_gateway.config import Settings, get_settings
 from aegisflow_gateway.persistence.database import check_database, get_session
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
+    ApprovalRecord,
     ToolInvocationRecord,
     WorkflowRecord,
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.services.events import WorkflowEventPublisher
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
-from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowService
+from aegisflow_gateway.services.workflows import WorkflowReviewActionError, WorkflowService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -106,6 +115,34 @@ def tool_invocation_to_response(invocation: ToolInvocationRecord) -> ToolInvocat
         started_at=invocation.started_at,
         completed_at=invocation.completed_at,
         created_at=invocation.created_at,
+    )
+
+
+def approval_to_response(approval: ApprovalRecord) -> ApprovalRecordResponse:
+    return ApprovalRecordResponse(
+        approval_id=UUID(approval.approval_id),
+        workflow_id=UUID(approval.workflow_id),
+        decision=approval.decision,
+        decision_reason=approval.decision_reason,
+        comment=approval.comment,
+        reviewed_by=approval.reviewed_by,
+        reviewed_at=approval.reviewed_at,
+        metadata=approval.approval_metadata,
+        correlation_id=approval.correlation_id,
+        created_at=approval.created_at,
+    )
+
+
+def workflow_to_review_queue_item(workflow: WorkflowRecord) -> HumanReviewQueueItemResponse:
+    return HumanReviewQueueItemResponse(
+        workflow_id=UUID(workflow.workflow_id),
+        workflow_type=workflow.workflow_type,
+        state=workflow.state,
+        priority=workflow.priority,
+        correlation_id=workflow.correlation_id,
+        created_at=workflow.created_at,
+        updated_at=workflow.updated_at,
+        metadata=workflow.workflow_metadata,
     )
 
 
@@ -218,4 +255,116 @@ async def get_workflow_tool_invocations(
     return WorkflowToolInvocationsResponse(
         workflow_id=workflow_id,
         invocations=[tool_invocation_to_response(invocation) for invocation in invocations],
+    )
+
+
+@router.get(
+    "/api/v1/reviews/human-review-queue",
+    response_model=HumanReviewQueueResponse,
+)
+async def get_human_review_queue(
+    session: AsyncSession = Depends(get_session),
+) -> HumanReviewQueueResponse:
+    service = WorkflowService(session)
+    workflows = await service.list_human_review_queue()
+    items = [workflow_to_review_queue_item(workflow) for workflow in workflows]
+    return HumanReviewQueueResponse(items=items, count=len(items))
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/review-context",
+    response_model=WorkflowReviewContextResponse,
+)
+async def get_workflow_review_context(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowReviewContextResponse:
+    service = WorkflowService(session)
+    workflow = await service.get_workflow(workflow_id)
+    timeline = await service.list_timeline_entries(workflow_id)
+    agent_executions = await service.list_agent_executions(workflow_id)
+    tool_invocations = await service.list_tool_invocations(workflow_id)
+    approvals = await service.list_approval_records(workflow_id)
+    return WorkflowReviewContextResponse(
+        workflow=workflow_to_response(workflow),
+        timeline=[timeline_entry_to_response(entry) for entry in timeline],
+        agent_executions=[agent_execution_to_response(execution) for execution in agent_executions],
+        tool_invocations=[tool_invocation_to_response(invocation) for invocation in tool_invocations],
+        approvals=[approval_to_response(approval) for approval in approvals],
+    )
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/approvals",
+    response_model=WorkflowApprovalsResponse,
+)
+async def get_workflow_approvals(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowApprovalsResponse:
+    service = WorkflowService(session)
+    approvals = await service.list_approval_records(workflow_id)
+    return WorkflowApprovalsResponse(
+        workflow_id=workflow_id,
+        approvals=[approval_to_response(approval) for approval in approvals],
+    )
+
+
+@router.post(
+    "/api/v1/workflows/{workflow_id}/approvals",
+    response_model=ApprovalDecisionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_workflow_approval(
+    workflow_id: UUID,
+    payload: ApprovalDecisionRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+) -> ApprovalDecisionResponse:
+    if actor_id is None or not actor_id.strip():
+        raise WorkflowReviewActionError(
+            error="actor_required",
+            message="Approval decisions require X-Actor-ID",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    service = WorkflowService(session)
+    workflow = await service.require_human_reviewable_workflow(workflow_id)
+    approval_id = uuid4()
+    reviewed_at = datetime.now(timezone.utc)
+    decision_payload = {
+        "approval_id": str(approval_id),
+        "workflow_id": str(workflow_id),
+        "correlation_id": workflow.correlation_id or request.state.correlation_id,
+        "decision": payload.decision.value,
+        "decision_reason": payload.decision_reason,
+        "comment": payload.comment,
+        "reviewed_by": actor_id.strip(),
+        "reviewed_at": reviewed_at.isoformat(),
+        "approval_metadata": {
+            **payload.metadata,
+            "review_channel": payload.metadata.get("review_channel", "gateway-api"),
+        },
+    }
+
+    starter = TemporalWorkflowStarter(settings)
+    decision_result = await starter.apply_human_review_decision(decision_payload)
+
+    session.expire_all()
+    refreshed_workflow = await service.get_workflow(workflow_id)
+    approvals = await service.list_approval_records(workflow_id)
+    approval = next((record for record in approvals if record.approval_id == str(approval_id)), None)
+    if approval is None:
+        raise WorkflowReviewActionError(
+            error="approval_record_unavailable",
+            message=f"Approval decision {approval_id} was accepted but no approval record was available",
+            status_code=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return ApprovalDecisionResponse(
+        workflow=workflow_to_response(refreshed_workflow),
+        approval=approval_to_response(approval),
+        decision_result=decision_result,
     )

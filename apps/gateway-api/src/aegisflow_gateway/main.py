@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from aegisflow_gateway.api.routes import router
 from aegisflow_gateway.api.schemas import ErrorResponse
 from aegisflow_gateway.config import get_settings
-from aegisflow_gateway.services.workflows import WorkflowNotFoundError
+from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowReviewActionError
 from aegisflow_gateway.telemetry.correlation import CorrelationIdMiddleware
 from aegisflow_gateway.telemetry.logging import configure_logging
 
@@ -14,6 +15,13 @@ def create_app() -> FastAPI:
     configure_logging(settings)
 
     app = FastAPI(title=settings.api_title, version=settings.api_version)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allowed_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Accept", "Content-Type", "X-Actor-ID", "X-Correlation-ID"],
+    )
     app.add_middleware(CorrelationIdMiddleware)
     app.include_router(router)
 
@@ -24,6 +32,17 @@ def create_app() -> FastAPI:
             content=ErrorResponse(
                 error="workflow_not_found",
                 message=str(exc),
+                correlation_id=getattr(request.state, "correlation_id", None),
+            ).model_dump(),
+        )
+
+    @app.exception_handler(WorkflowReviewActionError)
+    async def workflow_review_action_handler(request: Request, exc: WorkflowReviewActionError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ErrorResponse(
+                error=exc.error,
+                message=exc.message,
                 correlation_id=getattr(request.state, "correlation_id", None),
             ).model_dump(),
         )

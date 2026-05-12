@@ -12,6 +12,11 @@ class WorkflowPriority(StrEnum):
     urgent = "URGENT"
 
 
+class ApprovalDecision(StrEnum):
+    approved = "APPROVED"
+    rejected = "REJECTED"
+
+
 class WorkflowState(StrEnum):
     new = "NEW"
     intake_in_progress = "INTAKE_IN_PROGRESS"

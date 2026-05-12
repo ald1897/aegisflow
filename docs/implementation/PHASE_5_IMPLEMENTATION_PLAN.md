@@ -418,41 +418,41 @@ Completion criteria:
 
 ## Workstream 3 - Gateway Review APIs
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add human review queue endpoint
-- add workflow review context endpoint
-- add workflow approvals retrieval endpoint
-- add workflow approval decision endpoint
-- add DTOs for review queue, review context, and approval records
-- add gateway-api tests
+- add human review queue endpoint - Complete
+- add workflow review context endpoint - Complete
+- add workflow approvals retrieval endpoint - Complete
+- add workflow approval decision endpoint - Complete
+- add DTOs for review queue, review context, and approval records - Complete
+- add gateway-api tests - Complete
 
 Completion criteria:
-- gateway can list workflows awaiting human review
-- gateway can return full review context for a workflow
-- gateway can record approval and rejection decisions
-- gateway returns structured errors for invalid review actions
+- gateway can list workflows awaiting human review - Met
+- gateway can return full review context for a workflow - Met
+- gateway can record approval and rejection decisions - Met
+- gateway returns structured errors for invalid review actions - Met
 
 ---
 
 ## Workstream 4 - Operator Console Foundation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- inspect existing `apps/operator-console` structure
-- choose implementation approach aligned with repository patterns
-- create local frontend app if needed
-- add Docker Compose support if needed
-- add review queue screen
-- add API client configuration
+- inspect existing `apps/operator-console` structure - Complete
+- choose implementation approach aligned with repository patterns - Complete
+- create local frontend app if needed - Complete
+- add Docker Compose support if needed - Complete
+- add review queue screen - Complete
+- add API client configuration - Complete
 
 Completion criteria:
-- operator-console starts locally
-- first screen shows human review queue
-- queue fetches data from gateway-api
-- UI uses operational layout suitable for repeated review work
+- operator-console starts locally - Met
+- first screen shows human review queue - Met
+- queue fetches data from gateway-api - Met
+- UI uses operational layout suitable for repeated review work - Met
 
 ---
 
@@ -686,12 +686,67 @@ Completed workstream:
 - Workstream 2 - Workflow Decision Integration
 
 Boundary:
-- gateway-api does not yet expose review queue, review context, or approval decision endpoints
 - operator-console does not yet display or submit approval decisions
 - standard Mortgage Exception Review workflow still pauses at `HUMAN_REVIEW_REQUIRED` until a human decision activity is invoked
 
 Next step:
 - implement Workstream 3: Gateway Review APIs
+
+## 2026-05-12 - Workstream 3
+
+Status:
+- added gateway-api `GET /api/v1/reviews/human-review-queue`
+- added gateway-api `GET /api/v1/workflows/{workflow_id}/review-context`
+- added gateway-api `GET /api/v1/workflows/{workflow_id}/approvals`
+- added gateway-api `POST /api/v1/workflows/{workflow_id}/approvals`
+- added DTOs for review queue entries, review context, approval records, and decision responses
+- added required `X-Actor-ID` enforcement for approval decisions
+- added structured `workflow_not_reviewable` and `actor_required` error handling
+- added a workflow-engine-owned `HumanReviewDecisionWorkflow` that executes the existing `apply_human_review_decision` activity
+- routed gateway approval decisions through Temporal instead of direct gateway state mutation
+- rebuilt gateway-api and workflow-engine containers
+- validated gateway-api automated tests with 15 passing tests
+- validated workflow-engine automated tests with 12 passing tests
+- validated local live API smoke path from workflow creation to `HUMAN_REVIEW_REQUIRED` to gateway approval and `COMPLETED`
+
+Completed workstream:
+- Workstream 3 - Gateway Review APIs
+
+Boundary:
+- operator-console does not yet display or submit approval decisions
+- Postman approval decision coverage remains assigned to Workstream 6
+- standard Mortgage Exception Review workflow still pauses at `HUMAN_REVIEW_REQUIRED` until a human decision is submitted through the gateway approval API
+
+Next step:
+- implement Workstream 4: Operator Console Foundation
+
+## 2026-05-12 - Workstream 4
+
+Status:
+- scaffolded `apps/operator-console` as a React, TypeScript, Vite, and Tailwind application
+- implemented the first screen as an operational human review queue
+- added queue summary counts for awaiting review, urgent, and high-priority workflows
+- added gateway-api client configuration through `VITE_GATEWAY_API_URL`
+- added Dockerfile for local operator-console execution
+- added Docker Compose service on port `3000`
+- added gateway-api CORS support for `http://localhost:3000`
+- added operator-console README with local startup and validation commands
+- validated operator-console production build with `npm run build`
+- validated gateway-api automated tests with 15 passing tests after CORS update
+- built and started local operator-console container
+- validated gateway-api review queue API from the running local stack
+- validated gateway-api CORS preflight for operator-console origin
+
+Completed workstream:
+- Workstream 4 - Operator Console Foundation
+
+Boundary:
+- operator-console displays the review queue only
+- workflow detail, timeline panels, agent/tool panels, and approval form remain assigned to Workstream 5
+- operator-console does not call agent-runtime, tool-runtime, or workflow-engine directly
+
+Next step:
+- implement Workstream 5: Workflow Review Experience
 
 ---
 

@@ -36,6 +36,7 @@ The local Docker Compose stack currently runs:
 - workflow-engine
 - agent-runtime
 - tool-runtime
+- operator-console
 
 ---
 
@@ -49,9 +50,14 @@ The gateway API currently supports:
 - workflow timeline retrieval
 - workflow agent execution retrieval
 - workflow tool invocation retrieval
+- human review queue retrieval
+- workflow review context retrieval
+- workflow approval record retrieval
+- workflow approval and rejection decision submission
 - correlation ID propagation
 - structured JSON logs
 - Temporal workflow startup
+- Temporal human review decision workflow dispatch
 - workflow event publication for workflow creation
 
 Implemented endpoints:
@@ -64,6 +70,10 @@ GET /api/v1/workflows/{workflow_id}
 GET /api/v1/workflows/{workflow_id}/timeline
 GET /api/v1/workflows/{workflow_id}/agent-executions
 GET /api/v1/workflows/{workflow_id}/tool-invocations
+GET /api/v1/reviews/human-review-queue
+GET /api/v1/workflows/{workflow_id}/review-context
+GET /api/v1/workflows/{workflow_id}/approvals
+POST /api/v1/workflows/{workflow_id}/approvals
 ```
 
 ---
@@ -139,6 +149,43 @@ Implemented Phase 4 gateway capability:
 
 ---
 
+## operator-console
+
+The operator-console currently supports the Phase 5 human review queue foundation.
+
+It provides:
+- React and TypeScript frontend application
+- TailwindCSS operational UI styling
+- local Vite runtime on port `3000`
+- gateway-api client configuration through `VITE_GATEWAY_API_URL`
+- first-screen human review queue
+- queue summary counts for awaiting review, urgent workflows, and high-priority workflows
+- workflow identifiers, case references, priorities, states, update timestamps, and correlation IDs
+- manual refresh of queue data
+
+Implemented local endpoint:
+
+```text
+http://localhost:3000
+```
+
+The operator-console calls gateway-api only.
+
+It does not call:
+- workflow-engine
+- agent-runtime
+- tool-runtime
+- Postgres
+- Temporal
+
+Current Phase 5 operator-console boundary:
+- queue visibility is implemented
+- workflow detail review is not yet implemented
+- approval and rejection form submission is not yet implemented
+- production authentication and RBAC are not yet implemented
+
+---
+
 ## workflow-engine
 
 The workflow-engine currently runs as a Temporal worker.
@@ -167,6 +214,7 @@ During current workflow execution:
 - tool invocation records produce timeline entries and outbox events
 - human approval decisions can be recorded by a workflow-engine activity for backend validation
 - human approval decisions can advance workflows through approved or rejected completion paths when invoked by workflow-engine activity
+- human approval decisions submitted through gateway-api are routed to a workflow-engine-owned Temporal decision workflow
 
 ---
 
@@ -224,7 +272,10 @@ Current approval persistence boundary:
 - approval records can produce workflow event outbox records
 - duplicate terminal approval decisions are rejected by backend logic
 - approval decisions can advance workflow state through the workflow-engine decision activity
-- gateway-api does not yet expose approval decision endpoints
+- gateway-api can list human-review workflows
+- gateway-api can retrieve workflow review context
+- gateway-api can retrieve persisted workflow approval records
+- gateway-api can submit approval and rejection decisions through the workflow-engine Temporal decision workflow
 
 ---
 
@@ -257,7 +308,7 @@ Current approval event boundary:
 - approval decision events are supported by the workflow-engine recording activity
 - approval decision events are persisted through the outbox model
 - approval decision integration emits workflow approved, rejected, and completed events
-- approval decision events are not yet produced by gateway approval APIs
+- approval decision events are produced when gateway approval APIs dispatch human decisions through the workflow-engine Temporal decision workflow
 
 Event publication status is tracked in:
 
@@ -701,8 +752,28 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-9 passed
+15 passed
 ```
+
+---
+
+## operator-console Build
+
+```powershell
+Set-Location apps/operator-console
+npm install
+npm run build
+```
+
+Expected result:
+
+```text
+TypeScript compilation succeeds
+Vite production build succeeds
+```
+
+Known local note:
+- npm audit currently reports moderate Vite/esbuild dev-server advisories for the Node 16-compatible Vite version used by the local workstation. This is a local development tooling concern, not a production mortgage workflow runtime surface.
 
 ---
 
@@ -749,7 +820,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-5 passed
+12 passed
 ```
 
 ---

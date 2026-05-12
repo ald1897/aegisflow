@@ -126,6 +126,10 @@ GET /api/v1/workflows/{workflow_id}
 GET /api/v1/workflows/{workflow_id}/timeline
 GET /api/v1/workflows/{workflow_id}/agent-executions
 GET /api/v1/workflows/{workflow_id}/tool-invocations
+GET /api/v1/reviews/human-review-queue
+GET /api/v1/workflows/{workflow_id}/review-context
+GET /api/v1/workflows/{workflow_id}/approvals
+POST /api/v1/workflows/{workflow_id}/approvals
 ```
 
 The gateway-api remains the primary API surface for workflow initiation and operational query access.
@@ -133,6 +137,19 @@ The gateway-api remains the primary API surface for workflow initiation and oper
 The `agent-executions` endpoint returns persisted agent execution records associated with a workflow. It must not expose unrestricted prompt input, sensitive borrower payloads, secrets, or internal persistence entities directly.
 
 The `tool-invocations` endpoint returns persisted governed tool invocation records associated with a workflow. It must expose DTOs containing operational status, validation status, permission status, correlation metadata, and validated output summaries. It must not expose persistence models, secrets, raw document content, or unrestricted borrower PII.
+
+The human review queue endpoint returns workflows currently in `HUMAN_REVIEW_REQUIRED` state for operator review. It must not include completed, failed, approved, rejected, or non-reviewable workflows.
+
+The review context endpoint aggregates workflow-owned review data for an operator:
+- workflow record
+- timeline entries
+- agent execution records
+- tool invocation records
+- approval records
+
+The approvals retrieval endpoint returns persisted approval records for a workflow through DTOs.
+
+The approval decision endpoint accepts approval or rejection decisions from a human operator. It must require `X-Actor-ID`, reject non-reviewable workflows with structured errors, and route workflow state changes through workflow-engine-owned Temporal decision execution. Gateway handlers must not directly mutate workflow state for approval outcomes.
 
 ---
 

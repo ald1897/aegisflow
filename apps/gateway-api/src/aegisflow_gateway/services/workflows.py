@@ -13,6 +13,7 @@ from aegisflow_gateway.domain.workflows import (
 )
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
+    ApprovalRecord,
     ToolInvocationRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
@@ -25,6 +26,14 @@ class WorkflowNotFoundError(Exception):
     def __init__(self, workflow_id: UUID) -> None:
         self.workflow_id = workflow_id
         super().__init__(f"Workflow {workflow_id} was not found")
+
+
+class WorkflowReviewActionError(Exception):
+    def __init__(self, *, error: str, message: str, status_code: int) -> None:
+        self.error = error
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
 
 
 class WorkflowService:
@@ -140,3 +149,30 @@ class WorkflowService:
             .order_by(ToolInvocationRecord.created_at.asc(), ToolInvocationRecord.tool_invocation_id.asc())
         )
         return list(result.scalars().all())
+
+    async def list_human_review_queue(self) -> list[WorkflowRecord]:
+        result = await self.session.execute(
+            select(WorkflowRecord)
+            .where(WorkflowRecord.state == WorkflowState.human_review_required.value)
+            .order_by(WorkflowRecord.updated_at.asc(), WorkflowRecord.workflow_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_approval_records(self, workflow_id: UUID) -> list[ApprovalRecord]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(ApprovalRecord)
+            .where(ApprovalRecord.workflow_id == str(workflow_id))
+            .order_by(ApprovalRecord.reviewed_at.asc(), ApprovalRecord.approval_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def require_human_reviewable_workflow(self, workflow_id: UUID) -> WorkflowRecord:
+        workflow = await self.get_workflow(workflow_id)
+        if workflow.state != WorkflowState.human_review_required.value:
+            raise WorkflowReviewActionError(
+                error="workflow_not_reviewable",
+                message=f"Workflow {workflow_id} is not in HUMAN_REVIEW_REQUIRED state",
+                status_code=409,
+            )
+        return workflow

@@ -241,4 +241,4 @@ They describe a human operator decision recorded inside a governed workflow cont
 Current implementation boundary:
 - approval decision event records are written through the outbox model
 - approval decision integration can advance workflow state through `APPROVED` or `REJECTED` to `COMPLETED`
-- gateway-api does not yet expose approval decision endpoints
+- gateway-api exposes approval decision submission and routes decisions through workflow-engine-owned Temporal decision execution

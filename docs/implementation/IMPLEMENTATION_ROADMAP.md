@@ -65,27 +65,32 @@ The platform can currently:
 - record approved tool invocation activity during the workflow path
 - persist validated agent execution records
 - stop at `HUMAN_REVIEW_REQUIRED`
+- present reviewable workflows in a local operator console
+- show workflow evidence for human review
+- capture local approval or rejection decisions with operator comments
+- persist approval records and approval decision history
+- complete the local workflow after a human decision through workflow-engine-owned transitions
 - record workflow timeline entries
 - retrieve workflow tool invocation history
 - publish workflow events for downstream operational visibility
-- support manual validation through Postman
+- support manual validation through Postman for both approval and rejection paths
 
 Current business capability:
-- AegisFlow can demonstrate the controlled intake and routing backbone for mortgage exception review cases.
-- The platform can show how a case moves from creation through governed AI-assisted intake and document analysis to required human review with durable state history.
-- The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action.
+- AegisFlow can demonstrate a controlled mortgage exception review case from intake through AI-assisted preparation, human review, decision capture, and local workflow completion.
+- The platform can show how a case moves from creation through governed agent and tool activity to an accountable operator decision with durable state history.
+- The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action, and decision history preserved.
 
 Current business boundary:
 - AegisFlow performs local deterministic document analysis simulation for workflow demonstration, not production document interpretation.
 - AegisFlow can execute synthetic mock tool calls through a governed service boundary and persist those calls during the workflow path.
-- AegisFlow is not yet making approval, denial, underwriting, or exception decisions.
+- AegisFlow can record local simulated approval or rejection decisions for the Mortgage Exception Review workflow, but it does not make underwriting, credit, compliance, servicing, or production exception decisions.
 - AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
-- AegisFlow does not yet provide an operator-facing review console.
+- AegisFlow does not update downstream mortgage systems after local approval or rejection.
 
 Business meaning:
-- the platform has moved from design into a working operational prototype
-- the current implementation proves the control framework, not the final business automation
-- the system is ready for governed tool mediation and human review tooling
+- the platform has moved from design into a working local operational prototype
+- the current implementation proves the control framework and human review loop, not final production mortgage automation
+- the system is ready for observability, AI evaluation, replay, and production-style hardening work
 
 ---
 
@@ -94,12 +99,9 @@ Business meaning:
 Future phases will expand AegisFlow from a workflow orchestration foundation into a governed AI-assisted mortgage operations platform.
 
 Planned future capability includes:
-- AI-assisted intake and document review
-- governed tool access to approved mortgage data sources
-- structured AI outputs that must be validated before use
-- operator review queues for human approval and exception handling
-- approval and rejection actions with audit history
-- workflow completion after human decisioning
+- production-grade identity and role enforcement
+- governed integration with approved mortgage data sources
+- richer operational dashboards for review queues and bottlenecks
 - production-grade observability for operational oversight
 - AI evaluation and replay-based quality measurement
 - failure recovery and replay tooling
@@ -135,6 +137,7 @@ The following phases have been completed in the local implementation:
 - Phase 2 - Workflow Engine MVP
 - Phase 3 - Agent Runtime MVP
 - Phase 4 - Tool Runtime MVP
+- Phase 5 - Human Review UI
 
 ---
 
@@ -197,9 +200,11 @@ The current implementation includes the Phase 3 governed agent runtime foundatio
 Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- Phase 5 final documentation closeout
 - distributed tracing
 - AI evaluation
+- replay and failure recovery tooling
+- production identity provider and RBAC integration
+- production mortgage system integrations
 
 These capabilities remain assigned to later roadmap phases.
 
@@ -402,8 +407,55 @@ Validation completed:
 - Postman collection JSON validated successfully with Phase 4 tool requests
 - local gateway-api retrieval returned persisted `borrower_profile_lookup` and `document_fetch` records for a workflow
 
+---
+
+## Phase 5 - Human Review UI
+
+Status: Completed
+
+Implementation started: 2026-05-12
+
+Completion date: 2026-05-12
+
+Completed deliverables:
+- `approval_records` persistence table
+- workflow-engine approval decision recording activity
+- workflow-engine human review decision integration activity
+- approval decision timeline entries
+- approval decision outbox events
+- `workflow.approved`, `workflow.rejected`, and `workflow.completed` event support for human decisions
+- gateway-api human review queue endpoint
+- gateway-api workflow review context endpoint
+- gateway-api workflow approval retrieval endpoint
+- gateway-api approval and rejection submission endpoint
+- workflow-engine-owned Temporal decision workflow for approval and rejection actions
+- operator-console local frontend foundation
+- operator-console human review queue
+- operator-console workflow review workspace
+- workflow detail, timeline, agent execution, tool invocation, and approval history panels
+- operator-console approval and rejection form submission
+- Postman approval and rejection validation flow
+- current functionality, roadmap, API, event, data, and security documentation updates
+
+Explicit non-scope:
+- production identity provider integration
+- production RBAC policy enforcement
+- production mortgage system update actions
+- final underwriting, credit, compliance, or servicing decisions
+
+Validation completed:
+- workflow-engine pytest suite passed with 12 tests
+- gateway-api pytest suite passed with 15 tests
+- operator-console production build passed with `npm run build`
+- operator-console container started and served locally on port `3000`
+- gateway-api review queue and review context retrieval were validated against the local stack
+- Postman collection JSON validated successfully with Phase 5 approval and rejection requests
+- local live API smoke validation approved one reviewable workflow to `COMPLETED`
+- local live API smoke validation rejected a separate reviewable workflow to `COMPLETED`
+- persisted approval records were retrieved for both approved and rejected workflows
+
 Next deliverable:
-- Phase 5 - Human Review UI
+- Phase 6 - Observability Integration
 
 ---
 

@@ -501,20 +501,20 @@ Completion criteria:
 
 ## Workstream 7 - Documentation And Roadmap Updates
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- update `CURRENT_FUNCTIONALITY.md`
-- update `IMPLEMENTATION_ROADMAP.md`
-- update `API_CONTRACTS.md`
-- update `EVENT_CATALOG.md`
-- update `DATA_MODEL.md` if approval implementation details refine the model
-- update `SECURITY_MODEL.md` if new operator enforcement decisions are added
+- update `CURRENT_FUNCTIONALITY.md` - Complete
+- update `IMPLEMENTATION_ROADMAP.md` - Complete
+- update `API_CONTRACTS.md` - Complete
+- update `EVENT_CATALOG.md` - Complete
+- update `DATA_MODEL.md` if approval implementation details refine the model - Complete
+- update `SECURITY_MODEL.md` if new operator enforcement decisions are added - Complete
 
 Completion criteria:
-- documentation describes implemented behavior, not aspirational behavior
-- Phase 5 completion log is added after validation
-- business-facing boundary remains clear for mortgage stakeholders
+- documentation describes implemented behavior, not aspirational behavior - Met
+- Phase 5 completion log is added after validation - Met
+- business-facing boundary remains clear for mortgage stakeholders - Met
 
 ---
 
@@ -550,15 +550,19 @@ Expected Postman requests:
 - Get Workflow Review Context
 - Get Workflow Approvals
 - Approve Workflow
-- Reject Workflow
 - Get Workflow Timeline
+- Create Mortgage Exception Review Workflow For Rejection
+- Poll Rejection Workflow Until Human Review Required
+- Reject Workflow
+- Get Rejection Workflow Approvals
 
 Expected manual result:
 - workflow reaches `HUMAN_REVIEW_REQUIRED`
 - review queue includes the workflow
 - review context includes prepared workflow history
-- approval decision is persisted
-- approval decision produces timeline and event records
+- approval decision is persisted for one workflow
+- rejection decision is persisted for a separate workflow
+- approval and rejection decisions produce timeline and event records
 - workflow state changes according to state machine rules
 
 ---
@@ -612,6 +616,8 @@ Mitigation:
 ---
 
 # Phase 5 Completion Criteria
+
+Status: Completed
 
 Phase 5 is complete when:
 - approval records are persisted in PostgreSQL
@@ -801,6 +807,27 @@ Boundary:
 
 Next step:
 - implement Workstream 7: Documentation And Roadmap Updates
+
+## 2026-05-12 - Workstream 7
+
+Status:
+- updated current functionality documentation to describe completed Phase 5 human review behavior
+- updated implementation roadmap business language for current local operator review and decision capability
+- added Phase 5 completion log to the implementation roadmap
+- updated API contracts with implemented approval decision response and transition behavior
+- updated event catalog with approval event production boundaries for operator-console and Postman validation
+- updated data model with current local persistence records and approval record ownership boundaries
+- updated security model to reflect operator-console approval submission and local `X-Actor-ID` boundary
+- preserved explicit non-scope for production identity, RBAC, downstream mortgage system updates, and final underwriting or compliance decisions
+
+Completed workstream:
+- Workstream 7 - Documentation And Roadmap Updates
+
+Completed phase:
+- Phase 5 - Human Review UI
+
+Next step:
+- begin Phase 6 planning: Observability Integration
 
 ---
 

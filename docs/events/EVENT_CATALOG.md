@@ -242,3 +242,4 @@ Current implementation boundary:
 - approval decision event records are written through the outbox model
 - approval decision integration can advance workflow state through `APPROVED` or `REJECTED` to `COMPLETED`
 - gateway-api exposes approval decision submission and routes decisions through workflow-engine-owned Temporal decision execution
+- operator-console and Postman validation submit approval decisions through gateway-api; they do not emit approval events directly

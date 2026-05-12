@@ -619,6 +619,34 @@ PostgreSQL schemas should:
 
 ---
 
+## Current Local Implementation
+
+The local implementation currently persists:
+- workflow records
+- workflow state transitions
+- workflow timeline entries
+- workflow event outbox records
+- agent execution records
+- tool invocation records
+- approval records
+
+Approval records currently preserve:
+- approval identity
+- workflow identity
+- correlation identity
+- approval or rejection decision
+- decision reason
+- operator comment
+- reviewing operator identity
+- review timestamp
+- bounded decision metadata
+
+Approval records are written by workflow-engine-owned decision execution.
+
+gateway-api and operator-console may request approval or rejection actions, but they do not own authoritative approval persistence or workflow state transition logic.
+
+---
+
 # pgvector
 
 ## Responsibility

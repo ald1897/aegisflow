@@ -24,6 +24,8 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and Phas
 - approval and rejection submission through gateway-api
 - operator-console review and decision workflow
 
+Phase 5 is complete for the local simulation boundary.
+
 ---
 
 # Implemented Runtime Components

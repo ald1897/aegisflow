@@ -223,11 +223,13 @@ Current enforced controls:
 - gateway-api routes decision execution through workflow-engine-owned Temporal decision workflow
 - approval records preserve reviewing operator identity and decision metadata
 - gateway-api returns structured errors for missing actor identity and non-reviewable workflows
+- operator-console captures operator identity, decision, and comment before submitting decisions to gateway-api
 
 Current local boundary:
 - production identity provider integration is not yet implemented
 - production RBAC policy enforcement is not yet implemented
-- operator-console approval submission is not yet implemented
+- `X-Actor-ID` is a local development actor boundary, not a substitute for production authentication
+- operator-console does not enforce production role policy locally
 
 ---
 

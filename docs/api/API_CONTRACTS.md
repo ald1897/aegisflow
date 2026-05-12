@@ -151,6 +151,13 @@ The approvals retrieval endpoint returns persisted approval records for a workfl
 
 The approval decision endpoint accepts approval or rejection decisions from a human operator. It must require `X-Actor-ID`, reject non-reviewable workflows with structured errors, and route workflow state changes through workflow-engine-owned Temporal decision execution. Gateway handlers must not directly mutate workflow state for approval outcomes.
 
+Current approval decision behavior:
+- accepted decisions return the refreshed workflow record, persisted approval record, and workflow-engine decision result
+- approved decisions transition the local workflow through `APPROVED` to `COMPLETED`
+- rejected decisions transition the local workflow through `REJECTED` to `COMPLETED`
+- duplicate or non-reviewable workflow decisions are rejected by workflow review validation
+- approval and rejection requests are available to the operator-console and Postman validation collection through gateway-api only
+
 ---
 
 ## agent-runtime

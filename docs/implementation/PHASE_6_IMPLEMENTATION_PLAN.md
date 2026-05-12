@@ -220,6 +220,26 @@ Structured application logs may remain container logs in early workstreams if tr
 
 ---
 
+## Current Local Observability Endpoints
+
+Workstream 1 exposes the following local endpoints:
+- Grafana: `http://localhost:3001`
+- Prometheus: `http://localhost:9090`
+- Jaeger: `http://localhost:16686`
+- OpenTelemetry Collector OTLP gRPC: `localhost:4317`
+- OpenTelemetry Collector OTLP HTTP: `http://localhost:4318`
+- OpenTelemetry Collector internal metrics: `http://localhost:8888/metrics`
+- OpenTelemetry Collector exported metrics: `http://localhost:8889/metrics`
+
+Grafana local credentials:
+
+```text
+Username: admin
+Password: aegisflow
+```
+
+---
+
 ## Telemetry Ownership
 
 Each service owns telemetry emission for its own execution boundary.
@@ -345,23 +365,23 @@ Logs must not become the primary audit store.
 
 ## Workstream 1 - Local Observability Stack
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add OpenTelemetry Collector service to local Docker Compose
-- add trace backend service, preferably Tempo or Jaeger
-- add Prometheus service
-- add Grafana service
-- add local observability configuration files under `infrastructure/local-dev`
-- expose stable local ports for Grafana, Prometheus, and trace inspection
-- document local observability startup URLs
+- add OpenTelemetry Collector service to local Docker Compose - Complete
+- add trace backend service, preferably Tempo or Jaeger - Complete
+- add Prometheus service - Complete
+- add Grafana service - Complete
+- add local observability configuration files under `infrastructure/local-dev` - Complete
+- expose stable local ports for Grafana, Prometheus, and trace inspection - Complete
+- document local observability startup URLs - Complete
 
 Completion criteria:
-- local Docker Compose stack starts with observability services
-- Grafana is reachable locally
-- Prometheus is reachable locally
-- trace backend is reachable locally
-- existing application services continue to start successfully
+- local Docker Compose stack starts with observability services - Met
+- Grafana is reachable locally - Met
+- Prometheus is reachable locally - Met
+- trace backend is reachable locally - Met
+- existing application services continue to start successfully - Met
 
 ---
 
@@ -634,6 +654,39 @@ Status:
 Next step:
 - implement Workstream 1: Local Observability Stack
 
+## 2026-05-12 - Workstream 1
+
+Status:
+- added OpenTelemetry Collector to local Docker Compose
+- added Jaeger trace backend for local trace inspection
+- added Prometheus for local metrics collection
+- added Grafana on port `3001` to avoid collision with operator-console on port `3000`
+- added OpenTelemetry Collector configuration under `infrastructure/local-dev/observability`
+- added Prometheus scrape configuration for Prometheus, OpenTelemetry Collector, Collector-exported metrics, and Jaeger
+- added Grafana datasource provisioning for Prometheus and Jaeger
+- added local observability README with URLs and local credentials
+- validated Docker Compose configuration
+- started observability services locally
+- validated Grafana health endpoint
+- validated Prometheus readiness endpoint
+- validated Jaeger UI endpoint
+- validated OpenTelemetry Collector metrics endpoints
+- validated Prometheus target health for all initial observability scrape targets
+- validated Grafana datasource provisioning
+- validated existing gateway-api, agent-runtime, tool-runtime, and operator-console local endpoints after adding observability services
+
+Completed workstream:
+- Workstream 1 - Local Observability Stack
+
+Boundary:
+- application services are not instrumented yet
+- Jaeger may not contain AegisFlow traces until later workstreams emit telemetry
+- Grafana has datasource provisioning but Phase 6 dashboards remain assigned to Workstream 6
+- Loki and local log aggregation remain deferred
+
+Next step:
+- implement Workstream 2: Shared Telemetry Configuration
+
 ---
 
 # Decision Log
@@ -671,3 +724,16 @@ Reason:
 - Temporal workflow determinism is a core AegisFlow architecture constraint
 - telemetry must not affect workflow replay or state progression
 - activity-level and service-boundary instrumentation provides observability without weakening orchestration guarantees
+
+---
+
+## Decision 4 - Use Jaeger As Initial Local Trace Backend
+
+Decision:
+- Workstream 1 uses Jaeger as the initial local trace backend.
+
+Reason:
+- Jaeger provides a lightweight trace inspection UI for local development
+- the OpenTelemetry Collector can export traces to Jaeger through OTLP
+- the stack remains simple while Phase 6 establishes trace and metric plumbing
+- Grafana can still be provisioned with a Jaeger datasource for later dashboards and trace links

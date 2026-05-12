@@ -121,6 +121,9 @@ The current local implementation emits workflow, agent execution, supported tool
 ```text
 workflow.created
 workflow.state_changed
+workflow.approved
+workflow.rejected
+workflow.completed
 workflow.failed
 ```
 
@@ -209,7 +212,7 @@ Produced by the workflow-engine when a human approval decision is recorded:
 approval.decision_recorded
 ```
 
-Reserved for workflow decision integration:
+Produced by workflow decision integration when human review decisions are applied:
 
 ```text
 workflow.approved
@@ -237,5 +240,5 @@ They describe a human operator decision recorded inside a governed workflow cont
 
 Current implementation boundary:
 - approval decision event records are written through the outbox model
-- approval decision records do not yet advance workflow state
+- approval decision integration can advance workflow state through `APPROVED` or `REJECTED` to `COMPLETED`
 - gateway-api does not yet expose approval decision endpoints

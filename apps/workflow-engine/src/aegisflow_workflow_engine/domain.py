@@ -7,6 +7,8 @@ class WorkflowState(StrEnum):
     document_analysis_pending = "DOCUMENT_ANALYSIS_PENDING"
     risk_review_pending = "RISK_REVIEW_PENDING"
     human_review_required = "HUMAN_REVIEW_REQUIRED"
+    approved = "APPROVED"
+    rejected = "REJECTED"
     completed = "COMPLETED"
     failed = "FAILED"
 
@@ -54,7 +56,9 @@ ALLOWED_STATE_TRANSITIONS: dict[WorkflowState, set[WorkflowState]] = {
     WorkflowState.intake_in_progress: {WorkflowState.document_analysis_pending, WorkflowState.failed},
     WorkflowState.document_analysis_pending: {WorkflowState.risk_review_pending, WorkflowState.failed},
     WorkflowState.risk_review_pending: {WorkflowState.human_review_required, WorkflowState.failed},
-    WorkflowState.human_review_required: {WorkflowState.completed, WorkflowState.failed},
+    WorkflowState.human_review_required: {WorkflowState.approved, WorkflowState.rejected, WorkflowState.failed},
+    WorkflowState.approved: {WorkflowState.completed, WorkflowState.failed},
+    WorkflowState.rejected: {WorkflowState.completed, WorkflowState.failed},
     WorkflowState.completed: set(),
     WorkflowState.failed: set(),
 }

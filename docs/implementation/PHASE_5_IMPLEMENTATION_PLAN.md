@@ -398,21 +398,21 @@ Completion criteria:
 
 ## Workstream 2 - Workflow Decision Integration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add workflow-engine activity for human approval decisions
-- validate current workflow state before decisioning
-- transition approved workflows through valid state machine states
-- transition rejected workflows through valid state machine states
-- preserve Temporal replay safety
-- add workflow-engine tests
+- add workflow-engine activity for human approval decisions - Complete
+- validate current workflow state before decisioning - Complete
+- transition approved workflows through valid state machine states - Complete
+- transition rejected workflows through valid state machine states - Complete
+- preserve Temporal replay safety - Complete
+- add workflow-engine tests - Complete
 
 Completion criteria:
-- only `HUMAN_REVIEW_REQUIRED` workflows can be decisioned
-- approved workflows reach the expected approved or completed state
-- rejected workflows reach the expected rejected or completed state
-- invalid transitions are rejected and auditable
+- only `HUMAN_REVIEW_REQUIRED` workflows can be decisioned - Met
+- approved workflows reach the expected approved or completed state - Met
+- rejected workflows reach the expected rejected or completed state - Met
+- invalid transitions are rejected and auditable - Met
 
 ---
 
@@ -659,12 +659,39 @@ Completed workstream:
 - Workstream 1 - Approval Persistence And Events
 
 Boundary:
-- approval decisions do not yet advance workflow state
+- approval decision state advancement was deferred to Workstream 2 at this checkpoint
 - gateway-api does not yet expose review queue, review context, or approval decision endpoints
 - operator-console does not yet display or submit approval decisions
 
 Next step:
 - implement Workstream 2: Workflow Decision Integration
+
+## 2026-05-12 - Workstream 2
+
+Status:
+- added explicit workflow states `APPROVED` and `REJECTED`
+- updated allowed workflow transitions for human review decisions
+- added workflow-engine `apply_human_review_decision` activity
+- validated workflows must be in `HUMAN_REVIEW_REQUIRED` before a new human decision is applied
+- wired approved decisions through `HUMAN_REVIEW_REQUIRED` to `APPROVED` to `COMPLETED`
+- wired rejected decisions through `HUMAN_REVIEW_REQUIRED` to `REJECTED` to `COMPLETED`
+- emitted `workflow.approved`, `workflow.rejected`, and `workflow.completed` events through the existing state transition outbox pattern
+- preserved idempotent retries after decision completion
+- registered the decision activity with the Temporal worker
+- rebuilt the local workflow-engine container with the new activity
+- validated workflow-engine automated tests with 12 passing tests
+- validated gateway-api automated tests with 9 passing tests
+
+Completed workstream:
+- Workstream 2 - Workflow Decision Integration
+
+Boundary:
+- gateway-api does not yet expose review queue, review context, or approval decision endpoints
+- operator-console does not yet display or submit approval decisions
+- standard Mortgage Exception Review workflow still pauses at `HUMAN_REVIEW_REQUIRED` until a human decision activity is invoked
+
+Next step:
+- implement Workstream 3: Gateway Review APIs
 
 ---
 

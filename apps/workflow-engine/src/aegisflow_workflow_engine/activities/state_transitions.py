@@ -94,11 +94,7 @@ async def advance_workflow_state(payload: dict) -> dict:
         )
         session.add(timeline_entry)
 
-        event_type = (
-            WorkflowEventType.failed.value
-            if target_state == WorkflowState.failed
-            else WorkflowEventType.state_changed.value
-        )
+        event_type = _event_type_for_target_state(target_state)
         event_id = f"{workflow_id}:{event_type}:{target_state.value}"
         existing_event = await session.get(WorkflowEventOutbox, event_id)
         if existing_event is None:
@@ -127,6 +123,18 @@ async def advance_workflow_state(payload: dict) -> dict:
 
     await publish_workflow_event(event_id)
     return {"workflow_id": workflow_id, "state": target_state.value, "idempotent": False}
+
+
+def _event_type_for_target_state(target_state: WorkflowState) -> str:
+    if target_state == WorkflowState.failed:
+        return WorkflowEventType.failed.value
+    if target_state == WorkflowState.approved:
+        return WorkflowEventType.approved.value
+    if target_state == WorkflowState.rejected:
+        return WorkflowEventType.rejected.value
+    if target_state == WorkflowState.completed:
+        return WorkflowEventType.completed.value
+    return WorkflowEventType.state_changed.value
 
 
 async def publish_workflow_event(event_id: str) -> None:

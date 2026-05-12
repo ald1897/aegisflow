@@ -151,9 +151,12 @@ INTAKE_IN_PROGRESS
 DOCUMENT_ANALYSIS_PENDING
 RISK_REVIEW_PENDING
 HUMAN_REVIEW_REQUIRED
+APPROVED
+REJECTED
+COMPLETED
 ```
 
-The workflow stops at `HUMAN_REVIEW_REQUIRED` because human approval handling is not implemented yet.
+The standard workflow path stops at `HUMAN_REVIEW_REQUIRED` until a human decision is applied.
 
 During current workflow execution:
 - `intake_agent` runs during `INTAKE_IN_PROGRESS`
@@ -163,6 +166,7 @@ During current workflow execution:
 - approved agent tool invocations are persisted as workflow-owned tool invocation records
 - tool invocation records produce timeline entries and outbox events
 - human approval decisions can be recorded by a workflow-engine activity for backend validation
+- human approval decisions can advance workflows through approved or rejected completion paths when invoked by workflow-engine activity
 
 ---
 
@@ -219,7 +223,8 @@ Current approval persistence boundary:
 - approval records can produce workflow timeline entries
 - approval records can produce workflow event outbox records
 - duplicate terminal approval decisions are rejected by backend logic
-- approval decisions do not yet advance workflow state
+- approval decisions can advance workflow state through the workflow-engine decision activity
+- gateway-api does not yet expose approval decision endpoints
 
 ---
 
@@ -236,6 +241,9 @@ workflow-events
 Current event types:
 - `workflow.created`
 - `workflow.state_changed`
+- `workflow.approved`
+- `workflow.rejected`
+- `workflow.completed`
 - `agent.execution_completed`
 - `tool.invocation_completed`
 - `tool.invocation_failed`
@@ -248,6 +256,7 @@ Current tool invocation event boundary:
 Current approval event boundary:
 - approval decision events are supported by the workflow-engine recording activity
 - approval decision events are persisted through the outbox model
+- approval decision integration emits workflow approved, rejected, and completed events
 - approval decision events are not yet produced by gateway approval APIs
 
 Event publication status is tracked in:
@@ -269,8 +278,7 @@ PUBLISHED
 The following capabilities are intentionally not implemented yet:
 - human approval UI
 - gateway approve/reject APIs
-- workflow state advancement after approval decisions
-- workflow completion after human review
+- operator-accessible workflow completion after human review
 - distributed tracing stack
 - AI evaluation
 - authentication and RBAC

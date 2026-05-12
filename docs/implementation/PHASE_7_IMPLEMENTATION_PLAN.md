@@ -534,23 +534,23 @@ Completion criteria:
 
 ## Workstream 6 - Dataset And Replay-Aware Evaluation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define local evaluation dataset case format
-- seed initial Mortgage Exception Review local dataset cases
-- add dataset listing and case retrieval endpoints
-- support evaluating a workflow against an expected dataset case
-- compare expected agents, tools, human review requirement, and decision path against actual records
-- document the boundary between evaluation replay datasets and full workflow replay engine
-- add tests for dataset-case scoring
+- define local evaluation dataset case format - Complete
+- seed initial Mortgage Exception Review local dataset cases - Complete
+- add dataset listing and case retrieval endpoints - Complete
+- support evaluating a workflow against an expected dataset case - Complete
+- compare expected agents, tools, human review requirement, and decision path against actual records - Complete
+- document the boundary between evaluation replay datasets and full workflow replay engine - Complete
+- add tests for dataset-case scoring - Complete
 
 Completion criteria:
-- local dataset cases are versioned or explicitly identified
-- evaluation runs can reference a dataset case
-- dataset comparison results are persisted
-- replay-aware evaluation is side-effect free
-- tests pass
+- local dataset cases are versioned or explicitly identified - Met
+- evaluation runs can reference a dataset case - Met
+- dataset comparison results are persisted - Met
+- replay-aware evaluation is side-effect free - Met
+- tests pass - Met
 
 ---
 
@@ -882,6 +882,34 @@ Boundary:
 
 Next step:
 - implement Workstream 6: Dataset And Replay-Aware Evaluation
+
+## 2026-05-12 - Workstream 6
+
+Status:
+- added explicit local dataset case definitions for `mortgage-exception-local-v1`
+- seeded approval, rejection, and human-review Mortgage Exception Review dataset cases idempotently through evaluation-service
+- added dataset summary DTOs and dataset case request support
+- added `GET /api/v1/evaluations/datasets`
+- added `GET /api/v1/evaluations/datasets/{dataset_id}/cases`
+- added `dataset_case_id` support to evaluation run creation
+- added `dataset-replay-contract` evaluator for dataset case alignment
+- compared expected agents, tools, human review requirement, and terminal decision against persisted workflow evidence
+- persisted dataset comparison results as evaluation results
+- stored dataset case identity and replay boundary metadata on evaluation run metadata
+- rebuilt the evaluation-service image
+- validated evaluation-service automated tests with 36 passing tests
+
+Completed workstream:
+- Workstream 6 - Dataset And Replay-Aware Evaluation
+
+Boundary:
+- dataset replay is side-effect-free scoring against persisted records only
+- Phase 7 dataset replay does not invoke Temporal replay, workflow activities, agent execution, tool execution, approval dispatch, or recovery behavior
+- full workflow replay and failure recovery remain assigned to the later replay phase
+- gateway/Postman validation, dashboards, and phase closeout documentation remain assigned to later workstreams
+
+Next step:
+- implement Workstream 7: Gateway And Postman Validation
 
 ---
 

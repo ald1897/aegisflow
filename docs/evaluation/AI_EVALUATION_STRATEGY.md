@@ -421,6 +421,7 @@ Implemented flow:
 - reject missing workflows or workflows that have not reached a reviewable or terminal state
 - execute deterministic local evaluators against bounded evidence
 - optionally include the deterministic judge-boundary fallback when using `judge_model_disabled` mode
+- optionally compare workflow evidence against a selected local dataset case when `dataset_case_id` is supplied
 - persist evaluation run and evaluation result records
 - retrieve a run with its results or list runs for a workflow
 
@@ -430,6 +431,10 @@ Current implemented endpoints:
 POST /api/v1/evaluations/workflows/{workflow_id}/runs
 GET /api/v1/evaluations/runs/{evaluation_run_id}
 GET /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/datasets
+GET /api/v1/evaluations/datasets/{dataset_id}/cases
 ```
 
 Evaluation run orchestration is side-effect free with respect to workflow state. It reads authoritative records and writes evaluation records only.
+
+The initial local replay-aware dataset is `mortgage-exception-local-v1`. It includes approval, rejection, and human-review Mortgage Exception Review scenarios. Dataset replay means deterministic comparison against persisted records; it does not run a full workflow replay engine, invoke Temporal activities, call agents, execute tools, dispatch approvals, or perform recovery actions.

@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from aegisflow_evaluation_service.evaluators import EvaluationScore, evaluate_deterministically
+from aegisflow_evaluation_service.datasets import LOCAL_DATASET_CASES
+from aegisflow_evaluation_service.evaluators import DatasetReplayEvaluator, EvaluationScore, evaluate_deterministically
 from aegisflow_evaluation_service.evidence import (
     AgentExecutionEvidence,
     EvaluationExpectations,
@@ -12,6 +13,8 @@ from aegisflow_evaluation_service.judges import JudgeEvaluationRequest, get_judg
 from aegisflow_evaluation_service.repository import EvaluationRepository
 from aegisflow_evaluation_service.schemas import (
     EvaluationDatasetCaseCreate,
+    EvaluationDatasetCaseRead,
+    EvaluationDatasetSummary,
     EvaluationResultCreate,
     EvaluationResultRead,
     EvaluationRunDetail,
@@ -39,6 +42,11 @@ class WorkflowNotFoundError(EvaluationOrchestrationError):
 class WorkflowNotReadyForEvaluationError(EvaluationOrchestrationError):
     error_code = "workflow_not_ready_for_evaluation"
     status_code = 409
+
+
+class DatasetCaseNotFoundError(EvaluationOrchestrationError):
+    error_code = "dataset_case_not_found"
+    status_code = 404
 
 
 REVIEWABLE_OR_TERMINAL_STATES = {"HUMAN_REVIEW_REQUIRED", "APPROVED", "REJECTED", "COMPLETED"}
@@ -91,16 +99,13 @@ class EvaluationRunService:
             )
 
         evidence = await self.load_workflow_evidence(str(workflow_id))
-        expectations = EvaluationExpectations(
-            expected_agents=payload.expected_agents,
-            expected_tools=payload.expected_tools,
-            expected_human_review=payload.expected_human_review,
-            expected_terminal_decision=payload.expected_terminal_decision,
-        )
+        dataset_case = await self._get_dataset_case_for_run(payload)
+        expectations = self._build_expectations(payload, dataset_case)
 
         started_at = datetime.now(timezone.utc)
-        scores = self._score_evidence(evidence, expectations, payload.evaluation_mode)
+        scores = self._score_evidence(evidence, expectations, payload.evaluation_mode, dataset_case is not None)
         completed_at = datetime.now(timezone.utc)
+        run_dataset_id = dataset_case.dataset_id if dataset_case else payload.dataset_id
         run = await self.repository.create_run(
             EvaluationRunCreate(
                 evaluation_run_id=payload.evaluation_run_id,
@@ -108,16 +113,18 @@ class EvaluationRunService:
                 correlation_id=evidence.correlation_id,
                 evaluation_scope=payload.evaluation_scope,
                 evaluation_mode=payload.evaluation_mode,
-                dataset_id=payload.dataset_id,
+                dataset_id=run_dataset_id,
                 status="COMPLETED",
                 started_at=started_at,
                 completed_at=completed_at,
                 created_by=created_by,
                 run_metadata={
                     **payload.run_metadata,
+                    "dataset_case_id": dataset_case.dataset_case_id if dataset_case else payload.dataset_case_id,
                     "agent_execution_count": len(evidence.agent_executions),
                     "tool_invocation_count": len(evidence.tool_invocations),
                     "approval_decision_present": evidence.approval_decision is not None,
+                    "replay_boundary": "dataset_evaluation_only" if dataset_case else "none",
                 },
             )
         )
@@ -234,14 +241,83 @@ class EvaluationRunService:
         evidence: WorkflowEvaluationEvidence,
         expectations: EvaluationExpectations,
         evaluation_mode: str,
+        include_dataset_score: bool,
     ) -> list[EvaluationScore]:
         scores = evaluate_deterministically(evidence, expectations)
+        if include_dataset_score or evaluation_mode == "dataset_replay":
+            scores.extend(DatasetReplayEvaluator().evaluate(evidence, expectations))
         if evaluation_mode == "judge_model_disabled":
             judge_score = get_judge_evaluator(self.judge_settings).evaluate(
                 JudgeEvaluationRequest(evidence=evidence, expectations=expectations)
             )
             scores.append(judge_score.to_evaluation_score())
         return scores
+
+    async def list_datasets(self) -> list[EvaluationDatasetSummary]:
+        await self._ensure_local_dataset_cases()
+        cases = await self.repository.list_dataset_cases()
+        grouped: dict[str, list] = {}
+        for dataset_case in cases:
+            grouped.setdefault(dataset_case.dataset_id, []).append(dataset_case)
+
+        summaries: list[EvaluationDatasetSummary] = []
+        for dataset_id, dataset_cases in sorted(grouped.items()):
+            version = None
+            for dataset_case in dataset_cases:
+                version = dataset_case.case_metadata.get("dataset_version")
+                if version:
+                    break
+            summaries.append(
+                EvaluationDatasetSummary(
+                    dataset_id=dataset_id,
+                    workflow_type=dataset_cases[0].workflow_type,
+                    case_count=len(dataset_cases),
+                    dataset_version=version,
+                )
+            )
+        return summaries
+
+    async def list_dataset_cases(self, dataset_id: str) -> list[EvaluationDatasetCaseRead]:
+        await self._ensure_local_dataset_cases()
+        cases = await self.repository.list_dataset_cases(dataset_id)
+        return [EvaluationDatasetCaseRead.model_validate(dataset_case) for dataset_case in cases]
+
+    async def _get_dataset_case_for_run(self, payload: EvaluationRunRequest):
+        if payload.dataset_case_id is None:
+            return None
+        await self._ensure_local_dataset_cases()
+        dataset_case = await self.repository.get_dataset_case(payload.dataset_case_id)
+        if dataset_case is None:
+            raise DatasetCaseNotFoundError("dataset case was not found")
+        if payload.dataset_id and payload.dataset_id != dataset_case.dataset_id:
+            raise DatasetCaseNotFoundError("dataset case was not found in the requested dataset")
+        return dataset_case
+
+    async def _ensure_local_dataset_cases(self) -> None:
+        for dataset_case in LOCAL_DATASET_CASES:
+            await self.repository.create_dataset_case(dataset_case)
+
+    def _build_expectations(self, payload: EvaluationRunRequest, dataset_case) -> EvaluationExpectations:
+        if dataset_case is None:
+            return EvaluationExpectations(
+                expected_agents=payload.expected_agents,
+                expected_tools=payload.expected_tools,
+                expected_human_review=payload.expected_human_review,
+                expected_terminal_decision=payload.expected_terminal_decision,
+            )
+
+        expected_agents = tuple(dataset_case.expected_agents.get("agent_ids", ()))
+        expected_tools = tuple(dataset_case.expected_tools.get("tool_ids", ()))
+        return EvaluationExpectations(
+            expected_agents=payload.expected_agents or expected_agents,
+            expected_tools=payload.expected_tools or expected_tools,
+            expected_human_review=(
+                payload.expected_human_review
+                if payload.expected_human_review is not None
+                else dataset_case.expected_human_review
+            ),
+            expected_terminal_decision=payload.expected_terminal_decision or dataset_case.expected_decision,
+        )
 
 
 def _uuid_or_none(value: str | None) -> UUID | None:

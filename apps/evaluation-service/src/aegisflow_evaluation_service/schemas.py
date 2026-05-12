@@ -109,6 +109,7 @@ class EvaluationRunRequest(BaseModel):
     evaluation_scope: str = Field(default="workflow", min_length=1, max_length=80)
     evaluation_mode: str = Field(default="deterministic_local", min_length=1, max_length=80)
     dataset_id: str | None = Field(default=None, max_length=120)
+    dataset_case_id: str | None = Field(default=None, max_length=128)
     expected_agents: tuple[str, ...] = Field(default_factory=tuple)
     expected_tools: tuple[str, ...] = Field(default_factory=tuple)
     expected_human_review: bool | None = None
@@ -135,3 +136,10 @@ class EvaluationRunSummary(BaseModel):
 class EvaluationRunDetail(BaseModel):
     run: EvaluationRunRead
     results: list[EvaluationResultRead]
+
+
+class EvaluationDatasetSummary(BaseModel):
+    dataset_id: str
+    workflow_type: str
+    case_count: int
+    dataset_version: str | None = None

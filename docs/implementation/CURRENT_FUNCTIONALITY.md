@@ -29,6 +29,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - provisioned Grafana dashboards for local operational inspection
 - structured JSON logs with correlation ID and trace ID support
 - evaluation-service health, readiness, metrics, persistence, deterministic evaluators, judge-boundary fallback, and evaluation run orchestration
+- local evaluation dataset listing and replay-aware dataset case scoring
 - persisted evaluation runs and evaluation results for bounded workflow evidence
 
 Phase 6 is complete for the local simulation boundary.
@@ -191,6 +192,8 @@ It provides:
 - judge-model boundary with external judging disabled by default
 - deterministic local judge fallback for repeatable local validation
 - evaluation run orchestration for persisted workflow evidence
+- local seeded dataset cases for Mortgage Exception Review approval, rejection, and human-review scenarios
+- dataset-backed scoring that compares expected agents, tools, human review, and terminal decision against actual records
 - structured errors for missing workflows and workflows not ready for evaluation
 - idempotent run creation when an explicit `evaluation_run_id` is reused
 
@@ -203,6 +206,8 @@ GET /metrics
 POST /api/v1/evaluations/workflows/{workflow_id}/runs
 GET /api/v1/evaluations/runs/{evaluation_run_id}
 GET /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/datasets
+GET /api/v1/evaluations/datasets/{dataset_id}/cases
 ```
 
 The evaluation-service reads workflow evidence but does not mutate workflow state, approve or reject workflows, bypass human review, or call production mortgage systems.
@@ -210,7 +215,8 @@ The evaluation-service reads workflow evidence but does not mutate workflow stat
 Current Phase 7 boundary:
 - evaluation runs score bounded local workflow evidence only
 - external judge model calls are disabled by default
-- dataset listing, dataset scoring, gateway evaluation retrieval, Postman validation, and evaluation dashboards remain future Phase 7 workstreams
+- dataset replay is side-effect-free scoring against persisted records, not full Temporal replay or failure recovery
+- gateway evaluation retrieval, Postman validation, and evaluation dashboards remain future Phase 7 workstreams
 
 ---
 

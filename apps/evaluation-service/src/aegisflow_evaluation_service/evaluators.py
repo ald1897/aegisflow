@@ -414,6 +414,103 @@ class HallucinationSignalEvaluator:
         )
 
 
+class DatasetReplayEvaluator:
+    evaluator_id = "dataset-replay-contract"
+    evaluator_version = EVALUATOR_VERSION
+
+    def evaluate(
+        self,
+        evidence: WorkflowEvaluationEvidence,
+        expectations: EvaluationExpectations | None = None,
+    ) -> list[EvaluationScore]:
+        expectations = expectations or EvaluationExpectations()
+        observed_agents = {agent.agent_id for agent in evidence.agent_executions}
+        observed_tools = {tool.tool_id for tool in evidence.tool_invocations}
+        missing_agents = sorted(set(expectations.expected_agents) - observed_agents)
+        missing_tools = sorted(set(expectations.expected_tools) - observed_tools)
+        failures: list[str] = []
+        warnings: list[str] = []
+
+        if missing_agents:
+            failures.append("dataset expected agents were missing")
+        if missing_tools:
+            failures.append("dataset expected tools were missing")
+        if expectations.expected_human_review is True and evidence.workflow_state not in REVIEWABLE_OR_TERMINAL_STATES:
+            failures.append("dataset expected a human-review or terminal workflow path")
+        if expectations.expected_human_review is False and evidence.workflow_state in REVIEWABLE_OR_TERMINAL_STATES:
+            warnings.append("dataset did not expect a human-review path")
+        if expectations.expected_terminal_decision and evidence.approval_decision != expectations.expected_terminal_decision:
+            failures.append("dataset expected terminal decision did not match actual approval evidence")
+        if not expectations.expected_terminal_decision and evidence.approval_decision:
+            warnings.append("dataset did not expect a terminal decision but one was present")
+
+        metadata = {
+            "expected_agents": list(expectations.expected_agents),
+            "observed_agents": sorted(observed_agents),
+            "expected_tools": list(expectations.expected_tools),
+            "observed_tools": sorted(observed_tools),
+            "expected_human_review": expectations.expected_human_review,
+            "expected_terminal_decision": expectations.expected_terminal_decision,
+            "actual_workflow_state": evidence.workflow_state,
+            "actual_approval_decision": evidence.approval_decision,
+            "missing_agents": missing_agents,
+            "missing_tools": missing_tools,
+        }
+
+        if failures:
+            return [
+                self._score(
+                    score_value=0.0,
+                    score_status=FAIL,
+                    severity=SEVERITY_CRITICAL,
+                    rationale="Workflow evidence did not satisfy the selected local dataset case.",
+                    metadata={**metadata, "failures": failures, "warnings": warnings},
+                )
+            ]
+        if warnings:
+            return [
+                self._score(
+                    score_value=0.75,
+                    score_status=WARN,
+                    severity=SEVERITY_MODERATE,
+                    rationale="Workflow evidence satisfied required dataset checks with warning signals.",
+                    metadata={**metadata, "warnings": warnings},
+                )
+            ]
+        return [
+            self._score(
+                score_value=1.0,
+                score_status=PASS,
+                severity=SEVERITY_INFORMATIONAL,
+                rationale="Workflow evidence satisfied the selected local dataset case.",
+                metadata=metadata,
+            )
+        ]
+
+    def _score(
+        self,
+        *,
+        score_value: float,
+        score_status: str,
+        severity: str,
+        rationale: str,
+        metadata: dict[str, Any],
+    ) -> EvaluationScore:
+        return EvaluationScore(
+            evaluator_id=self.evaluator_id,
+            evaluator_version=self.evaluator_version,
+            score_name="dataset_case_alignment",
+            score_value=score_value,
+            score_status=score_status,
+            severity=severity,
+            rationale=rationale,
+            result_metadata=metadata,
+        )
+
+
+REVIEWABLE_OR_TERMINAL_STATES = {"HUMAN_REVIEW_REQUIRED", "APPROVED", "REJECTED", "COMPLETED"}
+
+
 def deterministic_evaluators() -> tuple[DeterministicEvaluator, ...]:
     return (
         AgentOutputEvaluator(),

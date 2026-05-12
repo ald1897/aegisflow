@@ -9,8 +9,15 @@ from aegisflow_evaluation_service.database import check_database, get_session
 from aegisflow_evaluation_service.logging import configure_logging
 from aegisflow_evaluation_service.metrics import record_service_startup, render_prometheus_metrics
 from aegisflow_evaluation_service.repository import EvaluationRepository
-from aegisflow_evaluation_service.schemas import EvaluationRunDetail, EvaluationRunRequest, EvaluationRunSummary
+from aegisflow_evaluation_service.schemas import (
+    EvaluationDatasetCaseRead,
+    EvaluationDatasetSummary,
+    EvaluationRunDetail,
+    EvaluationRunRequest,
+    EvaluationRunSummary,
+)
 from aegisflow_evaluation_service.services import (
+    DatasetCaseNotFoundError,
     EvaluationOrchestrationError,
     EvaluationRunService,
     WorkflowNotFoundError,
@@ -111,11 +118,30 @@ def create_app() -> FastAPI:
         except EvaluationOrchestrationError as exc:
             raise _evaluation_http_error(exc) from exc
 
+    @app.get("/api/v1/evaluations/datasets", response_model=list[EvaluationDatasetSummary])
+    async def list_evaluation_datasets(
+        session: AsyncSession = Depends(get_session),
+    ) -> list[EvaluationDatasetSummary]:
+        service = EvaluationRunService(EvaluationRepository(session), judge_settings=settings)
+        datasets = await service.list_datasets()
+        await session.commit()
+        return datasets
+
+    @app.get("/api/v1/evaluations/datasets/{dataset_id}/cases", response_model=list[EvaluationDatasetCaseRead])
+    async def list_evaluation_dataset_cases(
+        dataset_id: str,
+        session: AsyncSession = Depends(get_session),
+    ) -> list[EvaluationDatasetCaseRead]:
+        service = EvaluationRunService(EvaluationRepository(session), judge_settings=settings)
+        cases = await service.list_dataset_cases(dataset_id)
+        await session.commit()
+        return cases
+
     return app
 
 
 def _evaluation_http_error(exc: EvaluationOrchestrationError) -> HTTPException:
-    if isinstance(exc, WorkflowNotFoundError):
+    if isinstance(exc, WorkflowNotFoundError | DatasetCaseNotFoundError):
         status_code = status.HTTP_404_NOT_FOUND
     elif isinstance(exc, WorkflowNotReadyForEvaluationError):
         status_code = status.HTTP_409_CONFLICT

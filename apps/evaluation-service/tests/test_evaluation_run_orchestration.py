@@ -64,6 +64,7 @@ async def seed_evaluable_workflow(
     workflow_id,
     state: str = "COMPLETED",
     include_agent: bool = True,
+    include_document_evidence: bool = False,
 ) -> None:
     now = datetime.now(timezone.utc)
     async with session_factory() as session:
@@ -132,6 +133,56 @@ async def seed_evaluable_workflow(
                     created_at=now,
                 )
             )
+            if include_document_evidence:
+                document_agent_execution_id = uuid4()
+                session.add(
+                    AgentExecutionRecord(
+                        agent_execution_id=str(document_agent_execution_id),
+                        workflow_id=str(workflow_id),
+                        agent_id="document_analysis_agent",
+                        prompt_id="document-analysis-agent",
+                        prompt_version="v1",
+                        model_name="deterministic-langgraph-local-v1",
+                        status="COMPLETED",
+                        validation_status="VALIDATED",
+                        confidence_score=0.88,
+                        requires_human_review=True,
+                        input_metadata={"bounded": True},
+                        output_payload={
+                            "recommended_next_state": "RISK_REVIEW_PENDING",
+                            "summary": "Bounded document evaluation orchestration test summary.",
+                            "requires_human_review": True,
+                            "confidence_score": 0.88,
+                        },
+                        execution_metadata={"tool_invocations": [{"tool_id": "document_fetch"}]},
+                        correlation_id="phase7-ws5",
+                        created_by="pytest",
+                        started_at=now,
+                        completed_at=now,
+                        created_at=now,
+                    )
+                )
+                session.add(
+                    ToolInvocationRecord(
+                        tool_invocation_id=str(uuid4()),
+                        workflow_id=str(workflow_id),
+                        correlation_id="phase7-ws5",
+                        agent_execution_id=str(document_agent_execution_id),
+                        agent_id="document_analysis_agent",
+                        tool_id="document_fetch",
+                        status="COMPLETED",
+                        permission_status="AUTHORIZED",
+                        input_validation_status="VALIDATED",
+                        output_validation_status="VALIDATED",
+                        input_metadata={"bounded": True},
+                        output_payload={"available_document_types": ["income_statement"]},
+                        execution_metadata={"source": "unit-test"},
+                        created_by="pytest",
+                        started_at=now,
+                        completed_at=now,
+                        created_at=now,
+                    )
+                )
         session.add(
             WorkflowTimelineEntry(
                 timeline_entry_id=str(uuid4()),
@@ -289,3 +340,84 @@ async def test_incomplete_workflow_returns_structured_error(
 
     assert response.status_code == 409
     assert response.json()["detail"]["error"] == "workflow_not_ready_for_evaluation"
+
+
+async def test_dataset_listing_seeds_local_mortgage_exception_cases(client: AsyncClient) -> None:
+    datasets_response = await client.get("/api/v1/evaluations/datasets")
+    cases_response = await client.get("/api/v1/evaluations/datasets/mortgage-exception-local-v1/cases")
+
+    assert datasets_response.status_code == 200
+    assert datasets_response.json()[0]["dataset_id"] == "mortgage-exception-local-v1"
+    assert datasets_response.json()[0]["case_count"] == 3
+    assert cases_response.status_code == 200
+    case_ids = {case["dataset_case_id"] for case in cases_response.json()}
+    assert case_ids == {
+        "mortgage-exception-local-v1:approval",
+        "mortgage-exception-local-v1:human-review",
+        "mortgage-exception-local-v1:rejection",
+    }
+
+
+async def test_dataset_case_evaluation_persists_dataset_alignment_score(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    workflow_id = uuid4()
+    await seed_evaluable_workflow(session_factory, workflow_id=workflow_id, include_document_evidence=True)
+
+    response = await client.post(
+        f"/api/v1/evaluations/workflows/{workflow_id}/runs",
+        json={
+            "evaluation_mode": "dataset_replay",
+            "dataset_case_id": "mortgage-exception-local-v1:approval",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()
+    assert payload["run"]["dataset_id"] == "mortgage-exception-local-v1"
+    assert payload["run"]["run_metadata"]["dataset_case_id"] == "mortgage-exception-local-v1:approval"
+    dataset_score = next(result for result in payload["results"] if result["evaluator_id"] == "dataset-replay-contract")
+    assert dataset_score["score_status"] == "PASS"
+    assert dataset_score["result_metadata"]["expected_agents"] == ["intake_agent", "document_analysis_agent"]
+    assert dataset_score["result_metadata"]["expected_tools"] == ["borrower_profile_lookup", "document_fetch"]
+
+
+async def test_dataset_case_evaluation_fails_mismatched_expected_decision(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    workflow_id = uuid4()
+    await seed_evaluable_workflow(session_factory, workflow_id=workflow_id, include_document_evidence=True)
+
+    response = await client.post(
+        f"/api/v1/evaluations/workflows/{workflow_id}/runs",
+        json={
+            "evaluation_mode": "dataset_replay",
+            "dataset_case_id": "mortgage-exception-local-v1:rejection",
+        },
+    )
+
+    assert response.status_code == 201
+    dataset_score = next(result for result in response.json()["results"] if result["evaluator_id"] == "dataset-replay-contract")
+    assert dataset_score["score_status"] == "FAIL"
+    assert (
+        "dataset expected terminal decision did not match actual approval evidence"
+        in dataset_score["result_metadata"]["failures"]
+    )
+
+
+async def test_missing_dataset_case_returns_structured_error(
+    client: AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    workflow_id = uuid4()
+    await seed_evaluable_workflow(session_factory, workflow_id=workflow_id)
+
+    response = await client.post(
+        f"/api/v1/evaluations/workflows/{workflow_id}/runs",
+        json={"evaluation_mode": "dataset_replay", "dataset_case_id": "missing-dataset:case"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "dataset_case_not_found"

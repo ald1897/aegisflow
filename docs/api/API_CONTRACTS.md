@@ -239,6 +239,8 @@ GET /metrics
 POST /api/v1/evaluations/workflows/{workflow_id}/runs
 GET /api/v1/evaluations/runs/{evaluation_run_id}
 GET /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/datasets
+GET /api/v1/evaluations/datasets/{dataset_id}/cases
 ```
 
 The evaluation-service API is an internal quality-governance boundary for local AI evaluation.
@@ -252,5 +254,11 @@ Evaluation run creation must:
 - reject incomplete workflows with `workflow_not_ready_for_evaluation`
 
 Evaluation responses expose run metadata and bounded result records. They must not expose prompt content, raw document contents, borrower PII, secrets, approval comments as scoring metadata, or full model outputs.
+
+Current dataset behavior:
+- `mortgage-exception-local-v1` is seeded as the initial local Mortgage Exception Review dataset
+- dataset cases include approval, rejection, and human-review scenarios
+- evaluation run requests may include `dataset_case_id` to persist `dataset-replay-contract` comparison results
+- dataset replay evaluates persisted evidence only and does not invoke workflow replay, agent execution, tool execution, approval dispatch, or recovery behavior
 
 Evaluation results are quality signals only. They must not mutate workflow state, approve or reject workflows, bypass human review, or replace workflow timelines, approval records, or audit records.

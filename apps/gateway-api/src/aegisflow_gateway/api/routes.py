@@ -8,15 +8,22 @@ from aegisflow_gateway.api.schemas import (
     AgentExecutionRecordResponse,
     HealthResponse,
     ReadyResponse,
+    ToolInvocationRecordResponse,
     WorkflowAgentExecutionsResponse,
     WorkflowCreateRequest,
     WorkflowResponse,
+    WorkflowToolInvocationsResponse,
     WorkflowTimelineEntryResponse,
     WorkflowTimelineResponse,
 )
 from aegisflow_gateway.config import Settings, get_settings
 from aegisflow_gateway.persistence.database import check_database, get_session
-from aegisflow_gateway.persistence.models import AgentExecutionRecord, WorkflowRecord, WorkflowTimelineEntry
+from aegisflow_gateway.persistence.models import (
+    AgentExecutionRecord,
+    ToolInvocationRecord,
+    WorkflowRecord,
+    WorkflowTimelineEntry,
+)
 from aegisflow_gateway.services.events import WorkflowEventPublisher
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
 from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowService
@@ -76,6 +83,29 @@ def agent_execution_to_response(execution: AgentExecutionRecord) -> AgentExecuti
         started_at=execution.started_at,
         completed_at=execution.completed_at,
         created_at=execution.created_at,
+    )
+
+
+def tool_invocation_to_response(invocation: ToolInvocationRecord) -> ToolInvocationRecordResponse:
+    return ToolInvocationRecordResponse(
+        tool_invocation_id=UUID(invocation.tool_invocation_id),
+        workflow_id=UUID(invocation.workflow_id),
+        agent_execution_id=UUID(invocation.agent_execution_id) if invocation.agent_execution_id else None,
+        agent_id=invocation.agent_id,
+        tool_id=invocation.tool_id,
+        status=invocation.status,
+        permission_status=invocation.permission_status,
+        input_validation_status=invocation.input_validation_status,
+        output_validation_status=invocation.output_validation_status,
+        input_metadata=invocation.input_metadata,
+        output=invocation.output_payload,
+        metadata=invocation.execution_metadata,
+        error_message=invocation.error_message,
+        correlation_id=invocation.correlation_id,
+        created_by=invocation.created_by,
+        started_at=invocation.started_at,
+        completed_at=invocation.completed_at,
+        created_at=invocation.created_at,
     )
 
 
@@ -172,4 +202,20 @@ async def get_workflow_agent_executions(
     return WorkflowAgentExecutionsResponse(
         workflow_id=workflow_id,
         executions=[agent_execution_to_response(execution) for execution in executions],
+    )
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/tool-invocations",
+    response_model=WorkflowToolInvocationsResponse,
+)
+async def get_workflow_tool_invocations(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowToolInvocationsResponse:
+    service = WorkflowService(session)
+    invocations = await service.list_tool_invocations(workflow_id)
+    return WorkflowToolInvocationsResponse(
+        workflow_id=workflow_id,
+        invocations=[tool_invocation_to_response(invocation) for invocation in invocations],
     )

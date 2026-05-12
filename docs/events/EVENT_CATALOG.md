@@ -197,4 +197,4 @@ They describe whether an approved tool invocation completed or failed inside a g
 Current implementation boundary:
 - tool invocation event records are written through the outbox model
 - standard Mortgage Exception Review execution produces tool invocation events for approved agent tool use
-- gateway-api does not yet expose workflow tool invocation retrieval
+- gateway-api exposes workflow tool invocation retrieval for persisted tool invocation records

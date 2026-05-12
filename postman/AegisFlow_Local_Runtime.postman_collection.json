@@ -17,6 +17,11 @@
       "type": "string"
     },
     {
+      "key": "toolRuntimeUrl",
+      "value": "http://localhost:8020",
+      "type": "string"
+    },
+    {
       "key": "correlationId",
       "value": "postman-manual-test",
       "type": "string"
@@ -185,6 +190,266 @@
               "  const agentIds = json.agents.map((agent) => agent.agent_id);",
               "  pm.expect(agentIds).to.include(\"intake_agent\");",
               "  pm.expect(agentIds).to.include(\"document_analysis_agent\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tool Runtime Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/health",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"tool runtime health returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"tool runtime is healthy\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.service).to.eql(\"tool-runtime\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tool Runtime Ready",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/ready",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "ready"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"tool runtime ready returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"tool registry is ready\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.checks.tool_registry).to.eql(\"ok\");",
+              "  pm.expect(json.registered_tools).to.eql(3);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Registered Tools",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/api/v1/tools",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "tools"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"registered tools returned\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Phase 4 tools are registered\", function () {",
+              "  const json = pm.response.json();",
+              "  const toolIds = json.tools.map((tool) => tool.tool_id);",
+              "  pm.expect(toolIds).to.include(\"borrower_profile_lookup\");",
+              "  pm.expect(toolIds).to.include(\"document_fetch\");",
+              "  pm.expect(toolIds).to.include(\"fraud_signal_lookup\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoke Borrower Profile Lookup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n  \"correlation_id\": \"{{correlationId}}\",\n  \"agent_id\": \"intake_agent\",\n  \"agent_execution_id\": null,\n  \"idempotency_key\": \"postman:borrower-profile-lookup\",\n  \"input\": {\n    \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n    \"correlation_id\": \"{{correlationId}}\",\n    \"case_reference\": \"MORT-POSTMAN-001\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/api/v1/tools/borrower_profile_lookup/invocations",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "tools",
+            "borrower_profile_lookup",
+            "invocations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"borrower profile lookup completes\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"borrower profile output is validated\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.tool_id).to.eql(\"borrower_profile_lookup\");",
+              "  pm.expect(json.permission_status).to.eql(\"AUTHORIZED\");",
+              "  pm.expect(json.output_validation_status).to.eql(\"VALIDATED\");",
+              "  pm.expect(json.output.output_type).to.eql(\"borrower_profile_lookup_output\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoke Document Fetch",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n  \"correlation_id\": \"{{correlationId}}\",\n  \"agent_id\": \"document_analysis_agent\",\n  \"agent_execution_id\": null,\n  \"idempotency_key\": \"postman:document-fetch\",\n  \"input\": {\n    \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n    \"correlation_id\": \"{{correlationId}}\",\n    \"case_reference\": \"MORT-POSTMAN-001\",\n    \"requested_document_types\": [\"income_verification\", \"bank_statement\"]\n  }\n}"
+        },
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/api/v1/tools/document_fetch/invocations",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "tools",
+            "document_fetch",
+            "invocations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"document fetch completes\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"document fetch output is validated\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.tool_id).to.eql(\"document_fetch\");",
+              "  pm.expect(json.permission_status).to.eql(\"AUTHORIZED\");",
+              "  pm.expect(json.output_validation_status).to.eql(\"VALIDATED\");",
+              "  pm.expect(json.output.output_type).to.eql(\"document_fetch_output\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoke Fraud Signal Lookup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n  \"correlation_id\": \"{{correlationId}}\",\n  \"agent_id\": \"document_analysis_agent\",\n  \"agent_execution_id\": null,\n  \"idempotency_key\": \"postman:fraud-signal-lookup\",\n  \"input\": {\n    \"workflow_id\": \"00000000-0000-0000-0000-000000000999\",\n    \"correlation_id\": \"{{correlationId}}\",\n    \"case_reference\": \"MORT-POSTMAN-001\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/api/v1/tools/fraud_signal_lookup/invocations",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "tools",
+            "fraud_signal_lookup",
+            "invocations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"fraud signal lookup completes\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"fraud signal output is validated\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.tool_id).to.eql(\"fraud_signal_lookup\");",
+              "  pm.expect(json.permission_status).to.eql(\"AUTHORIZED\");",
+              "  pm.expect(json.output_validation_status).to.eql(\"VALIDATED\");",
+              "  pm.expect(json.output.output_type).to.eql(\"fraud_signal_lookup_output\");",
               "});"
             ]
           }
@@ -408,6 +673,10 @@
               "  pm.expect(entryTypes).to.include(\"AGENT_EXECUTION_COMPLETED\");",
               "});",
               "",
+              "pm.test(\"timeline includes Phase 4 tool invocations\", function () {",
+              "  pm.expect(entryTypes).to.include(\"TOOL_INVOCATION_COMPLETED\");",
+              "});",
+              "",
               "pm.test(\"timeline includes published events\", function () {",
               "  pm.expect(entryTypes).to.include(\"EVENT_PUBLISHED\");",
               "});"
@@ -463,6 +732,63 @@
               "  json.executions.forEach((execution) => {",
               "    pm.expect(execution.validation_status).to.eql(\"VALIDATED\");",
               "    pm.expect(execution.output).to.be.an(\"object\");",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Workflow Tool Invocations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{workflowId}}/tool-invocations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{workflowId}}",
+            "tool-invocations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"tool invocations retrieved\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Phase 4 tool invocations are persisted\", function () {",
+              "  const json = pm.response.json();",
+              "  const toolIds = json.invocations.map((invocation) => invocation.tool_id);",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"workflowId\"));",
+              "  pm.expect(toolIds).to.include(\"borrower_profile_lookup\");",
+              "  pm.expect(toolIds).to.include(\"document_fetch\");",
+              "});",
+              "",
+              "pm.test(\"tool invocations are governed and validated\", function () {",
+              "  const json = pm.response.json();",
+              "  json.invocations.forEach((invocation) => {",
+              "    pm.expect(invocation.status).to.eql(\"COMPLETED\");",
+              "    pm.expect(invocation.permission_status).to.eql(\"AUTHORIZED\");",
+              "    pm.expect(invocation.input_validation_status).to.eql(\"VALIDATED\");",
+              "    pm.expect(invocation.output_validation_status).to.eql(\"VALIDATED\");",
+              "    pm.expect(invocation.output).to.be.an(\"object\");",
               "  });",
               "});"
             ]

@@ -66,6 +66,7 @@ The platform can currently:
 - persist validated agent execution records
 - stop at `HUMAN_REVIEW_REQUIRED`
 - record workflow timeline entries
+- retrieve workflow tool invocation history
 - publish workflow events for downstream operational visibility
 - support manual validation through Postman
 
@@ -166,6 +167,7 @@ The platform currently supports:
 - structured agent output validation
 - agent execution record persistence
 - workflow timeline retrieval
+- workflow tool invocation retrieval
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -175,10 +177,9 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, and workflow-engine persistence of agent-produced tool invocation telemetry.
+The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, workflow-engine persistence of agent-produced tool invocation telemetry, and gateway-api retrieval of workflow tool invocation history.
 
 The platform does not yet implement:
-- workflow tool invocation retrieval
 - human review UI
 - approval workflows
 - distributed tracing
@@ -356,9 +357,11 @@ Completed deliverables:
 - standard Mortgage Exception Review production of tool invocation records
 - workflow timeline entries for standard path tool invocation activity
 - workflow event outbox records for standard path tool invocation activity
+- gateway-api workflow tool invocation retrieval endpoint
+- Postman requests for tool-runtime health, readiness, registry, and direct invocation validation
+- Postman request for workflow tool invocation retrieval
 
 Explicit non-scope for completed increments:
-- gateway-api workflow tool invocation retrieval
 - real mortgage system connectivity
 
 Validation completed:
@@ -377,9 +380,12 @@ Validation completed:
 - live agent-runtime HTTP validation confirmed approved tool invocation through tool-runtime
 - local end-to-end workflow validation reached `HUMAN_REVIEW_REQUIRED`
 - local end-to-end workflow validation produced persisted records for `borrower_profile_lookup` and `document_fetch`
+- gateway-api pytest suite passed with 9 tests after workflow tool invocation retrieval was added
+- Postman collection JSON validated successfully with Phase 4 tool requests
+- local gateway-api retrieval returned persisted `borrower_profile_lookup` and `document_fetch` records for a workflow
 
 Next deliverable:
-- Workstream 6 - Gateway API And Postman
+- Workstream 7 - Documentation And Roadmap Updates
 
 ---
 

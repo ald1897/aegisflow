@@ -554,18 +554,18 @@ Completion criteria:
 
 ## Workstream 6 - Gateway API And Postman
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add `GET /api/v1/workflows/{workflow_id}/tool-invocations`
-- update Postman collection with tool-runtime health and registry requests
-- update Postman collection with workflow tool invocation retrieval
-- update manual validation documentation
+- add `GET /api/v1/workflows/{workflow_id}/tool-invocations` - Complete
+- update Postman collection with tool-runtime health and registry requests - Complete
+- update Postman collection with workflow tool invocation retrieval - Complete
+- update manual validation documentation - Complete
 
 Completion criteria:
-- Postman can validate tool-runtime availability
-- Postman can validate registered tools
-- Postman can validate persisted workflow tool invocation records
+- Postman can validate tool-runtime availability - Met
+- Postman can validate registered tools - Met
+- Postman can validate persisted workflow tool invocation records - Met
 
 ---
 
@@ -753,7 +753,7 @@ Completed workstream:
 
 Boundary:
 - agent-runtime does not yet invoke tool-runtime during workflow execution
-- gateway-api does not yet expose the workflow tool invocation retrieval endpoint
+- gateway-api workflow tool invocation retrieval was deferred at this point
 - end-to-end workflow production of tool invocation records remains assigned to Workstreams 4, 5, and 6
 
 Next step:
@@ -806,6 +806,28 @@ Boundary:
 
 Next step:
 - implement Workstream 6: Gateway API And Postman
+
+## 2026-05-12 - Workstream 6
+
+Status:
+- added gateway-api `GET /api/v1/workflows/{workflow_id}/tool-invocations`
+- added DTO-based workflow tool invocation responses without exposing persistence models directly
+- added gateway-api tests for workflow tool invocation retrieval and missing workflow behavior
+- expanded the Postman collection with tool-runtime health, readiness, registry, and direct invocation checks
+- expanded the Postman collection with workflow tool invocation retrieval
+- validated Postman collection JSON structure
+- validated gateway-api automated tests with 9 passing tests
+- validated local tool-runtime health, readiness, and registry responses
+- validated local end-to-end workflow retrieval of persisted `borrower_profile_lookup` and `document_fetch` records through gateway-api
+
+Completed workstream:
+- Workstream 6 - Gateway API And Postman
+
+Boundary:
+- Phase 4 documentation and roadmap cleanup remains assigned to Workstream 7
+
+Next step:
+- implement Workstream 7: Documentation And Roadmap Updates
 
 ---
 

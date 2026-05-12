@@ -19,7 +19,6 @@ from aegisflow_gateway.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.persistence.models import utc_now
-from aegisflow_gateway.services.workflows import WorkflowService
 
 
 @pytest.fixture
@@ -199,7 +198,7 @@ async def test_get_workflow_agent_executions_returns_persisted_records(
     assert body["executions"][0]["validation_status"] == "VALIDATED"
 
 
-async def test_tool_invocation_records_are_queryable_by_workflow(
+async def test_get_workflow_tool_invocations_returns_persisted_records(
     client: AsyncClient,
     app_context: tuple[object, async_sessionmaker[AsyncSession]],
 ) -> None:
@@ -237,10 +236,22 @@ async def test_tool_invocation_records_are_queryable_by_workflow(
         )
         await session.commit()
 
-    async with session_factory() as session:
-        service = WorkflowService(session)
-        invocations = await service.list_tool_invocations(UUID(workflow_id))
+    response = await client.get(f"/api/v1/workflows/{workflow_id}/tool-invocations")
 
-    assert len(invocations) == 1
-    assert invocations[0].tool_id == "borrower_profile_lookup"
-    assert invocations[0].permission_status == "AUTHORIZED"
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow_id"] == workflow_id
+    assert len(body["invocations"]) == 1
+    assert body["invocations"][0]["tool_id"] == "borrower_profile_lookup"
+    assert body["invocations"][0]["permission_status"] == "AUTHORIZED"
+    assert body["invocations"][0]["input_validation_status"] == "VALIDATED"
+    assert body["invocations"][0]["output_validation_status"] == "VALIDATED"
+    assert body["invocations"][0]["output"] == {"profile_status": "FOUND"}
+    assert body["invocations"][0]["metadata"] == {"replay_safe": True}
+
+
+async def test_get_workflow_tool_invocations_returns_structured_404(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/workflows/00000000-0000-0000-0000-000000000000/tool-invocations")
+
+    assert response.status_code == 404
+    assert response.json()["error"] == "workflow_not_found"

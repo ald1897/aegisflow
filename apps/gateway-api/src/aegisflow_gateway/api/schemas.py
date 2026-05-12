@@ -89,3 +89,29 @@ class AgentExecutionRecordResponse(BaseModel):
 class WorkflowAgentExecutionsResponse(BaseModel):
     workflow_id: UUID
     executions: list[AgentExecutionRecordResponse]
+
+
+class ToolInvocationRecordResponse(BaseModel):
+    tool_invocation_id: UUID
+    workflow_id: UUID
+    agent_execution_id: UUID | None
+    agent_id: str
+    tool_id: str
+    status: str
+    permission_status: str
+    input_validation_status: str
+    output_validation_status: str
+    input_metadata: dict[str, Any]
+    output: dict[str, Any]
+    metadata: dict[str, Any]
+    error_message: str | None
+    correlation_id: str
+    created_by: str
+    started_at: datetime
+    completed_at: datetime | None
+    created_at: datetime
+
+
+class WorkflowToolInvocationsResponse(BaseModel):
+    workflow_id: UUID
+    invocations: list[ToolInvocationRecordResponse]

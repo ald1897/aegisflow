@@ -125,11 +125,14 @@ POST /api/v1/workflows
 GET /api/v1/workflows/{workflow_id}
 GET /api/v1/workflows/{workflow_id}/timeline
 GET /api/v1/workflows/{workflow_id}/agent-executions
+GET /api/v1/workflows/{workflow_id}/tool-invocations
 ```
 
 The gateway-api remains the primary API surface for workflow initiation and operational query access.
 
 The `agent-executions` endpoint returns persisted agent execution records associated with a workflow. It must not expose unrestricted prompt input, sensitive borrower payloads, secrets, or internal persistence entities directly.
+
+The `tool-invocations` endpoint returns persisted governed tool invocation records associated with a workflow. It must expose DTOs containing operational status, validation status, permission status, correlation metadata, and validated output summaries. It must not expose persistence models, secrets, raw document content, or unrestricted borrower PII.
 
 ---
 
@@ -168,3 +171,35 @@ Current Phase 4 agent-runtime tool behavior:
 - tool invocations must occur through tool-runtime
 - tool invocation telemetry must include tool identifier, invocation identifier, validation status, permission status, and correlation metadata
 - tool output remains supporting context and must not be interpreted as final mortgage decision authority
+
+---
+
+## tool-runtime
+
+```text
+GET /health
+GET /ready
+GET /api/v1/tools
+POST /api/v1/tools/{tool_id}/invocations
+```
+
+The tool-runtime API is an internal governed execution boundary used by agent-runtime.
+
+It is not intended as an unrestricted public integration, database, shell, or HTTP execution interface.
+
+Tool invocation requests must:
+- include `workflow_id`
+- include `correlation_id`
+- identify the requesting `agent_id`
+- target a registered `tool_id`
+- provide input matching the registered tool schema
+- use idempotency metadata where retry safety is required
+
+Tool invocation responses must:
+- identify the tool invocation
+- identify the requesting agent
+- expose execution status
+- expose permission status
+- expose input and output validation status
+- return validated synthetic or masked output
+- include telemetry metadata required for workflow persistence and audit correlation

@@ -47,6 +47,7 @@ The gateway API currently supports:
 - workflow retrieval
 - workflow timeline retrieval
 - workflow agent execution retrieval
+- workflow tool invocation retrieval
 - correlation ID propagation
 - structured JSON logs
 - Temporal workflow startup
@@ -61,6 +62,7 @@ POST /api/v1/workflows
 GET /api/v1/workflows/{workflow_id}
 GET /api/v1/workflows/{workflow_id}/timeline
 GET /api/v1/workflows/{workflow_id}/agent-executions
+GET /api/v1/workflows/{workflow_id}/tool-invocations
 ```
 
 ---
@@ -131,8 +133,8 @@ POST /api/v1/tools/{tool_id}/invocations
 
 The tool-runtime is an internal mediation boundary. It does not mutate workflow state, approve mortgage actions, expose arbitrary tools, or call production mortgage systems.
 
-Current Phase 4 limitation:
-- gateway-api does not yet expose workflow tool invocation history
+Current Phase 4 capability:
+- gateway-api exposes workflow tool invocation history through a DTO-based query endpoint
 
 ---
 
@@ -202,7 +204,7 @@ Current tool invocation persistence boundary:
 - tool invocation records can produce workflow timeline entries
 - tool invocation records can produce workflow event outbox records
 - agent-produced tool invocation telemetry is persisted during the standard Mortgage Exception Review path
-- gateway-api does not yet expose workflow tool invocation history
+- gateway-api can retrieve persisted workflow tool invocation history
 
 ---
 
@@ -244,7 +246,6 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- workflow tool invocation retrieval API
 - human approval UI
 - approve/reject actions
 - workflow completion after human review
@@ -269,20 +270,27 @@ The collection includes:
 - health check
 - agent-runtime health check
 - registered agent lookup
+- tool-runtime health check
+- tool-runtime readiness check
+- registered tool lookup
+- direct governed tool invocation checks
 - readiness check
 - workflow creation
 - workflow retrieval
 - polling until `HUMAN_REVIEW_REQUIRED`
 - workflow timeline retrieval
 - workflow agent execution retrieval
+- workflow tool invocation retrieval
 - missing workflow error validation
 
 The collection uses `http://localhost:8000` as the default `baseUrl`.
 The collection uses `http://localhost:8010` as the default `agentRuntimeUrl`.
+The collection uses `http://localhost:8020` as the default `toolRuntimeUrl`.
 
 Recommended collection variables:
 - `baseUrl`: `http://localhost:8000`
 - `agentRuntimeUrl`: `http://localhost:8010`
+- `toolRuntimeUrl`: `http://localhost:8020`
 - `correlationId`: `postman-manual-test`
 - `actorId`: `postman-operator`
 
@@ -398,7 +406,73 @@ Expected result:
 
 ---
 
-## 7. Create A Workflow
+## 7. Run Tool Runtime Health
+
+Run the Postman request:
+
+```text
+Tool Runtime Health
+```
+
+Expected result:
+- HTTP status is `200`
+- `status` is `ok`
+- `service` is `tool-runtime`
+
+---
+
+## 7. Run Tool Runtime Ready
+
+Run the Postman request:
+
+```text
+Tool Runtime Ready
+```
+
+Expected result:
+- HTTP status is `200`
+- `status` is `ok`
+- `checks.tool_registry` is `ok`
+- `registered_tools` is `3`
+
+---
+
+## 8. List Registered Tools
+
+Run the Postman request:
+
+```text
+List Registered Tools
+```
+
+Expected result:
+- HTTP status is `200`
+- `borrower_profile_lookup` is registered
+- `document_fetch` is registered
+- `fraud_signal_lookup` is registered
+
+---
+
+## 9. Invoke Governed Tools Directly
+
+Run the following Postman requests:
+
+```text
+Invoke Borrower Profile Lookup
+Invoke Document Fetch
+Invoke Fraud Signal Lookup
+```
+
+Expected result:
+- HTTP status is `201`
+- `permission_status` is `AUTHORIZED`
+- `input_validation_status` is `VALIDATED`
+- `output_validation_status` is `VALIDATED`
+- output payloads contain synthetic and masked operational data only
+
+---
+
+## 10. Create A Workflow
 
 Run the Postman request:
 
@@ -419,7 +493,7 @@ The request test script stores the created `workflow_id` as the `workflowId` col
 
 ---
 
-## 8. Poll Workflow Progression
+## 11. Poll Workflow Progression
 
 Run the Postman request:
 
@@ -448,7 +522,7 @@ HUMAN_REVIEW_REQUIRED
 
 ---
 
-## 9. Retrieve The Workflow Timeline
+## 12. Retrieve The Workflow Timeline
 
 Run the Postman request:
 
@@ -468,7 +542,7 @@ Expected timeline entries include:
 
 ---
 
-## 10. Retrieve Workflow Agent Executions
+## 13. Retrieve Workflow Agent Executions
 
 Run the Postman request:
 
@@ -486,7 +560,25 @@ Expected result:
 
 ---
 
-## 11. Validate Missing Workflow Behavior
+## 14. Retrieve Workflow Tool Invocations
+
+Run the Postman request:
+
+```text
+Get Workflow Tool Invocations
+```
+
+Expected result:
+- HTTP status is `200`
+- `borrower_profile_lookup` invocation is present
+- `document_fetch` invocation is present
+- each invocation has `status` set to `COMPLETED`
+- each invocation has `permission_status` set to `AUTHORIZED`
+- each invocation has input and output validation status set to `VALIDATED`
+
+---
+
+## 15. Validate Missing Workflow Behavior
 
 Run the Postman request:
 
@@ -500,7 +592,7 @@ Expected result:
 
 ---
 
-## 12. Run The Collection
+## 16. Run The Collection
 
 The collection can be run end-to-end in Postman Collection Runner.
 
@@ -508,16 +600,23 @@ Recommended request order:
 - `Health`
 - `Agent Runtime Health`
 - `List Registered Agents`
+- `Tool Runtime Health`
+- `Tool Runtime Ready`
+- `List Registered Tools`
+- `Invoke Borrower Profile Lookup`
+- `Invoke Document Fetch`
+- `Invoke Fraud Signal Lookup`
 - `Ready`
 - `Create Mortgage Exception Review Workflow`
 - `Poll Until Human Review Required`
 - `Get Workflow Timeline`
 - `Get Workflow Agent Executions`
+- `Get Workflow Tool Invocations`
 - `Missing Workflow Returns 404`
 
 ---
 
-## 13. Open Temporal UI
+## 17. Open Temporal UI
 
 Open:
 
@@ -533,25 +632,27 @@ Expected:
 
 ---
 
-## 14. Manual Validation Coverage
+## 18. Manual Validation Coverage
 
 The Postman collection validates:
 - gateway health and readiness
 - agent-runtime health
 - agent registry availability
+- tool-runtime health and readiness
+- tool registry availability
+- direct governed tool invocation
 - database connectivity through the readiness endpoint
 - workflow creation persistence
 - Temporal workflow startup metadata
 - governed agent execution persistence
+- governed tool invocation persistence
 - deterministic state progression to `HUMAN_REVIEW_REQUIRED`
 - workflow timeline retrieval
 - workflow agent execution retrieval
+- workflow tool invocation retrieval
 - missing workflow error behavior
 
 Direct Postgres, Redpanda, and Temporal history inspection is not required for routine manual API testing.
-
-Workflow tool invocation records are currently validated through automated tests and local smoke validation.
-The Postman workflow tool invocation retrieval request will be added when the gateway-api endpoint is implemented.
 
 ---
 
@@ -570,7 +671,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-8 passed
+9 passed
 ```
 
 ---

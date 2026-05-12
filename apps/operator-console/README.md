@@ -7,7 +7,9 @@ The operator-console is the local frontend surface for AegisFlow human review wo
 Current scope:
 - display workflows waiting in `HUMAN_REVIEW_REQUIRED`
 - show queue summary counts
-- fetch queue data from gateway-api
+- fetch queue and workflow review context from gateway-api
+- display workflow timeline, agent execution records, tool invocation records, and approval history
+- submit approval and rejection decisions through gateway-api
 - preserve gateway-api as the only external workflow API boundary
 
 The operator-console does not call agent-runtime, tool-runtime, or workflow-engine directly.

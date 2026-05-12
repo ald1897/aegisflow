@@ -151,7 +151,7 @@ Implemented Phase 4 gateway capability:
 
 ## operator-console
 
-The operator-console currently supports the Phase 5 human review queue foundation.
+The operator-console currently supports the Phase 5 human review queue and workflow review experience.
 
 It provides:
 - React and TypeScript frontend application
@@ -162,6 +162,14 @@ It provides:
 - queue summary counts for awaiting review, urgent workflows, and high-priority workflows
 - workflow identifiers, case references, priorities, states, update timestamps, and correlation IDs
 - manual refresh of queue data
+- selected workflow review workspace
+- workflow detail display with state, priority, workflow metadata, Temporal identifiers, and correlation metadata
+- workflow timeline display
+- agent execution summaries with validation status, prompt version, confidence score, and structured output summary
+- tool invocation summaries with permission status, validation status, and validated output summary
+- approval history display
+- approval and rejection form submission through gateway-api
+- required operator identity and decision comment capture
 
 Implemented local endpoint:
 
@@ -180,8 +188,8 @@ It does not call:
 
 Current Phase 5 operator-console boundary:
 - queue visibility is implemented
-- workflow detail review is not yet implemented
-- approval and rejection form submission is not yet implemented
+- workflow detail review is implemented
+- approval and rejection form submission is implemented through gateway-api
 - production authentication and RBAC are not yet implemented
 
 ---

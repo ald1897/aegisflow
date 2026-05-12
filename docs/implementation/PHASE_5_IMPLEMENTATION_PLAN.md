@@ -458,23 +458,23 @@ Completion criteria:
 
 ## Workstream 5 - Workflow Review Experience
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add workflow detail view
-- display workflow metadata and current state
-- display timeline entries
-- display agent execution summaries
-- display tool invocation summaries
-- add approval and rejection form
-- capture required operator comments
-- show submitted decision result
+- add workflow detail view - Complete
+- display workflow metadata and current state - Complete
+- display timeline entries - Complete
+- display agent execution summaries - Complete
+- display tool invocation summaries - Complete
+- add approval and rejection form - Complete
+- capture required operator comments - Complete
+- show submitted decision result - Complete
 
 Completion criteria:
-- operator can inspect workflow context before decisioning
-- operator can approve a workflow
-- operator can reject a workflow
-- UI distinguishes AI assistance from human decision authority
+- operator can inspect workflow context before decisioning - Met
+- operator can approve a workflow - Met
+- operator can reject a workflow - Met
+- UI distinguishes AI assistance from human decision authority - Met
 
 ---
 
@@ -747,6 +747,35 @@ Boundary:
 
 Next step:
 - implement Workstream 5: Workflow Review Experience
+
+## 2026-05-12 - Workstream 5
+
+Status:
+- added selected workflow review workspace to operator-console
+- added workflow detail panel with workflow state, priority, metadata, Temporal identifiers, and correlation metadata
+- added timeline panel populated from gateway review context
+- added agent execution panel with validation status, prompt version, confidence score, and structured output summary
+- added tool invocation panel with permission status, validation status, and validated output summary
+- added approval history panel
+- added human decision form with operator identity, approval or rejection decision, and required comment
+- wired approval and rejection submissions to gateway-api `POST /api/v1/workflows/{workflow_id}/approvals`
+- preserved gateway-api as the only frontend API boundary
+- refreshed the review queue after decision submission
+- validated operator-console production build with `npm run build`
+- rebuilt and restarted local operator-console container
+- validated operator-console HTTP serving on port `3000`
+- validated live gateway review context retrieval for a queued workflow
+
+Completed workstream:
+- Workstream 5 - Workflow Review Experience
+
+Boundary:
+- Postman approval validation remains assigned to Workstream 6
+- production authentication and RBAC remain out of scope
+- operator-console still does not call agent-runtime, tool-runtime, workflow-engine, Postgres, or Temporal directly
+
+Next step:
+- implement Workstream 6: Postman And Manual Validation
 
 ---
 

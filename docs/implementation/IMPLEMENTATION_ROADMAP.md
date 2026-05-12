@@ -180,6 +180,8 @@ The platform currently supports:
 - gateway approval and rejection decision submission
 - operator-console local frontend foundation
 - operator-console human review queue screen
+- operator-console workflow review detail workspace
+- operator-console approval and rejection form submission
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -191,11 +193,10 @@ The platform currently supports:
 
 The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the initial Phase 5 human review API foundation.
 
-Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the initial operator-console review queue screen.
+Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- workflow detail review UI
-- operator-console approval and rejection form submission
+- Postman coverage for approval and rejection paths
 - distributed tracing
 - AI evaluation
 
@@ -203,7 +204,7 @@ These capabilities remain assigned to later roadmap phases.
 
 Current workflow orchestration supports deterministic progression from `NEW` through `HUMAN_REVIEW_REQUIRED`, including governed intake and document analysis agent execution.
 
-Human approval and completion actions are now available through gateway APIs and workflow-engine-owned decision execution. Operator-facing queue visibility is available locally; full workflow review and decision submission UI remains assigned to Phase 5 follow-on workstreams.
+Human approval and completion actions are now available through gateway APIs, workflow-engine-owned decision execution, and the local operator-console review experience.
 
 ---
 

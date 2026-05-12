@@ -53,11 +53,52 @@ Dashboard panels intentionally aggregate by low-cardinality operational dimensio
 
 ---
 
+## Local Log Diagnostics
+
+Local services emit structured JSON logs with bounded operational fields such as `service`, `environment`, `correlation_id`, `trace_id`, `workflow_id`, `agent_id`, `tool_id`, `approval_id`, `operation`, and `status` where those values are available.
+
+Logs are for local diagnostics only. They are not the system of record for workflow state, approval decisions, timeline history, or event publication.
+
+Use the workflow correlation ID to inspect related logs across services:
+
+```powershell
+$correlationId = "phase6-ws7-log-check"
+$services = @(
+  "aegisflow-gateway-api",
+  "aegisflow-workflow-engine",
+  "aegisflow-agent-runtime",
+  "aegisflow-tool-runtime"
+)
+
+foreach ($service in $services) {
+  docker logs $service --since 15m 2>&1 |
+    ForEach-Object {
+      try { $_.ToString() | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+    } |
+    Where-Object { $_.correlation_id -eq $correlationId } |
+    Select-Object timestamp, service, level, message, correlation_id, trace_id, workflow_id, agent_id, tool_id, approval_id, status
+}
+```
+
+Useful direct log commands:
+
+```powershell
+docker logs aegisflow-gateway-api --since 10m
+docker logs aegisflow-workflow-engine --since 10m
+docker logs aegisflow-agent-runtime --since 10m
+docker logs aegisflow-tool-runtime --since 10m
+```
+
+Loki and Docker log collection are deferred for the local stack. Docker Desktop-compatible log collection adds host-specific setup, while Docker logs plus JSON filtering are sufficient for Phase 6 local correlation diagnostics.
+
+Structured logs must not include borrower PII, raw document contents, secrets, prompt content, full model output, approval comments, or unrestricted request and response payloads.
+
+---
+
 ## Current Boundary
 
-Phase 6 currently includes local observability infrastructure, Python service tracing, Prometheus metrics, and provisioned Grafana dashboards.
+Phase 6 currently includes local observability infrastructure, Python service tracing, Prometheus metrics, provisioned Grafana dashboards, and structured local log diagnostics.
 
 Current remaining Phase 6 work:
-- structured log enrichment and local diagnostics
 - Postman and manual observability validation documentation
 - final Phase 6 roadmap and current functionality closeout

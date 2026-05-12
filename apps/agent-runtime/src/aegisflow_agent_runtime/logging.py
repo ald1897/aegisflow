@@ -1,25 +1,27 @@
 import json
 import logging
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from typing import Any
 
-from aegisflow_gateway.config import Settings
-from aegisflow_gateway.telemetry.correlation import get_correlation_id
-from aegisflow_gateway.telemetry.tracing import current_trace_id
+from aegisflow_agent_runtime.config import Settings
+
+_log_context: ContextVar[dict[str, str]] = ContextVar("agent_runtime_log_context", default={})
 
 EXTRA_FIELDS = {
-    "actor_id",
     "agent_id",
-    "approval_id",
+    "agent_execution_id",
     "correlation_id",
-    "decision",
-    "event_id",
-    "event_type",
     "operation",
+    "prompt_id",
+    "prompt_version",
     "route",
     "status",
     "tool_id",
+    "validation_status",
     "workflow_id",
+    "workflow_state",
 }
 
 
@@ -38,10 +40,8 @@ class JsonFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
         }
-        correlation_id = get_correlation_id()
-        if correlation_id:
-            payload["correlation_id"] = correlation_id
-        trace_id = current_trace_id()
+        payload.update(_log_context.get())
+        trace_id = _current_trace_id()
         if trace_id:
             payload["trace_id"] = trace_id
         for field in EXTRA_FIELDS:
@@ -61,3 +61,20 @@ def configure_logging(settings: Settings) -> None:
     handler = logging.StreamHandler()
     handler.setFormatter(JsonFormatter(service_name=settings.service_name, environment=settings.environment))
     root_logger.addHandler(handler)
+
+
+@contextmanager
+def bind_log_context(**context: str | None):
+    current = _log_context.get()
+    filtered = {key: str(value) for key, value in context.items() if value is not None}
+    token = _log_context.set(current | filtered)
+    try:
+        yield
+    finally:
+        _log_context.reset(token)
+
+
+def _current_trace_id() -> str | None:
+    from aegisflow_agent_runtime.telemetry import current_trace_id
+
+    return current_trace_id()

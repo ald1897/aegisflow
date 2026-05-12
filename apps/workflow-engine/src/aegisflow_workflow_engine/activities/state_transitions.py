@@ -145,6 +145,15 @@ async def advance_workflow_state(payload: dict) -> dict:
     )
     set_span_attributes({"prior_state": prior_state.value, "new_state": target_state.value, "idempotent": False})
     await publish_workflow_event(event_id)
+    logger.info(
+        "workflow state advanced",
+        extra={
+            "workflow_id": workflow_id,
+            "correlation_id": correlation_id,
+            "status": "completed",
+            "operation": "state_transition",
+        },
+    )
     return {"workflow_id": workflow_id, "state": target_state.value, "idempotent": False}
 
 
@@ -216,7 +225,16 @@ async def publish_workflow_event(event_id: str) -> None:
                         created_at=datetime.now(timezone.utc),
                     )
                 )
-                logger.info("workflow event published", extra={"workflow_id": event.workflow_id})
+                logger.info(
+                    "workflow event published",
+                    extra={
+                        "workflow_id": event.workflow_id,
+                        "correlation_id": event.correlation_id,
+                        "event_id": event.event_id,
+                        "event_type": event.event_type,
+                        "status": "published",
+                    },
+                )
         except Exception as exc:
             publish_status = "failed"
             span = trace.get_current_span()
@@ -238,7 +256,16 @@ async def publish_workflow_event(event_id: str) -> None:
                     created_at=datetime.now(timezone.utc),
                 )
             )
-            logger.exception("workflow event publication failed", extra={"workflow_id": event.workflow_id})
+            logger.exception(
+                "workflow event publication failed",
+                extra={
+                    "workflow_id": event.workflow_id,
+                    "correlation_id": event.correlation_id,
+                    "event_id": event.event_id,
+                    "event_type": event.event_type,
+                    "status": "failed",
+                },
+            )
         finally:
             await producer.stop()
             record_event_publication(

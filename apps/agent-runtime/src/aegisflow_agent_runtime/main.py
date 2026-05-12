@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import Depends, FastAPI, HTTPException, Response, status
 
 from aegisflow_agent_runtime.agents import (
@@ -8,6 +6,7 @@ from aegisflow_agent_runtime.agents import (
     UnsupportedWorkflowStateError,
 )
 from aegisflow_agent_runtime.config import Settings, get_settings
+from aegisflow_agent_runtime.logging import configure_logging
 from aegisflow_agent_runtime.prompts import PromptRegistry
 from aegisflow_agent_runtime.schemas import (
     AgentExecutionRequest,
@@ -28,7 +27,7 @@ def get_agent_runtime(settings: Settings = Depends(get_settings)) -> AgentRuntim
 
 def create_app() -> FastAPI:
     settings = get_settings()
-    logging.basicConfig(level=settings.log_level.upper())
+    configure_logging(settings)
     configure_telemetry(settings)
     app = FastAPI(title="AegisFlow Agent Runtime", version="0.1.0")
     app.add_middleware(AgentRuntimeTelemetryMiddleware)

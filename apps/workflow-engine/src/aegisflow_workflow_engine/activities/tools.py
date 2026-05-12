@@ -167,7 +167,16 @@ async def record_tool_invocation(payload: dict) -> dict:
         }
 
     await publish_workflow_event(event_id)
-    logger.info("tool invocation recorded", extra={"workflow_id": workflow_id, "tool_id": tool_id})
+    logger.info(
+        "tool invocation recorded",
+        extra={
+            "workflow_id": workflow_id,
+            "correlation_id": correlation_id,
+            "tool_id": tool_id,
+            "status": status,
+            "permission_status": payload["permission_status"],
+        },
+    )
     record_tool_invocation_metric(
         tool_id=tool_id,
         status=status,

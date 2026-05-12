@@ -1,4 +1,5 @@
 from collections.abc import Callable
+import logging
 from time import perf_counter
 from typing import Any, Protocol, TypedDict
 from uuid import uuid4
@@ -8,6 +9,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 
+from aegisflow_agent_runtime.logging import bind_log_context
 from aegisflow_agent_runtime.metrics import record_agent_execution, record_graph_step
 from aegisflow_agent_runtime.prompts import PromptAsset, PromptRegistry
 from aegisflow_agent_runtime.registry import AGENT_REGISTRY
@@ -21,6 +23,8 @@ from aegisflow_agent_runtime.schemas import (
 )
 from aegisflow_agent_runtime.telemetry import set_span_attributes
 from aegisflow_agent_runtime.tools import ToolInvocationContext, ToolRuntimeClient, ToolRuntimeError
+
+logger = logging.getLogger(__name__)
 
 
 class AgentGraphState(TypedDict, total=False):
@@ -90,6 +94,22 @@ class AgentRuntime:
                 f"{agent_id} does not support workflow state {request.workflow_state}"
             )
 
+        with bind_log_context(
+            workflow_id=request.workflow_id,
+            correlation_id=request.correlation_id,
+            agent_id=agent_id,
+            workflow_state=request.workflow_state,
+        ):
+            logger.info(
+                "agent execution started",
+                extra={
+                    "agent_id": agent_id,
+                    "workflow_id": request.workflow_id,
+                    "workflow_state": request.workflow_state,
+                    "prompt_id": registry_entry.prompt_id,
+                    "prompt_version": registry_entry.prompt_version,
+                },
+            )
         with tracer.start_as_current_span("agent_runtime.execute_agent") as span:
             span.set_attribute("workflow_id", request.workflow_id)
             span.set_attribute("correlation_id", request.correlation_id)
@@ -154,10 +174,30 @@ class AgentRuntime:
                 span.set_attribute("agent.validation_status", response.validation_status.value)
                 span.set_attribute("agent.requires_human_review", response.requires_human_review)
                 span.set_attribute("agent.tool_invocation_count", len(tool_context))
+                logger.info(
+                    "agent execution completed",
+                    extra={
+                        "agent_id": agent_id,
+                        "agent_execution_id": execution_id,
+                        "correlation_id": request.correlation_id,
+                        "workflow_id": request.workflow_id,
+                        "status": response.status.value,
+                        "validation_status": response.validation_status.value,
+                    },
+                )
                 return response
             except Exception as exc:
                 span.record_exception(exc)
                 span.set_status(Status(StatusCode.ERROR))
+                logger.exception(
+                    "agent execution failed",
+                    extra={
+                        "agent_id": agent_id,
+                        "correlation_id": request.correlation_id,
+                        "workflow_id": request.workflow_id,
+                        "status": "failed",
+                    },
+                )
                 record_agent_execution(
                     agent_id=agent_id,
                     status="failed",

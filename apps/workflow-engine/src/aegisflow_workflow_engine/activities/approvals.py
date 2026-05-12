@@ -158,7 +158,16 @@ async def record_approval_decision(payload: dict) -> dict:
         }
 
     await publish_workflow_event(event_id)
-    logger.info("approval decision recorded", extra={"workflow_id": workflow_id, "approval_id": approval_id})
+    logger.info(
+        "approval decision recorded",
+        extra={
+            "workflow_id": workflow_id,
+            "correlation_id": correlation_id,
+            "approval_id": approval_id,
+            "decision": decision,
+            "status": "recorded",
+        },
+    )
     record_approval_decision_metric(
         decision=decision,
         status="recorded",

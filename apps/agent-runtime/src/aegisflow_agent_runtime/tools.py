@@ -74,7 +74,7 @@ class ToolRuntimeClient:
                     span.set_attribute("http.route", "/api/v1/tools/{tool_id}/invocations")
                     response = client.post(
                         f"/api/v1/tools/{tool_id}/invocations",
-                        headers=inject_trace_context(),
+                        headers=inject_trace_context({"X-Correlation-ID": request.correlation_id}),
                         json=invocation_request,
                     )
                     span.set_attribute("http.status_code", response.status_code)

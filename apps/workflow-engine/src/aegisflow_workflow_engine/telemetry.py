@@ -13,6 +13,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode
 
 from aegisflow_workflow_engine.config import Settings
+from aegisflow_workflow_engine.logging import bind_log_context
 from aegisflow_workflow_engine.metrics import record_activity_execution
 
 _configured = False
@@ -43,6 +44,13 @@ def inject_trace_context(headers: MutableMapping[str, str] | None = None) -> dic
     carrier = dict(headers or {})
     propagate.inject(carrier)
     return carrier
+
+
+def current_trace_id() -> str | None:
+    span_context = trace.get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return None
+    return f"{span_context.trace_id:032x}"
 
 
 def instrument_activity(activity_name: str) -> Callable:
@@ -80,13 +88,21 @@ def activity_span(activity_name: str, payload: dict) -> Any:
     token = attach(propagate.extract(payload.get("trace_context", {})))
     tracer = trace.get_tracer(__name__)
     try:
-        with tracer.start_as_current_span(
-            f"workflow_engine.activity.{activity_name}",
-            kind=SpanKind.INTERNAL,
-        ) as span:
-            _set_payload_attributes(span, payload)
-            span.set_attribute("temporal.activity", activity_name)
-            yield span
+        with bind_log_context(
+            activity=activity_name,
+            workflow_id=_as_str(payload.get("workflow_id")),
+            correlation_id=_as_str(payload.get("correlation_id")),
+            agent_id=_as_str(payload.get("agent_id")),
+            tool_id=_as_str(payload.get("tool_id")),
+            approval_id=_as_str(payload.get("approval_id")),
+        ):
+            with tracer.start_as_current_span(
+                f"workflow_engine.activity.{activity_name}",
+                kind=SpanKind.INTERNAL,
+            ) as span:
+                _set_payload_attributes(span, payload)
+                span.set_attribute("temporal.activity", activity_name)
+                yield span
     finally:
         detach(token)
 
@@ -117,3 +133,9 @@ def _set_payload_attributes(span: Span, payload: dict) -> None:
         value = payload.get(key)
         if value is not None:
             span.set_attribute(key, str(value))
+
+
+def _as_str(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

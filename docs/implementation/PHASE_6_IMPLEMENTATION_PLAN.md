@@ -515,20 +515,20 @@ Completion criteria:
 
 ## Workstream 7 - Logs And Local Diagnostics
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- enrich structured logs with trace ID where available
-- confirm correlation ID appears consistently in service logs
-- decide whether to add Loki and log collection in local Docker Compose
-- if Loki is added, configure log collection in a Docker Desktop-compatible manner
-- document fallback log validation through Docker logs if Loki is deferred
+- enrich structured logs with trace ID where available - Complete
+- confirm correlation ID appears consistently in service logs - Complete
+- decide whether to add Loki and log collection in local Docker Compose - Complete
+- if Loki is added, configure log collection in a Docker Desktop-compatible manner - Deferred
+- document fallback log validation through Docker logs if Loki is deferred - Complete
 
 Completion criteria:
-- logs support correlation-based local debugging
-- trace IDs are visible in logs where available
-- log collection decision is documented
-- no sensitive payloads are emitted into logs
+- logs support correlation-based local debugging - Met
+- trace IDs are visible in logs where available - Met
+- log collection decision is documented - Met
+- no sensitive payloads are emitted into logs - Met
 
 ---
 
@@ -883,6 +883,43 @@ Boundary:
 Next step:
 - implement Workstream 7: Logs And Local Diagnostics
 
+## 2026-05-12 - Workstream 7
+
+Status:
+- added structured JSON logging helpers to workflow-engine, agent-runtime, and tool-runtime
+- enriched gateway-api structured logs with bounded operational fields beyond workflow ID
+- added active trace ID enrichment to workflow-engine, agent-runtime, and tool-runtime JSON logs
+- bound correlation ID and route context around agent-runtime and tool-runtime HTTP requests
+- bound workflow, correlation, activity, agent, tool, and approval context around workflow-engine activity execution
+- propagated `X-Correlation-ID` from workflow-engine to agent-runtime and from agent-runtime to tool-runtime
+- added correlation-aware execution logs for agent starts, completions, and failures
+- added correlation-aware invocation logs for tool starts, denials, validation failures, output validation failures, and completions
+- enriched workflow-engine activity, state transition, event publication, and approval logs with bounded operational context
+- enriched gateway workflow creation and approval decision logs with bounded operational context
+- deferred Loki and Docker log collection from the local stack
+- documented Docker logs as the supported Workstream 7 local log diagnostics path
+- rebuilt gateway-api, workflow-engine, agent-runtime, and tool-runtime images
+- validated gateway-api automated tests with 16 passing tests
+- validated workflow-engine automated tests with 12 passing tests
+- validated agent-runtime automated tests with 8 passing tests
+- validated tool-runtime automated tests with 8 passing tests
+- executed a local Mortgage Exception Review workflow through approval to `COMPLETED`
+- validated Docker logs contain correlation-matched JSON entries for gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- validated all correlation-matched Docker log entries from the local workflow included trace IDs
+
+Completed workstream:
+- Workstream 7 - Logs And Local Diagnostics
+
+Boundary:
+- Loki is deferred because Docker Desktop-compatible log collection adds host-specific complexity that is not required for Phase 6 local diagnostics
+- local log validation uses Docker logs and structured JSON filtering by correlation ID
+- logs include bounded operational identifiers and statuses, but do not include borrower PII, raw document contents, secrets, prompt content, full model output, approval comments, or unrestricted payloads
+- logs remain operational diagnostics only and do not replace PostgreSQL workflow, approval, timeline, or event records
+- Postman observability validation and final documentation closeout remain assigned to Workstream 8
+
+Next step:
+- implement Workstream 8: Postman, Manual Validation, And Documentation
+
 ---
 
 # Decision Log
@@ -933,3 +970,17 @@ Reason:
 - the OpenTelemetry Collector can export traces to Jaeger through OTLP
 - the stack remains simple while Phase 6 establishes trace and metric plumbing
 - Grafana can still be provisioned with a Jaeger datasource for later dashboards and trace links
+
+---
+
+## Decision 5 - Defer Loki In Local Development
+
+Decision:
+- Workstream 7 defers Loki and Docker log collection from the local Docker Compose stack.
+- Local log diagnostics use `docker logs` and structured JSON filtering by correlation ID.
+
+Reason:
+- Docker Desktop-compatible log collection introduces host-specific configuration and operational overhead
+- Phase 6 already provides cross-service trace inspection through Jaeger and operational metrics through Prometheus and Grafana
+- Docker logs are sufficient for local correlation-based debugging when services emit JSON logs with correlation IDs and trace IDs
+- deferring Loki keeps local observability reproducible while preserving a clear path for future log aggregation

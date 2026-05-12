@@ -211,7 +211,15 @@ async def create_workflow(
             temporal_run_id=temporal_run_id,
         )
 
-    logger.info("workflow created", extra={"workflow_id": workflow.workflow_id})
+    logger.info(
+        "workflow created",
+        extra={
+            "workflow_id": workflow.workflow_id,
+            "correlation_id": workflow.correlation_id,
+            "operation": "workflow_create",
+            "status": "created",
+        },
+    )
     return workflow_to_response(workflow)
 
 
@@ -375,6 +383,18 @@ async def create_workflow_approval(
             status_code=status.HTTP_502_BAD_GATEWAY,
         )
 
+    logger.info(
+        "approval decision accepted",
+        extra={
+            "workflow_id": str(workflow_id),
+            "correlation_id": decision_payload["correlation_id"],
+            "approval_id": str(approval_id),
+            "decision": payload.decision.value,
+            "actor_id": actor_id.strip(),
+            "operation": "approval_decision",
+            "status": "accepted",
+        },
+    )
     return ApprovalDecisionResponse(
         workflow=workflow_to_response(refreshed_workflow),
         approval=approval_to_response(approval),

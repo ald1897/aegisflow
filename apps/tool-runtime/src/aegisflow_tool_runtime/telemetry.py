@@ -13,6 +13,7 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from aegisflow_tool_runtime.config import Settings
+from aegisflow_tool_runtime.logging import bind_log_context
 from aegisflow_tool_runtime.metrics import record_http_request
 
 _configured = False
@@ -45,6 +46,13 @@ def inject_trace_context(headers: MutableMapping[str, str] | None = None) -> dic
     return carrier
 
 
+def current_trace_id() -> str | None:
+    span_context = trace.get_current_span().get_span_context()
+    if not span_context.is_valid:
+        return None
+    return f"{span_context.trace_id:032x}"
+
+
 def set_span_attributes(attributes: dict[str, str | int | float | bool | None]) -> None:
     span = trace.get_current_span()
     if not span.is_recording():
@@ -67,20 +75,24 @@ class ToolRuntimeTelemetryMiddleware(BaseHTTPMiddleware):
         start_time = perf_counter()
         try:
             tracer = trace.get_tracer(__name__)
-            with tracer.start_as_current_span(
-                f"{request.method} {request.url.path}",
-                kind=SpanKind.SERVER,
-            ) as span:
-                _set_request_span_attributes(span, request)
-                response = await call_next(request)
-                status_code = response.status_code
-                route = _route_path(request)
-                span.update_name(f"{request.method} {route}")
-                span.set_attribute("http.route", route)
-                span.set_attribute("http.status_code", status_code)
-                if status_code >= 500:
-                    span.set_status(Status(StatusCode.ERROR))
-                return response
+            with bind_log_context(
+                correlation_id=request.headers.get("X-Correlation-ID"),
+                route=request.url.path,
+            ):
+                with tracer.start_as_current_span(
+                    f"{request.method} {request.url.path}",
+                    kind=SpanKind.SERVER,
+                ) as span:
+                    _set_request_span_attributes(span, request)
+                    response = await call_next(request)
+                    status_code = response.status_code
+                    route = _route_path(request)
+                    span.update_name(f"{request.method} {route}")
+                    span.set_attribute("http.route", route)
+                    span.set_attribute("http.status_code", status_code)
+                    if status_code >= 500:
+                        span.set_status(Status(StatusCode.ERROR))
+                    return response
         except Exception as exc:
             span = trace.get_current_span()
             if span.is_recording():

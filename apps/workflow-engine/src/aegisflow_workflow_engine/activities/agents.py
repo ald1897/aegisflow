@@ -199,7 +199,17 @@ async def execute_agent(payload: dict) -> dict:
         telemetry=response_payload["telemetry"],
         workflow_state=workflow_state,
     )
-    logger.info("agent execution completed", extra={"workflow_id": workflow_id, "agent_id": agent_id})
+    logger.info(
+        "agent execution completed",
+        extra={
+            "workflow_id": workflow_id,
+            "correlation_id": correlation_id,
+            "agent_id": agent_id,
+            "agent_execution_id": agent_execution_id,
+            "status": response_payload["status"],
+            "validation_status": response_payload["validation_status"],
+        },
+    )
     record_agent_execution(
         agent_id=agent_id,
         status=response_payload["status"],
@@ -287,7 +297,7 @@ async def _call_agent_runtime(agent_runtime_url: str, agent_id: str, payload: di
                 span.set_attribute("http.route", "/api/v1/agents/{agent_id}/executions")
                 response = await client.post(
                     f"/api/v1/agents/{agent_id}/executions",
-                    headers=inject_trace_context(),
+                    headers=inject_trace_context({"X-Correlation-ID": payload["correlation_id"]}),
                     json=payload,
                 )
                 span.set_attribute("http.status_code", response.status_code)

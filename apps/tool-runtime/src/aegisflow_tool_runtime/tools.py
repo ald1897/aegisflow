@@ -1,4 +1,5 @@
 from hashlib import sha256
+import logging
 from time import perf_counter
 from uuid import uuid5, NAMESPACE_URL
 
@@ -6,6 +7,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 from pydantic import ValidationError
 
+from aegisflow_tool_runtime.logging import bind_log_context
 from aegisflow_tool_runtime.metrics import record_tool_handler_duration, record_tool_invocation
 from aegisflow_tool_runtime.registry import TOOL_REGISTRY
 from aegisflow_tool_runtime.schemas import (
@@ -22,6 +24,8 @@ from aegisflow_tool_runtime.schemas import (
     ValidationStatus,
 )
 from aegisflow_tool_runtime.telemetry import set_span_attributes
+
+logger = logging.getLogger(__name__)
 
 
 class ToolNotFoundError(Exception):
@@ -55,6 +59,22 @@ class ToolRuntime:
             )
             raise ToolNotFoundError(tool_id)
 
+        with bind_log_context(
+            workflow_id=request.workflow_id,
+            correlation_id=request.correlation_id,
+            agent_id=request.agent_id,
+            agent_execution_id=request.agent_execution_id,
+            tool_id=tool_id,
+        ):
+            logger.info(
+                "tool invocation started",
+                extra={
+                    "workflow_id": request.workflow_id,
+                    "correlation_id": request.correlation_id,
+                    "agent_id": request.agent_id,
+                    "tool_id": tool_id,
+                },
+            )
         with tracer.start_as_current_span("tool_runtime.invoke_tool") as span:
             span.set_attribute("workflow_id", request.workflow_id)
             span.set_attribute("correlation_id", request.correlation_id)
@@ -75,6 +95,17 @@ class ToolRuntime:
                     output_validation_status="NOT_APPLICABLE",
                     duration_seconds=perf_counter() - start_time,
                 )
+                logger.warning(
+                    "tool invocation denied",
+                    extra={
+                        "workflow_id": request.workflow_id,
+                        "correlation_id": request.correlation_id,
+                        "agent_id": request.agent_id,
+                        "tool_id": tool_id,
+                        "permission_status": PermissionStatus.denied.value,
+                        "status": ToolInvocationStatus.failed.value,
+                    },
+                )
                 raise ToolPermissionDeniedError(f"{request.agent_id} is not allowed to invoke {tool_id}")
 
             input_model, output_model, handler = self._tool_definition(tool_id)
@@ -91,6 +122,17 @@ class ToolRuntime:
                     input_validation_status=ValidationStatus.rejected.value,
                     output_validation_status="NOT_APPLICABLE",
                     duration_seconds=perf_counter() - start_time,
+                )
+                logger.warning(
+                    "tool input validation rejected",
+                    extra={
+                        "workflow_id": request.workflow_id,
+                        "correlation_id": request.correlation_id,
+                        "agent_id": request.agent_id,
+                        "tool_id": tool_id,
+                        "validation_status": ValidationStatus.rejected.value,
+                        "status": ToolInvocationStatus.failed.value,
+                    },
                 )
                 raise ToolInputValidationError(str(exc)) from exc
 
@@ -118,6 +160,16 @@ class ToolRuntime:
                     input_validation_status=ValidationStatus.validated.value,
                     output_validation_status=ValidationStatus.rejected.value,
                     duration_seconds=perf_counter() - start_time,
+                )
+                logger.exception(
+                    "tool output validation failed",
+                    extra={
+                        "workflow_id": request.workflow_id,
+                        "correlation_id": request.correlation_id,
+                        "agent_id": request.agent_id,
+                        "tool_id": tool_id,
+                        "status": ToolInvocationStatus.failed.value,
+                    },
                 )
                 raise
 
@@ -161,6 +213,18 @@ class ToolRuntime:
                     "tool.input_validation_status": response.input_validation_status.value,
                     "tool.output_validation_status": response.output_validation_status.value,
                 }
+            )
+            logger.info(
+                "tool invocation completed",
+                extra={
+                    "workflow_id": request.workflow_id,
+                    "correlation_id": request.correlation_id,
+                    "agent_id": request.agent_id,
+                    "agent_execution_id": request.agent_execution_id,
+                    "tool_id": tool_id,
+                    "status": response.status.value,
+                    "permission_status": response.permission_status.value,
+                },
             )
             return response
 

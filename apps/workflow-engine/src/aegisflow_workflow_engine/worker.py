@@ -4,6 +4,7 @@ import logging
 from temporalio.client import Client
 from temporalio.worker import Worker
 
+from aegisflow_workflow_engine.activities.approvals import record_approval_decision
 from aegisflow_workflow_engine.activities.agents import execute_agent
 from aegisflow_workflow_engine.activities.state_transitions import advance_workflow_state
 from aegisflow_workflow_engine.activities.tools import record_tool_invocation
@@ -35,7 +36,7 @@ async def main() -> None:
         client,
         task_queue=settings.temporal_task_queue,
         workflows=[MortgageExceptionReviewWorkflow],
-        activities=[advance_workflow_state, execute_agent, record_tool_invocation],
+        activities=[advance_workflow_state, execute_agent, record_tool_invocation, record_approval_decision],
     )
     logger.info(
         "workflow-engine worker started on task queue %s",

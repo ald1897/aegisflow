@@ -169,6 +169,9 @@ The platform currently supports:
 - agent execution record persistence
 - workflow timeline retrieval
 - workflow tool invocation retrieval
+- approval record persistence table
+- workflow-engine approval decision recording activity
+- approval decision timeline and outbox event support
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -178,11 +181,14 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, workflow-engine persistence of agent-produced tool invocation telemetry, and gateway-api retrieval of workflow tool invocation history.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the initial Phase 5 approval persistence foundation.
+
+Phase 5 currently supports backend approval record persistence, approval decision timeline entries, and approval decision outbox events. Gateway approval APIs, workflow decision transitions, and the operator-console are not yet implemented.
 
 The platform does not yet implement:
 - human review UI
-- approval workflows
+- gateway approval workflows
+- workflow state advancement after approval decisions
 - distributed tracing
 - AI evaluation
 

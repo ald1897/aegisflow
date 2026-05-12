@@ -114,7 +114,7 @@ All events should follow:
 
 # Implemented Local Events
 
-The current local implementation emits workflow, agent execution, and supported tool invocation events through the `workflow-events` topic.
+The current local implementation emits workflow, agent execution, supported tool invocation, and approval decision events through the `workflow-events` topic.
 
 ## Workflow Events
 
@@ -198,3 +198,44 @@ Current implementation boundary:
 - tool invocation event records are written through the outbox model
 - standard Mortgage Exception Review execution produces tool invocation events for approved agent tool use
 - gateway-api exposes workflow tool invocation retrieval for persisted tool invocation records
+
+---
+
+## Approval Events
+
+Produced by the workflow-engine when a human approval decision is recorded:
+
+```text
+approval.decision_recorded
+```
+
+Reserved for workflow decision integration:
+
+```text
+workflow.approved
+workflow.rejected
+workflow.completed
+```
+
+Approval events represent human review facts.
+
+They must include:
+- `event_id`
+- `event_type`
+- `event_version`
+- `workflow_id`
+- `correlation_id`
+- approval identifier
+- decision
+- decision reason
+- reviewing operator
+- review timestamp
+
+Approval events must not be interpreted as AI decisions.
+
+They describe a human operator decision recorded inside a governed workflow context. Workflow state progression remains owned by the workflow engine.
+
+Current implementation boundary:
+- approval decision event records are written through the outbox model
+- approval decision records do not yet advance workflow state
+- gateway-api does not yet expose approval decision endpoints

@@ -378,21 +378,21 @@ The UI must clearly distinguish:
 
 ## Workstream 1 - Approval Persistence And Events
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add Alembic migration for `approval_records`
-- add persistence models to gateway-api and workflow-engine as needed
-- add approval event types
-- add approval timeline entry types
-- add approval record service logic
-- add idempotency and duplicate decision protections
+- add Alembic migration for `approval_records` - Complete
+- add persistence models to gateway-api and workflow-engine as needed - Complete
+- add approval event types - Complete
+- add approval timeline entry types - Complete
+- add approval record service logic - Complete
+- add idempotency and duplicate decision protections - Complete
 
 Completion criteria:
-- approval records are persisted by workflow
-- approval timeline entries are created
-- approval events are written through the outbox model
-- duplicate approval decisions fail safely or are idempotent by design
+- approval records are persisted by workflow - Met
+- approval timeline entries are created - Met
+- approval events are written through the outbox model - Met
+- duplicate approval decisions fail safely or are idempotent by design - Met
 
 ---
 
@@ -638,6 +638,33 @@ Status:
 
 Next step:
 - implement Workstream 1: Approval Persistence And Events
+
+## 2026-05-12 - Workstream 1
+
+Status:
+- added Alembic migration `20260512_0005` for `approval_records`
+- added approval persistence models to gateway-api and workflow-engine
+- added approval event vocabulary, including `approval.decision_recorded`
+- added approval timeline entry type `APPROVAL_DECISION_RECORDED`
+- added workflow-engine `record_approval_decision` activity
+- implemented idempotent retry behavior by `approval_id`
+- implemented duplicate terminal decision protection for workflows
+- registered the approval activity with the Temporal worker
+- applied the migration successfully against local Postgres
+- validated the local table shape in Postgres
+- validated workflow-engine automated tests with 8 passing tests
+- validated gateway-api automated tests with 9 passing tests
+
+Completed workstream:
+- Workstream 1 - Approval Persistence And Events
+
+Boundary:
+- approval decisions do not yet advance workflow state
+- gateway-api does not yet expose review queue, review context, or approval decision endpoints
+- operator-console does not yet display or submit approval decisions
+
+Next step:
+- implement Workstream 2: Workflow Decision Integration
 
 ---
 

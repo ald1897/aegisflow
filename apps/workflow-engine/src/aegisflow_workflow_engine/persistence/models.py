@@ -144,3 +144,22 @@ class ToolInvocationRecord(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class ApprovalRecord(Base):
+    __tablename__ = "approval_records"
+
+    approval_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    decision: Mapped[str] = mapped_column(String(40), nullable=False)
+    decision_reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    comment: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    approval_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

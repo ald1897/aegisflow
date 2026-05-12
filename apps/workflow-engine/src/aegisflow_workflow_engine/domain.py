@@ -14,10 +14,14 @@ class WorkflowState(StrEnum):
 class WorkflowEventType(StrEnum):
     state_changed = "workflow.state_changed"
     failed = "workflow.failed"
+    approved = "workflow.approved"
+    rejected = "workflow.rejected"
+    completed = "workflow.completed"
     agent_execution_completed = "agent.execution_completed"
     agent_execution_failed = "agent.execution_failed"
     tool_invocation_completed = "tool.invocation_completed"
     tool_invocation_failed = "tool.invocation_failed"
+    approval_decision_recorded = "approval.decision_recorded"
 
 
 class TimelineEntryType(StrEnum):
@@ -26,6 +30,7 @@ class TimelineEntryType(StrEnum):
     agent_execution_failed = "AGENT_EXECUTION_FAILED"
     tool_invocation_completed = "TOOL_INVOCATION_COMPLETED"
     tool_invocation_failed = "TOOL_INVOCATION_FAILED"
+    approval_decision_recorded = "APPROVAL_DECISION_RECORDED"
     event_published = "EVENT_PUBLISHED"
     event_publish_failed = "EVENT_PUBLISH_FAILED"
 

@@ -61,6 +61,10 @@ class WorkflowRecord(Base):
         back_populates="workflow",
         cascade="all, delete-orphan",
     )
+    approval_records: Mapped[list["ApprovalRecord"]] = relationship(
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
 
 
 class WorkflowStateTransition(Base):
@@ -190,6 +194,27 @@ class ToolInvocationRecord(Base):
     workflow: Mapped[WorkflowRecord] = relationship(back_populates="tool_invocations")
 
 
+class ApprovalRecord(Base):
+    __tablename__ = "approval_records"
+
+    approval_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    decision: Mapped[str] = mapped_column(String(40), nullable=False)
+    decision_reason: Mapped[str] = mapped_column(String(255), nullable=False)
+    comment: Mapped[str] = mapped_column(Text, nullable=False)
+    reviewed_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    approval_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    workflow: Mapped[WorkflowRecord] = relationship(back_populates="approval_records")
+
+
 Index("ix_workflow_timeline_entries_workflow_id", WorkflowTimelineEntry.workflow_id)
 Index("ix_workflow_timeline_entries_created_at", WorkflowTimelineEntry.created_at)
 Index("ix_workflow_event_outbox_workflow_id", WorkflowEventOutbox.workflow_id)
@@ -200,3 +225,6 @@ Index("ix_tool_invocation_records_workflow_id", ToolInvocationRecord.workflow_id
 Index("ix_tool_invocation_records_agent_id", ToolInvocationRecord.agent_id)
 Index("ix_tool_invocation_records_agent_execution_id", ToolInvocationRecord.agent_execution_id)
 Index("ix_tool_invocation_records_tool_id", ToolInvocationRecord.tool_id)
+Index("ix_approval_records_workflow_id", ApprovalRecord.workflow_id)
+Index("ix_approval_records_reviewed_by", ApprovalRecord.reviewed_by)
+Index("ix_approval_records_decision", ApprovalRecord.decision)

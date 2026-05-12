@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, and Phase 4 capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and initial Phase 5 persistence capabilities:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -18,6 +18,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, and Phase 4 capab
 - approved tool registry and schema validation
 - deterministic mock tool execution
 - workflow-integrated tool invocation persistence
+- approval record persistence foundation
 
 ---
 
@@ -161,6 +162,7 @@ During current workflow execution:
 - agent execution records are persisted for operational traceability
 - approved agent tool invocations are persisted as workflow-owned tool invocation records
 - tool invocation records produce timeline entries and outbox events
+- human approval decisions can be recorded by a workflow-engine activity for backend validation
 
 ---
 
@@ -175,6 +177,7 @@ Implemented persistence tables include:
 - `workflow_event_outbox`
 - `agent_execution_records`
 - `tool_invocation_records`
+- `approval_records`
 
 Current persisted data includes:
 - workflow identity
@@ -198,6 +201,11 @@ Current persisted data includes:
 - tool input validation status
 - tool output validation status
 - tool execution metadata
+- approval identity
+- approval decision
+- approval reason and comment
+- reviewing operator identity
+- approval review timestamp
 
 Current tool invocation persistence boundary:
 - workflow-engine can idempotently record tool invocation results
@@ -205,6 +213,13 @@ Current tool invocation persistence boundary:
 - tool invocation records can produce workflow event outbox records
 - agent-produced tool invocation telemetry is persisted during the standard Mortgage Exception Review path
 - gateway-api can retrieve persisted workflow tool invocation history
+
+Current approval persistence boundary:
+- workflow-engine can idempotently record approval decisions
+- approval records can produce workflow timeline entries
+- approval records can produce workflow event outbox records
+- duplicate terminal approval decisions are rejected by backend logic
+- approval decisions do not yet advance workflow state
 
 ---
 
@@ -224,10 +239,16 @@ Current event types:
 - `agent.execution_completed`
 - `tool.invocation_completed`
 - `tool.invocation_failed`
+- `approval.decision_recorded`
 
 Current tool invocation event boundary:
 - tool invocation events are produced when workflow-engine records agent-produced tool invocation telemetry
 - tool invocation events are persisted through the outbox model
+
+Current approval event boundary:
+- approval decision events are supported by the workflow-engine recording activity
+- approval decision events are persisted through the outbox model
+- approval decision events are not yet produced by gateway approval APIs
 
 Event publication status is tracked in:
 
@@ -247,7 +268,8 @@ PUBLISHED
 
 The following capabilities are intentionally not implemented yet:
 - human approval UI
-- approve/reject actions
+- gateway approve/reject APIs
+- workflow state advancement after approval decisions
 - workflow completion after human review
 - distributed tracing stack
 - AI evaluation

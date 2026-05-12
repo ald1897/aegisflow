@@ -451,21 +451,21 @@ Completion criteria:
 
 ## Workstream 2 - Evaluation Persistence Model
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add Alembic migration for evaluation persistence tables
-- add SQLAlchemy models for evaluation runs, results, and dataset cases
-- add repository/service layer for creating and retrieving evaluation records
-- add DTOs and schema validation for evaluation records
-- ensure records use bounded metadata and references rather than raw sensitive payloads
-- add tests for persistence, idempotency expectations, and retrieval ordering
+- add Alembic migration for evaluation persistence tables - Complete
+- add SQLAlchemy models for evaluation runs, results, and dataset cases - Complete
+- add repository/service layer for creating and retrieving evaluation records - Complete
+- add DTOs and schema validation for evaluation records - Complete
+- ensure records use bounded metadata and references rather than raw sensitive payloads - Complete
+- add tests for persistence, idempotency expectations, and retrieval ordering - Complete
 
 Completion criteria:
-- evaluation tables are created locally
-- evaluation records can be persisted and retrieved
-- model constraints preserve workflow association and reproducibility metadata
-- tests pass
+- evaluation tables are created locally - Met
+- evaluation records can be persisted and retrieved - Met
+- model constraints preserve workflow association and reproducibility metadata - Met
+- tests pass - Met
 
 ---
 
@@ -769,6 +769,36 @@ Boundary:
 
 Next step:
 - implement Workstream 2: Evaluation Persistence Model
+
+## 2026-05-12 - Workstream 2
+
+Status:
+- added Alembic migration `20260512_0006_add_evaluation_records`
+- added `evaluation_dataset_cases`, `evaluation_runs`, and `evaluation_results` tables
+- added indexes for workflow, correlation, dataset, status, evaluator, score, and severity lookup paths
+- added foreign key constraints to preserve workflow, agent execution, and evaluation run associations
+- added evaluation-service SQLAlchemy models for workflow references, agent execution references, evaluation runs, evaluation results, and dataset cases
+- added async session factory support for evaluation-service database access
+- added Pydantic DTOs for evaluation run, evaluation result, and dataset case create/read shapes
+- added evaluation repository and persistence service for create, retrieve, list, and idempotent explicit-ID operations
+- added tests for run/result persistence, explicit run ID idempotency, workflow run ordering, and dataset case filtering
+- rebuilt evaluation-service image with persistence modules
+- validated evaluation-service automated tests with 7 passing tests
+- rebuilt gateway-api image with the new Alembic migration
+- applied Alembic upgrade to local Postgres
+- validated local Postgres contains all three evaluation tables
+- restarted evaluation-service and validated readiness against the migrated database
+
+Completed workstream:
+- Workstream 2 - Evaluation Persistence Model
+
+Boundary:
+- Workstream 2 stores evaluation records and dataset definitions only
+- deterministic evaluator logic, run orchestration endpoints, dataset scoring behavior, gateway/Postman requests, and dashboards remain assigned to later Phase 7 workstreams
+- evaluation records preserve references and bounded metadata, not raw document contents, borrower PII, secrets, prompt content, or full model output
+
+Next step:
+- implement Workstream 3: Deterministic Local Evaluators
 
 ---
 

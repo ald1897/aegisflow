@@ -252,6 +252,19 @@ async def test_create_workflow_evaluation_run_persists_deterministic_results(
     assert len(runs) == 1
     assert len(results) == len(payload["results"])
 
+    metrics_response = await client.get("/metrics")
+    assert metrics_response.status_code == 200
+    assert "aegisflow_evaluation_service_evaluation_runs_total" in metrics_response.text
+    assert 'evaluation_scope="workflow"' in metrics_response.text
+    assert 'evaluation_mode="deterministic_local"' in metrics_response.text
+    assert 'status="COMPLETED"' in metrics_response.text
+    assert "aegisflow_evaluation_service_evaluation_run_duration_seconds" in metrics_response.text
+    assert "aegisflow_evaluation_service_evaluation_results_total" in metrics_response.text
+    assert 'evaluator_id="agent-output-contract",score_name="agent_output_contract",score_status="PASS"' in (
+        metrics_response.text
+    )
+    assert "aegisflow_evaluation_service_prompt_regression_results_total" in metrics_response.text
+
 
 async def test_judge_model_disabled_mode_includes_judge_boundary_result(
     client: AsyncClient,

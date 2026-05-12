@@ -15,8 +15,13 @@ EXTRA_FIELDS = {
     "evaluation_mode",
     "evaluation_run_id",
     "evaluation_scope",
+    "evaluator_id",
     "operation",
+    "result_count",
     "route",
+    "score_name",
+    "score_status",
+    "severity",
     "status",
     "workflow_id",
 }

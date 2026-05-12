@@ -54,3 +54,7 @@ async def test_metrics_endpoint_exposes_evaluation_service_metrics(client: Async
     assert "text/plain" in response.headers["content-type"]
     assert "aegisflow_evaluation_service_http_requests_total" in response.text
     assert "aegisflow_evaluation_service_startups_total" in response.text
+    assert "aegisflow_evaluation_service_evaluation_runs_total" in response.text
+    assert "aegisflow_evaluation_service_evaluation_results_total" in response.text
+    assert "aegisflow_evaluation_service_hallucination_signals_total" in response.text
+    assert "aegisflow_evaluation_service_prompt_regression_results_total" in response.text

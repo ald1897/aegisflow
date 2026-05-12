@@ -1,7 +1,11 @@
 {
   "uid": "aegisflow-service-health",
   "title": "AegisFlow - Service Health And Latency",
-  "tags": ["aegisflow", "phase-6", "services"],
+  "tags": [
+    "aegisflow",
+    "phase-6",
+    "services"
+  ],
   "timezone": "browser",
   "refresh": "10s",
   "schemaVersion": 39,
@@ -47,13 +51,15 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=~\"gateway-api|workflow-engine|agent-runtime|tool-runtime|otel-collector|jaeger\"}",
+          "expr": "up{job=~\"gateway-api|workflow-engine|agent-runtime|tool-runtime|evaluation-service|otel-collector|jaeger\"}",
           "legendFormat": "{{job}}"
         }
       ],
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -114,7 +120,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_requests_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_requests_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_requests_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\"))",
+          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_requests_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_requests_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_requests_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_evaluation_service_http_requests_total[$__rate_interval]), \"service\", \"evaluation-service\", \"job\", \".*\"))",
           "legendFormat": "{{service}} {{status_class}}"
         }
       ]
@@ -136,7 +142,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_gateway_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_agent_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_tool_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\")))",
+          "expr": "histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_gateway_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_agent_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_tool_runtime_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\"))) or histogram_quantile(0.95, sum by (le, service, route) (label_replace(rate(aegisflow_evaluation_service_http_request_duration_seconds_bucket[$__rate_interval]), \"service\", \"evaluation-service\", \"job\", \".*\")))",
           "legendFormat": "{{service}} {{route}}"
         }
       ],
@@ -164,7 +170,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_errors_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_errors_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_errors_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\"))",
+          "expr": "sum by (service, status_class) (label_replace(rate(aegisflow_gateway_http_errors_total[$__rate_interval]), \"service\", \"gateway-api\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_agent_runtime_http_errors_total[$__rate_interval]), \"service\", \"agent-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_tool_runtime_http_errors_total[$__rate_interval]), \"service\", \"tool-runtime\", \"job\", \".*\")) or sum by (service, status_class) (label_replace(rate(aegisflow_evaluation_service_http_errors_total[$__rate_interval]), \"service\", \"evaluation-service\", \"job\", \".*\"))",
           "legendFormat": "{{service}} {{status_class}}"
         }
       ]

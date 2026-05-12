@@ -2292,7 +2292,8 @@
               "    \"AegisFlow - Workflow Operations\",",
               "    \"AegisFlow - Service Health And Latency\",",
               "    \"AegisFlow - Agent And Tool Execution\",",
-              "    \"AegisFlow - Approval Decisions\"",
+              "    \"AegisFlow - Approval Decisions\",",
+              "    \"AegisFlow - Evaluation Quality\"",
               "  ].forEach((title) => pm.expect(dashboards, title).to.include(title));",
               "});"
             ]

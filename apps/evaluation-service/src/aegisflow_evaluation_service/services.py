@@ -1,5 +1,10 @@
+import logging
 from datetime import datetime, timezone
+from time import perf_counter
 from uuid import UUID
+
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 from aegisflow_evaluation_service.datasets import LOCAL_DATASET_CASES
 from aegisflow_evaluation_service.evaluators import DatasetReplayEvaluator, EvaluationScore, evaluate_deterministically
@@ -10,6 +15,8 @@ from aegisflow_evaluation_service.evidence import (
     WorkflowEvaluationEvidence,
 )
 from aegisflow_evaluation_service.judges import JudgeEvaluationRequest, get_judge_evaluator
+from aegisflow_evaluation_service.logging import bind_log_context
+from aegisflow_evaluation_service.metrics import record_evaluation_result, record_evaluation_run
 from aegisflow_evaluation_service.repository import EvaluationRepository
 from aegisflow_evaluation_service.schemas import (
     EvaluationDatasetCaseCreate,
@@ -23,6 +30,9 @@ from aegisflow_evaluation_service.schemas import (
     EvaluationRunRequest,
     EvaluationRunSummary,
 )
+
+logger = logging.getLogger(__name__)
+tracer = trace.get_tracer(__name__)
 
 
 class EvaluationOrchestrationError(Exception):
@@ -90,70 +100,161 @@ class EvaluationRunService:
         *,
         created_by: str,
     ) -> EvaluationRunDetail:
-        existing = await self.repository.get_run(str(payload.evaluation_run_id))
-        if existing is not None:
-            results = await self.repository.list_results_for_run(str(payload.evaluation_run_id))
-            return EvaluationRunDetail(
-                run=EvaluationRunRead.model_validate(existing),
-                results=[EvaluationResultRead.model_validate(result) for result in results],
+        start_time = perf_counter()
+        run_status = "FAILED"
+        with bind_log_context(
+            workflow_id=str(workflow_id),
+            evaluation_run_id=str(payload.evaluation_run_id),
+            evaluation_scope=payload.evaluation_scope,
+            evaluation_mode=payload.evaluation_mode,
+            dataset_id=payload.dataset_id,
+        ):
+            logger.info(
+                "evaluation run started",
+                extra={"operation": "evaluation_run_create", "status": "started"},
             )
+            idempotent_replay = False
+            with tracer.start_as_current_span("evaluation.run.create") as span:
+                span.set_attribute("workflow.id", str(workflow_id))
+                span.set_attribute("evaluation.run_id", str(payload.evaluation_run_id))
+                span.set_attribute("evaluation.scope", payload.evaluation_scope)
+                span.set_attribute("evaluation.mode", payload.evaluation_mode)
+                if payload.dataset_id:
+                    span.set_attribute("evaluation.dataset_id", payload.dataset_id)
+                if payload.dataset_case_id:
+                    span.set_attribute("evaluation.dataset_case_id", payload.dataset_case_id)
+                try:
+                    existing = await self.repository.get_run(str(payload.evaluation_run_id))
+                    if existing is not None:
+                        results = await self.repository.list_results_for_run(str(payload.evaluation_run_id))
+                        idempotent_replay = True
+                        span.set_attribute("evaluation.idempotent_replay", True)
+                        span.set_attribute("evaluation.result_count", len(results))
+                        logger.info(
+                            "evaluation run already existed",
+                            extra={
+                                "operation": "evaluation_run_create",
+                                "status": "idempotent_replay",
+                                "result_count": len(results),
+                            },
+                        )
+                        return EvaluationRunDetail(
+                            run=EvaluationRunRead.model_validate(existing),
+                            results=[EvaluationResultRead.model_validate(result) for result in results],
+                        )
 
-        evidence = await self.load_workflow_evidence(str(workflow_id))
-        dataset_case = await self._get_dataset_case_for_run(payload)
-        expectations = self._build_expectations(payload, dataset_case)
+                    evidence = await self.load_workflow_evidence(str(workflow_id))
+                    dataset_case = await self._get_dataset_case_for_run(payload)
+                    expectations = self._build_expectations(payload, dataset_case)
 
-        started_at = datetime.now(timezone.utc)
-        scores = self._score_evidence(evidence, expectations, payload.evaluation_mode, dataset_case is not None)
-        completed_at = datetime.now(timezone.utc)
-        run_dataset_id = dataset_case.dataset_id if dataset_case else payload.dataset_id
-        run = await self.repository.create_run(
-            EvaluationRunCreate(
-                evaluation_run_id=payload.evaluation_run_id,
-                workflow_id=workflow_id,
-                correlation_id=evidence.correlation_id,
-                evaluation_scope=payload.evaluation_scope,
-                evaluation_mode=payload.evaluation_mode,
-                dataset_id=run_dataset_id,
-                status="COMPLETED",
-                started_at=started_at,
-                completed_at=completed_at,
-                created_by=created_by,
-                run_metadata={
-                    **payload.run_metadata,
-                    "dataset_case_id": dataset_case.dataset_case_id if dataset_case else payload.dataset_case_id,
-                    "agent_execution_count": len(evidence.agent_executions),
-                    "tool_invocation_count": len(evidence.tool_invocations),
-                    "approval_decision_present": evidence.approval_decision is not None,
-                    "replay_boundary": "dataset_evaluation_only" if dataset_case else "none",
-                },
-            )
-        )
-        results = []
-        for score in scores:
-            result = await self.repository.create_result(
-                EvaluationResultCreate(
-                    evaluation_run_id=payload.evaluation_run_id,
-                    workflow_id=workflow_id,
-                    agent_execution_id=_uuid_or_none(score.agent_execution_id),
-                    prompt_id=score.prompt_id,
-                    prompt_version=score.prompt_version,
-                    model_name=score.model_name,
-                    evaluator_id=score.evaluator_id,
-                    evaluator_version=score.evaluator_version,
-                    score_name=score.score_name,
-                    score_value=score.score_value,
-                    score_status=score.score_status,
-                    severity=score.severity,
-                    rationale=score.rationale,
-                    result_metadata=score.result_metadata,
-                )
-            )
-            results.append(result)
+                    started_at = datetime.now(timezone.utc)
+                    scores = self._score_evidence(
+                        evidence,
+                        expectations,
+                        payload.evaluation_mode,
+                        dataset_case is not None,
+                    )
+                    completed_at = datetime.now(timezone.utc)
+                    run_dataset_id = dataset_case.dataset_id if dataset_case else payload.dataset_id
+                    with tracer.start_as_current_span("evaluation.results.persist") as persist_span:
+                        persist_span.set_attribute("evaluation.result_count", len(scores))
+                        run = await self.repository.create_run(
+                            EvaluationRunCreate(
+                                evaluation_run_id=payload.evaluation_run_id,
+                                workflow_id=workflow_id,
+                                correlation_id=evidence.correlation_id,
+                                evaluation_scope=payload.evaluation_scope,
+                                evaluation_mode=payload.evaluation_mode,
+                                dataset_id=run_dataset_id,
+                                status="COMPLETED",
+                                started_at=started_at,
+                                completed_at=completed_at,
+                                created_by=created_by,
+                                run_metadata={
+                                    **payload.run_metadata,
+                                    "dataset_case_id": (
+                                        dataset_case.dataset_case_id if dataset_case else payload.dataset_case_id
+                                    ),
+                                    "agent_execution_count": len(evidence.agent_executions),
+                                    "tool_invocation_count": len(evidence.tool_invocations),
+                                    "approval_decision_present": evidence.approval_decision is not None,
+                                    "replay_boundary": "dataset_evaluation_only" if dataset_case else "none",
+                                },
+                            )
+                        )
+                        results = []
+                        for score in scores:
+                            result = await self.repository.create_result(
+                                EvaluationResultCreate(
+                                    evaluation_run_id=payload.evaluation_run_id,
+                                    workflow_id=workflow_id,
+                                    agent_execution_id=_uuid_or_none(score.agent_execution_id),
+                                    prompt_id=score.prompt_id,
+                                    prompt_version=score.prompt_version,
+                                    model_name=score.model_name,
+                                    evaluator_id=score.evaluator_id,
+                                    evaluator_version=score.evaluator_version,
+                                    score_name=score.score_name,
+                                    score_value=score.score_value,
+                                    score_status=score.score_status,
+                                    severity=score.severity,
+                                    rationale=score.rationale,
+                                    result_metadata=score.result_metadata,
+                                )
+                            )
+                            record_evaluation_result(
+                                evaluator_id=score.evaluator_id,
+                                score_name=score.score_name,
+                                score_status=score.score_status,
+                                severity=score.severity,
+                                prompt_id=score.prompt_id,
+                                prompt_version=score.prompt_version,
+                            )
+                            logger.info(
+                                "evaluation result persisted",
+                                extra={
+                                    "operation": "evaluation_result_persist",
+                                    "status": "persisted",
+                                    "evaluator_id": score.evaluator_id,
+                                    "score_name": score.score_name,
+                                    "score_status": score.score_status,
+                                    "severity": score.severity,
+                                },
+                            )
+                            results.append(result)
 
-        return EvaluationRunDetail(
-            run=EvaluationRunRead.model_validate(run),
-            results=[EvaluationResultRead.model_validate(result) for result in results],
-        )
+                    run_status = "COMPLETED"
+                    span.set_attribute("evaluation.status", run_status)
+                    span.set_attribute("evaluation.result_count", len(results))
+                    logger.info(
+                        "evaluation run completed",
+                        extra={
+                            "operation": "evaluation_run_create",
+                            "status": "completed",
+                            "result_count": len(results),
+                            "dataset_id": run_dataset_id,
+                        },
+                    )
+                    return EvaluationRunDetail(
+                        run=EvaluationRunRead.model_validate(run),
+                        results=[EvaluationResultRead.model_validate(result) for result in results],
+                    )
+                except Exception as exc:
+                    span.record_exception(exc)
+                    span.set_status(Status(StatusCode.ERROR))
+                    logger.exception(
+                        "evaluation run failed",
+                        extra={"operation": "evaluation_run_create", "status": "failed"},
+                    )
+                    raise
+                finally:
+                    if not idempotent_replay:
+                        record_evaluation_run(
+                            evaluation_scope=payload.evaluation_scope,
+                            evaluation_mode=payload.evaluation_mode,
+                            status=run_status,
+                            duration_seconds=perf_counter() - start_time,
+                        )
 
     async def get_run_detail(self, evaluation_run_id: UUID) -> EvaluationRunDetail | None:
         run = await self.repository.get_run(str(evaluation_run_id))
@@ -182,59 +283,65 @@ class EvaluationRunService:
         return summaries
 
     async def load_workflow_evidence(self, workflow_id: str) -> WorkflowEvaluationEvidence:
-        workflow = await self.repository.get_workflow(workflow_id)
-        if workflow is None:
-            raise WorkflowNotFoundError("workflow was not found")
-        if workflow.state not in REVIEWABLE_OR_TERMINAL_STATES:
-            raise WorkflowNotReadyForEvaluationError("workflow has not reached a reviewable or terminal state")
+        with tracer.start_as_current_span("evaluation.workflow_evidence.load") as span:
+            span.set_attribute("workflow.id", workflow_id)
+            workflow = await self.repository.get_workflow(workflow_id)
+            if workflow is None:
+                raise WorkflowNotFoundError("workflow was not found")
+            if workflow.state not in REVIEWABLE_OR_TERMINAL_STATES:
+                raise WorkflowNotReadyForEvaluationError("workflow has not reached a reviewable or terminal state")
 
-        agent_records = await self.repository.list_agent_executions_for_workflow(workflow_id)
-        if not agent_records:
-            raise WorkflowNotReadyForEvaluationError("workflow has no persisted agent execution evidence")
+            agent_records = await self.repository.list_agent_executions_for_workflow(workflow_id)
+            if not agent_records:
+                raise WorkflowNotReadyForEvaluationError("workflow has no persisted agent execution evidence")
 
-        tool_records = await self.repository.list_tool_invocations_for_workflow(workflow_id)
-        await self.repository.list_timeline_entries_for_workflow(workflow_id)
-        approvals = await self.repository.list_approval_records_for_workflow(workflow_id)
-        approval_decision = approvals[-1].decision if approvals else None
+            tool_records = await self.repository.list_tool_invocations_for_workflow(workflow_id)
+            await self.repository.list_timeline_entries_for_workflow(workflow_id)
+            approvals = await self.repository.list_approval_records_for_workflow(workflow_id)
+            approval_decision = approvals[-1].decision if approvals else None
+            span.set_attribute("workflow.state", workflow.state or "UNKNOWN")
+            span.set_attribute("evaluation.agent_execution_count", len(agent_records))
+            span.set_attribute("evaluation.tool_invocation_count", len(tool_records))
+            span.set_attribute("evaluation.approval_record_count", len(approvals))
 
-        return WorkflowEvaluationEvidence(
-            workflow_id=workflow.workflow_id,
-            workflow_type=workflow.workflow_type or "UNKNOWN",
-            workflow_state=workflow.state or "UNKNOWN",
-            correlation_id=workflow.correlation_id or "",
-            agent_executions=tuple(
-                AgentExecutionEvidence(
-                    agent_execution_id=agent.agent_execution_id,
-                    agent_id=agent.agent_id or "unknown_agent",
-                    prompt_id=agent.prompt_id or "unknown_prompt",
-                    prompt_version=agent.prompt_version or "unknown",
-                    model_name=agent.model_name or "unknown_model",
-                    status=agent.status or "UNKNOWN",
-                    validation_status=agent.validation_status or "UNKNOWN",
-                    confidence_score=float(agent.confidence_score or 0.0),
-                    requires_human_review=bool(agent.requires_human_review),
-                    output_payload=agent.output_payload or {},
-                    execution_metadata=agent.execution_metadata or {},
-                )
-                for agent in agent_records
-            ),
-            tool_invocations=tuple(
-                ToolInvocationEvidence(
-                    tool_invocation_id=tool.tool_invocation_id,
-                    agent_execution_id=tool.agent_execution_id,
-                    agent_id=tool.agent_id,
-                    tool_id=tool.tool_id,
-                    status=tool.status,
-                    permission_status=tool.permission_status,
-                    input_validation_status=tool.input_validation_status,
-                    output_validation_status=tool.output_validation_status,
-                    output_payload=tool.output_payload or {},
-                    execution_metadata=tool.execution_metadata or {},
-                )
-                for tool in tool_records
-            ),
-            approval_decision=approval_decision,
-        )
+            return WorkflowEvaluationEvidence(
+                workflow_id=workflow.workflow_id,
+                workflow_type=workflow.workflow_type or "UNKNOWN",
+                workflow_state=workflow.state or "UNKNOWN",
+                correlation_id=workflow.correlation_id or "",
+                agent_executions=tuple(
+                    AgentExecutionEvidence(
+                        agent_execution_id=agent.agent_execution_id,
+                        agent_id=agent.agent_id or "unknown_agent",
+                        prompt_id=agent.prompt_id or "unknown_prompt",
+                        prompt_version=agent.prompt_version or "unknown",
+                        model_name=agent.model_name or "unknown_model",
+                        status=agent.status or "UNKNOWN",
+                        validation_status=agent.validation_status or "UNKNOWN",
+                        confidence_score=float(agent.confidence_score or 0.0),
+                        requires_human_review=bool(agent.requires_human_review),
+                        output_payload=agent.output_payload or {},
+                        execution_metadata=agent.execution_metadata or {},
+                    )
+                    for agent in agent_records
+                ),
+                tool_invocations=tuple(
+                    ToolInvocationEvidence(
+                        tool_invocation_id=tool.tool_invocation_id,
+                        agent_execution_id=tool.agent_execution_id,
+                        agent_id=tool.agent_id,
+                        tool_id=tool.tool_id,
+                        status=tool.status,
+                        permission_status=tool.permission_status,
+                        input_validation_status=tool.input_validation_status,
+                        output_validation_status=tool.output_validation_status,
+                        output_payload=tool.output_payload or {},
+                        execution_metadata=tool.execution_metadata or {},
+                    )
+                    for tool in tool_records
+                ),
+                approval_decision=approval_decision,
+            )
 
     def _score_evidence(
         self,
@@ -243,15 +350,20 @@ class EvaluationRunService:
         evaluation_mode: str,
         include_dataset_score: bool,
     ) -> list[EvaluationScore]:
-        scores = evaluate_deterministically(evidence, expectations)
-        if include_dataset_score or evaluation_mode == "dataset_replay":
-            scores.extend(DatasetReplayEvaluator().evaluate(evidence, expectations))
-        if evaluation_mode == "judge_model_disabled":
-            judge_score = get_judge_evaluator(self.judge_settings).evaluate(
-                JudgeEvaluationRequest(evidence=evidence, expectations=expectations)
-            )
-            scores.append(judge_score.to_evaluation_score())
-        return scores
+        with tracer.start_as_current_span("evaluation.evaluators.execute") as span:
+            span.set_attribute("evaluation.mode", evaluation_mode)
+            span.set_attribute("evaluation.dataset_score_enabled", include_dataset_score)
+            scores = evaluate_deterministically(evidence, expectations)
+            if include_dataset_score or evaluation_mode == "dataset_replay":
+                scores.extend(DatasetReplayEvaluator().evaluate(evidence, expectations))
+            if evaluation_mode == "judge_model_disabled":
+                judge_score = get_judge_evaluator(self.judge_settings).evaluate(
+                    JudgeEvaluationRequest(evidence=evidence, expectations=expectations)
+                )
+                scores.append(judge_score.to_evaluation_score())
+            span.set_attribute("evaluation.result_count", len(scores))
+            span.set_attribute("evaluation.evaluator_ids", sorted({score.evaluator_id for score in scores}))
+            return scores
 
     async def list_datasets(self) -> list[EvaluationDatasetSummary]:
         await self._ensure_local_dataset_cases()

@@ -163,6 +163,11 @@ The current local implementation emits spans for:
 - tool-runtime HTTP requests
 - tool-runtime governed tool invocation
 - tool-runtime permission checks, input validation, handler execution, and output validation
+- evaluation-service HTTP requests
+- evaluation-service evaluation run creation
+- evaluation-service workflow evidence loading
+- evaluation-service evaluator execution
+- evaluation-service evaluation result persistence
 
 Trace context propagates from gateway-api into workflow-engine deterministic payload fields and then across internal HTTP calls to agent-runtime and tool-runtime.
 
@@ -179,6 +184,7 @@ The current local implementation exposes Prometheus metrics for:
 - workflow-engine worker startup, activity execution, state transitions, agent execution, tool invocation, approval decisions, and event publication
 - agent-runtime HTTP requests, agent execution, graph steps, and tool-runtime client calls
 - tool-runtime HTTP requests, governed tool invocations, and handler latency
+- evaluation-service HTTP requests, evaluation run counts, run duration, evaluation result counts, evidence-consistency signal counts, and prompt-attributed result status
 
 Metric labels must not include:
 - borrower values
@@ -201,6 +207,7 @@ The current local Grafana stack provisions:
 - `AegisFlow - Service Health And Latency`
 - `AegisFlow - Agent And Tool Execution`
 - `AegisFlow - Approval Decisions`
+- `AegisFlow - Evaluation Quality`
 
 Dashboards are operational views only. They do not replace PostgreSQL records, Temporal history, workflow timeline entries, approval records, or outbox events.
 

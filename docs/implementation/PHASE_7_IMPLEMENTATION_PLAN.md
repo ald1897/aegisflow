@@ -575,21 +575,21 @@ Completion criteria:
 
 ## Workstream 8 - Evaluation Observability And Dashboards
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- emit evaluation-service traces for run creation, evidence loading, evaluator execution, and persistence
-- emit evaluation-service metrics for run counts, durations, result counts, and hallucination signal counts
-- add Grafana dashboard panels or a dedicated dashboard for evaluation runs and quality signals
-- validate Jaeger contains evaluation-service traces
-- validate Prometheus scrapes evaluation-service metrics
-- validate Grafana displays evaluation activity
+- emit evaluation-service traces for run creation, evidence loading, evaluator execution, and persistence - Complete
+- emit evaluation-service metrics for run counts, durations, result counts, and hallucination signal counts - Complete
+- add Grafana dashboard panels or a dedicated dashboard for evaluation runs and quality signals - Complete
+- validate Jaeger contains evaluation-service traces - Complete
+- validate Prometheus scrapes evaluation-service metrics - Complete
+- validate Grafana displays evaluation activity - Complete
 
 Completion criteria:
-- evaluation-service appears in Jaeger
-- Prometheus target is `up`
-- dashboard panels show local evaluation activity
-- logs, metrics, and traces avoid sensitive payloads
+- evaluation-service appears in Jaeger - Met
+- Prometheus target is `up` - Met
+- dashboard panels show local evaluation activity - Met
+- logs, metrics, and traces avoid sensitive payloads - Met
 
 ---
 
@@ -935,6 +935,30 @@ Boundary:
 
 Next step:
 - implement Workstream 8: Evaluation Observability And Dashboards
+
+## 2026-05-12 - Workstream 8
+
+Status:
+- added evaluation-service spans for evaluation run creation, workflow evidence loading, evaluator execution, and result persistence
+- added bounded structured logs for evaluation run start, completion, failure, and result persistence
+- added Prometheus metrics for evaluation run counts, run duration, persisted results, evidence-consistency signals, and prompt-attributed result status
+- kept metric labels aggregate and avoided workflow IDs, run IDs, trace IDs, borrower values, prompt content, document content, and approval comments
+- added `AegisFlow - Evaluation Quality` Grafana dashboard for evaluation runs, durations, evaluator results, evidence-consistency signals, and prompt-attributed result trends
+- updated the service health dashboard to include evaluation-service scrape health and HTTP request metrics
+- updated Postman dashboard validation to expect the evaluation dashboard
+- validated dashboard JSON files, Postman JSON, and Postman test script syntax
+- rebuilt the evaluation-service image and validated evaluation-service automated tests
+
+Completed workstream:
+- Workstream 8 - Evaluation Observability And Dashboards
+
+Boundary:
+- evaluation observability is aggregate operational telemetry only
+- metrics, dashboards, traces, and logs do not mutate workflow state or become the system of record for mortgage decisions
+- external judge models remain disabled by default
+
+Next step:
+- implement Workstream 9: Documentation And Phase Closeout
 
 ---
 

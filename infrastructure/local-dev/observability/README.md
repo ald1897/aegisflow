@@ -46,10 +46,11 @@ Current local dashboards:
 - `AegisFlow - Service Health And Latency`
 - `AegisFlow - Agent And Tool Execution`
 - `AegisFlow - Approval Decisions`
+- `AegisFlow - Evaluation Quality`
 
 The dashboards use Prometheus metrics and the provisioned Jaeger datasource.
 
-Dashboard panels intentionally aggregate by low-cardinality operational dimensions such as service, route, workflow state, agent, tool, decision, and status. They do not use borrower values, workflow IDs, approval IDs, trace IDs, operator IDs, prompt content, document content, or comments as metric labels.
+Dashboard panels intentionally aggregate by low-cardinality operational dimensions such as service, route, workflow state, agent, tool, decision, evaluation mode, evaluator, score status, severity, and status. They do not use borrower values, workflow IDs, evaluation run IDs, approval IDs, trace IDs, operator IDs, prompt content, document content, or comments as metric labels.
 
 ---
 
@@ -67,7 +68,8 @@ $services = @(
   "aegisflow-gateway-api",
   "aegisflow-workflow-engine",
   "aegisflow-agent-runtime",
-  "aegisflow-tool-runtime"
+  "aegisflow-tool-runtime",
+  "aegisflow-evaluation-service"
 )
 
 foreach ($service in $services) {
@@ -87,6 +89,7 @@ docker logs aegisflow-gateway-api --since 10m
 docker logs aegisflow-workflow-engine --since 10m
 docker logs aegisflow-agent-runtime --since 10m
 docker logs aegisflow-tool-runtime --since 10m
+docker logs aegisflow-evaluation-service --since 10m
 ```
 
 Loki and Docker log collection are deferred for the local stack. Docker Desktop-compatible log collection adds host-specific setup, while Docker logs plus JSON filtering are sufficient for Phase 6 local correlation diagnostics.
@@ -97,6 +100,6 @@ Structured logs must not include borrower PII, raw document contents, secrets, p
 
 ## Current Boundary
 
-Phase 6 includes local observability infrastructure, Python service tracing, Prometheus metrics, provisioned Grafana dashboards, structured local log diagnostics, and Postman/manual observability validation.
+Phase 6 includes local observability infrastructure, Python service tracing, Prometheus metrics, provisioned Grafana dashboards, structured local log diagnostics, and Postman/manual observability validation. Phase 7 extends the same local stack with evaluation-service run/result metrics, evaluation traces, and the `AegisFlow - Evaluation Quality` dashboard.
 
-Production alerting, production log aggregation, SIEM integration, compliance reporting, AI evaluation, and replay scoring are outside the Phase 6 local implementation boundary.
+Production alerting, production log aggregation, SIEM integration, compliance reporting, external judge-model evaluation, and full workflow replay scoring are outside the current local implementation boundary.

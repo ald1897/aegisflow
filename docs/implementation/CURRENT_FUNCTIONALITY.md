@@ -25,7 +25,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - operator-console review and decision workflow
 - local OpenTelemetry Collector, Jaeger, Prometheus, and Grafana observability stack
 - distributed tracing across gateway-api, workflow-engine, agent-runtime, and tool-runtime
-- Prometheus metrics for service requests, workflow activities, agents, tools, approvals, and event publication
+- Prometheus metrics for service requests, workflow activities, agents, tools, approvals, evaluation runs, evaluation results, and event publication
 - provisioned Grafana dashboards for local operational inspection
 - structured JSON logs with correlation ID and trace ID support
 - evaluation-service health, readiness, metrics, persistence, deterministic evaluators, judge-boundary fallback, and evaluation run orchestration
@@ -33,9 +33,10 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - persisted evaluation runs and evaluation results for bounded workflow evidence
 - gateway-api retrieval of persisted workflow evaluation runs and results
 - Postman validation for approval and rejection workflow evaluation runs
+- evaluation-service traces, metrics, structured logs, and Grafana dashboard panels
 
 Phase 6 is complete for the local simulation boundary.
-Phase 7 is partially complete through gateway and Postman validation.
+Phase 7 is partially complete through evaluation observability and dashboards.
 
 ---
 
@@ -199,6 +200,9 @@ It provides:
 - judge-model boundary with external judging disabled by default
 - deterministic local judge fallback for repeatable local validation
 - evaluation run orchestration for persisted workflow evidence
+- run creation, evidence loading, evaluator execution, and result persistence traces
+- run count, run duration, result count, evidence-consistency signal, and prompt-attributed result metrics
+- bounded structured logs for evaluation run and result persistence activity
 - local seeded dataset cases for Mortgage Exception Review approval, rejection, and human-review scenarios
 - dataset-backed scoring that compares expected agents, tools, human review, and terminal decision against actual records
 - structured errors for missing workflows and workflows not ready for evaluation
@@ -224,7 +228,7 @@ Current Phase 7 boundary:
 - external judge model calls are disabled by default
 - dataset replay is side-effect-free scoring against persisted records, not full Temporal replay or failure recovery
 - gateway evaluation retrieval and Postman validation are implemented for approval and rejection workflows
-- evaluation dashboards remain a future Phase 7 workstream
+- evaluation-service observability uses aggregate metrics and bounded logs/traces only
 
 ---
 
@@ -420,7 +424,6 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- evaluation-specific Grafana dashboard panels
 - authentication and RBAC
 - advanced replay tooling
 - production alerting and paging
@@ -1065,7 +1068,7 @@ Expected result:
 - Jaeger lists `gateway-api`, `workflow-engine`, `agent-runtime`, `tool-runtime`, and `evaluation-service` after workflow execution and evaluation requests
 - Jaeger trace search returns gateway traces
 - Grafana health returns `database` as `ok`
-- Grafana search returns the four provisioned AegisFlow dashboards
+- Grafana search returns the five provisioned AegisFlow dashboards
 
 ---
 

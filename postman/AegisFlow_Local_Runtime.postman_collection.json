@@ -65,6 +65,36 @@
       "key": "rejectionApprovalId",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "workflowEngineMetricsUrl",
+      "value": "http://localhost:8030",
+      "type": "string"
+    },
+    {
+      "key": "prometheusUrl",
+      "value": "http://localhost:9090",
+      "type": "string"
+    },
+    {
+      "key": "grafanaUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "grafanaUsername",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "grafanaPassword",
+      "value": "aegisflow",
+      "type": "string"
+    },
+    {
+      "key": "jaegerUrl",
+      "value": "http://localhost:16686",
+      "type": "string"
     }
   ],
   "item": [
@@ -1236,6 +1266,421 @@
               "  pm.expect(matchingApproval.decision).to.eql(\"REJECTED\");",
               "  pm.expect(matchingApproval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
               "  pm.expect(matchingApproval.metadata.review_channel).to.eql(\"postman\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/metrics",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Gateway Metrics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Gateway Metrics exposes expected Prometheus metrics\", function () {",
+              "  const body = pm.response.text();",
+              "  pm.expect(body).to.include(\"aegisflow_gateway_http_requests_total\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Workflow Engine Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{workflowEngineMetricsUrl}}/metrics",
+          "host": [
+            "{{workflowEngineMetricsUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Workflow Engine Metrics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Workflow Engine Metrics exposes expected Prometheus metrics\", function () {",
+              "  const body = pm.response.text();",
+              "  pm.expect(body).to.include(\"aegisflow_workflow_engine_activity_executions_total\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Agent Runtime Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{agentRuntimeUrl}}/metrics",
+          "host": [
+            "{{agentRuntimeUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Agent Runtime Metrics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Agent Runtime Metrics exposes expected Prometheus metrics\", function () {",
+              "  const body = pm.response.text();",
+              "  pm.expect(body).to.include(\"aegisflow_agent_runtime_agent_executions_total\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tool Runtime Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{toolRuntimeUrl}}/metrics",
+          "host": [
+            "{{toolRuntimeUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Tool Runtime Metrics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Tool Runtime Metrics exposes expected Prometheus metrics\", function () {",
+              "  const body = pm.response.text();",
+              "  pm.expect(body).to.include(\"aegisflow_tool_runtime_tool_invocations_total\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prometheus Targets",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{prometheusUrl}}/api/v1/targets",
+          "host": [
+            "{{prometheusUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "targets"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Prometheus targets endpoint returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"AegisFlow scrape targets are healthy\", function () {",
+              "  const json = pm.response.json();",
+              "  const activeTargets = json.data.activeTargets || [];",
+              "  const jobs = [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\"];",
+              "  for (const job of jobs) {",
+              "    const target = activeTargets.find((entry) => entry.labels && entry.labels.job === job);",
+              "    pm.expect(target, `${job} target`).to.exist;",
+              "    pm.expect(target.health, `${job} health`).to.eql(\"up\");",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Prometheus Workflow Activity Query",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{prometheusUrl}}/api/v1/query?query=aegisflow_workflow_engine_activity_executions_total",
+          "host": [
+            "{{prometheusUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "query"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "aegisflow_workflow_engine_activity_executions_total"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Prometheus query returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow activity metric has samples after local workflow execution\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"success\");",
+              "  pm.expect(json.data.result.length).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jaeger Services",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{jaegerUrl}}/api/services",
+          "host": [
+            "{{jaegerUrl}}"
+          ],
+          "path": [
+            "api",
+            "services"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Jaeger services endpoint returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Jaeger contains AegisFlow services after local workflow execution\", function () {",
+              "  const json = pm.response.json();",
+              "  const services = json.data || [];",
+              "  [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\"].forEach((service) => {",
+              "    pm.expect(services, `${service} traces`).to.include(service);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Jaeger Gateway Traces",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{jaegerUrl}}/api/traces?service=gateway-api&limit=20",
+          "host": [
+            "{{jaegerUrl}}"
+          ],
+          "path": [
+            "api",
+            "traces"
+          ],
+          "query": [
+            {
+              "key": "service",
+              "value": "gateway-api"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Jaeger trace search returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"gateway-api traces are available after local workflow execution\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.data.length).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Grafana Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{grafanaUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{grafanaPassword}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{grafanaUrl}}/api/health",
+          "host": [
+            "{{grafanaUrl}}"
+          ],
+          "path": [
+            "api",
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Grafana health returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Grafana database is ok\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.database).to.eql(\"ok\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Grafana AegisFlow Dashboards",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "auth": {
+          "type": "basic",
+          "basic": [
+            {
+              "key": "username",
+              "value": "{{grafanaUsername}}",
+              "type": "string"
+            },
+            {
+              "key": "password",
+              "value": "{{grafanaPassword}}",
+              "type": "string"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{grafanaUrl}}/api/search?query=AegisFlow",
+          "host": [
+            "{{grafanaUrl}}"
+          ],
+          "path": [
+            "api",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "query",
+              "value": "AegisFlow"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Grafana search returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"AegisFlow dashboards are provisioned\", function () {",
+              "  const dashboards = pm.response.json().map((entry) => entry.title);",
+              "  [",
+              "    \"AegisFlow - Workflow Operations\",",
+              "    \"AegisFlow - Service Health And Latency\",",
+              "    \"AegisFlow - Agent And Tool Execution\",",
+              "    \"AegisFlow - Approval Decisions\"",
+              "  ].forEach((title) => pm.expect(dashboards, title).to.include(title));",
               "});"
             ]
           }

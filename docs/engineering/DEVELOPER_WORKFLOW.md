@@ -648,13 +648,60 @@ Local development should support:
 
 # Local Infrastructure Stack
 
-Suggested local stack:
+Current local stack:
 - Postgres
 - Redpanda/Kafka
 - Redis
+- Temporal
+- Temporal UI
+- gateway-api
+- workflow-engine
+- agent-runtime
+- tool-runtime
+- operator-console
+- OpenTelemetry Collector
+- Jaeger
+- Prometheus
 - Grafana
-- Tempo
-- Loki
+
+Start the local stack from the repository root:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml up --build -d
+```
+
+Common local URLs:
+
+```text
+Operator Console: http://localhost:3000
+Gateway API: http://localhost:8000
+Agent Runtime: http://localhost:8010
+Tool Runtime: http://localhost:8020
+Workflow Engine Metrics: http://localhost:8030/metrics
+Temporal UI: http://localhost:8088
+Grafana: http://localhost:3001
+Prometheus: http://localhost:9090
+Jaeger: http://localhost:16686
+```
+
+Grafana local credentials:
+
+```text
+Username: admin
+Password: aegisflow
+```
+
+Local log diagnostics use Docker logs rather than Loki:
+
+```powershell
+$correlationId = "postman-manual-test"
+docker logs aegisflow-gateway-api --since 15m
+docker logs aegisflow-workflow-engine --since 15m
+docker logs aegisflow-agent-runtime --since 15m
+docker logs aegisflow-tool-runtime --since 15m
+```
+
+Filter structured JSON logs by `correlation_id` when investigating a workflow. Loki is deferred from the local Docker Compose stack to avoid host-specific log collection setup.
 
 ---
 

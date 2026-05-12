@@ -74,10 +74,15 @@ The platform can currently:
 - retrieve workflow tool invocation history
 - publish workflow events for downstream operational visibility
 - support manual validation through Postman for both approval and rejection paths
+- emit distributed traces across gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- expose Prometheus metrics for service, workflow, agent, tool, approval, and event activity
+- provide provisioned Grafana dashboards for local operational inspection
+- support local correlation-based diagnostics through structured JSON logs
 
 Current business capability:
-- AegisFlow can demonstrate a controlled mortgage exception review case from intake through AI-assisted preparation, human review, decision capture, and local workflow completion.
+- AegisFlow can demonstrate a controlled and observable mortgage exception review case from intake through AI-assisted preparation, human review, decision capture, and local workflow completion.
 - The platform can show how a case moves from creation through governed agent and tool activity to an accountable operator decision with durable state history.
+- The platform can trace and measure the local workflow path across service boundaries for operational debugging and stakeholder visibility.
 - The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action, and decision history preserved.
 
 Current business boundary:
@@ -90,7 +95,7 @@ Current business boundary:
 Business meaning:
 - the platform has moved from design into a working local operational prototype
 - the current implementation proves the control framework and human review loop, not final production mortgage automation
-- the system is ready for observability, AI evaluation, replay, and production-style hardening work
+- the system is ready for AI evaluation, replay, and production-style hardening work
 
 ---
 
@@ -138,6 +143,7 @@ The following phases have been completed in the local implementation:
 - Phase 3 - Agent Runtime MVP
 - Phase 4 - Tool Runtime MVP
 - Phase 5 - Human Review UI
+- Phase 6 - Observability Integration
 
 ---
 
@@ -186,6 +192,17 @@ The platform currently supports:
 - operator-console workflow review detail workspace
 - operator-console approval and rejection form submission
 - Postman validation for human review queue, review context, approval submission, rejection submission, and persisted approval records
+- OpenTelemetry Collector local telemetry intake
+- Jaeger local trace inspection
+- Prometheus local metrics collection
+- Grafana local operational dashboards
+- gateway-api request, Temporal dispatch, approval dispatch, and event publication telemetry
+- workflow-engine activity, state transition, agent, tool, approval, event publication, and worker telemetry
+- agent-runtime request, agent execution, graph step, and tool client telemetry
+- tool-runtime request, governed tool invocation, and handler latency telemetry
+- trace context propagation from gateway-api through workflow-engine, agent-runtime, and tool-runtime
+- structured JSON logs with correlation and trace metadata
+- Postman observability validation for metrics, Prometheus, Jaeger, and Grafana
 - workflow event outbox persistence
 - Redpanda/Kafka workflow event publication
 - structured JSON logging for workflow creation
@@ -195,15 +212,16 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, and the Phase 5 human review foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, the Phase 5 human review foundation, and the Phase 6 local observability foundation.
 
 Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- distributed tracing
 - AI evaluation
 - replay and failure recovery tooling
 - production identity provider and RBAC integration
+- production alerting and paging
+- production log aggregation
 - production mortgage system integrations
 
 These capabilities remain assigned to later roadmap phases.
@@ -454,8 +472,53 @@ Validation completed:
 - local live API smoke validation rejected a separate reviewable workflow to `COMPLETED`
 - persisted approval records were retrieved for both approved and rejected workflows
 
+## Phase 6 - Observability Integration
+
+Status: Completed
+
+Implementation started: 2026-05-12
+
+Completion date: 2026-05-12
+
+Completed deliverables:
+- local OpenTelemetry Collector, Jaeger, Prometheus, and Grafana services
+- OpenTelemetry trace export configuration for Python services
+- trace context propagation across gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- gateway-api request, workflow creation, Temporal dispatch, approval dispatch, and event publication telemetry
+- workflow-engine Temporal activity, state transition, agent, tool, approval, event publication, and worker startup telemetry
+- agent-runtime request, agent execution, graph step, and tool-runtime client telemetry
+- tool-runtime request, governed tool invocation, validation, permission, and handler telemetry
+- Prometheus metrics endpoints for gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- Prometheus scrape configuration for all instrumented services
+- provisioned Grafana datasources and AegisFlow dashboards
+- structured JSON logs with correlation ID and trace ID enrichment
+- Docker logs correlation diagnostics documented as the local log validation path
+- Postman observability validation requests for metrics, Prometheus, Jaeger, and Grafana
+- current functionality, roadmap, strategy, and developer workflow documentation updates
+
+Explicit non-scope:
+- production observability platform integration
+- production alerting and paging
+- production log aggregation
+- SIEM integration
+- compliance reporting
+- AI evaluation and replay scoring
+
+Validation completed:
+- gateway-api pytest suite passed with 16 tests
+- workflow-engine pytest suite passed with 12 tests
+- agent-runtime pytest suite passed with 8 tests
+- tool-runtime pytest suite passed with 8 tests
+- local observability stack started through Docker Compose
+- Prometheus reported AegisFlow service scrape targets as `up`
+- Grafana loaded four provisioned AegisFlow dashboards
+- Jaeger received traces for gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- local approval workflow completed and emitted trace, metric, and structured log telemetry
+- local rejection workflow completed and remained observable
+- Postman collection JSON validated successfully with Phase 6 observability requests
+
 Next deliverable:
-- Phase 6 - Observability Integration
+- Phase 7 - AI Evaluation And Replay Support
 
 ---
 

@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5 human review capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, and Phase 6 observability capabilities:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -23,8 +23,13 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, and Phas
 - workflow review context retrieval
 - approval and rejection submission through gateway-api
 - operator-console review and decision workflow
+- local OpenTelemetry Collector, Jaeger, Prometheus, and Grafana observability stack
+- distributed tracing across gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- Prometheus metrics for service requests, workflow activities, agents, tools, approvals, and event publication
+- provisioned Grafana dashboards for local operational inspection
+- structured JSON logs with correlation ID and trace ID support
 
-Phase 5 is complete for the local simulation boundary.
+Phase 6 is complete for the local simulation boundary.
 
 ---
 
@@ -43,6 +48,10 @@ The local Docker Compose stack currently runs:
 - agent-runtime
 - tool-runtime
 - operator-console
+- OpenTelemetry Collector
+- Jaeger
+- Prometheus
+- Grafana
 
 ---
 
@@ -65,12 +74,16 @@ The gateway API currently supports:
 - Temporal workflow startup
 - Temporal human review decision workflow dispatch
 - workflow event publication for workflow creation
+- distributed request and operation tracing
+- Prometheus request and workflow operation metrics
+- `/metrics` endpoint for local scraping
 
 Implemented endpoints:
 
 ```text
 GET /health
 GET /ready
+GET /metrics
 POST /api/v1/workflows
 GET /api/v1/workflows/{workflow_id}
 GET /api/v1/workflows/{workflow_id}/timeline
@@ -97,6 +110,9 @@ It provides:
 - structured output validation
 - confidence metadata
 - human review requirement metadata
+- distributed request, execution, graph step, and tool client tracing
+- Prometheus request, agent execution, graph step, and tool client metrics
+- structured JSON logs with correlation and trace metadata
 
 Implemented agents:
 - `intake_agent` with approved access to `borrower_profile_lookup`
@@ -107,6 +123,7 @@ Implemented endpoints:
 ```text
 GET /health
 GET /ready
+GET /metrics
 GET /api/v1/agents
 POST /api/v1/agents/{agent_id}/executions
 ```
@@ -133,6 +150,9 @@ It provides:
 - deterministic mock tool handlers
 - replay-safe invocation telemetry
 - masked and synthetic operational outputs
+- distributed request and governed invocation tracing
+- Prometheus request, tool invocation, and handler latency metrics
+- structured JSON logs with correlation and trace metadata
 
 Implemented tools:
 - `borrower_profile_lookup`
@@ -144,6 +164,7 @@ Implemented endpoints:
 ```text
 GET /health
 GET /ready
+GET /metrics
 GET /api/v1/tools
 POST /api/v1/tools/{tool_id}/invocations
 ```
@@ -218,6 +239,12 @@ COMPLETED
 ```
 
 The standard workflow path stops at `HUMAN_REVIEW_REQUIRED` until a human decision is applied.
+
+The workflow-engine also exposes:
+- Temporal activity tracing for state transitions, agent calls, tool recording, approvals, and event publication
+- Prometheus workflow activity, state transition, agent, tool, approval, event publication, and worker startup metrics
+- structured JSON logs with workflow, correlation, activity, event, approval, agent, tool, and trace metadata
+- metrics endpoint on `http://localhost:8030/metrics`
 
 During current workflow execution:
 - `intake_agent` runs during `INTAKE_IN_PROGRESS`
@@ -341,10 +368,11 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- distributed tracing stack
 - AI evaluation
 - authentication and RBAC
 - advanced replay tooling
+- production alerting and paging
+- production log aggregation
 - production mortgage system update actions
 
 ---
@@ -381,15 +409,33 @@ The collection includes:
 - workflow rejection submission
 - separate approval and rejection workflow validation
 - missing workflow error validation
+- gateway-api metrics validation
+- workflow-engine metrics validation
+- agent-runtime metrics validation
+- tool-runtime metrics validation
+- Prometheus scrape target validation
+- Prometheus workflow metric query validation
+- Jaeger service and trace validation
+- Grafana health and dashboard provisioning validation
 
 The collection uses `http://localhost:8000` as the default `baseUrl`.
 The collection uses `http://localhost:8010` as the default `agentRuntimeUrl`.
 The collection uses `http://localhost:8020` as the default `toolRuntimeUrl`.
+The collection uses `http://localhost:8030` as the default `workflowEngineMetricsUrl`.
+The collection uses `http://localhost:9090` as the default `prometheusUrl`.
+The collection uses `http://localhost:16686` as the default `jaegerUrl`.
+The collection uses `http://localhost:3001` as the default `grafanaUrl`.
 
 Recommended collection variables:
 - `baseUrl`: `http://localhost:8000`
 - `agentRuntimeUrl`: `http://localhost:8010`
 - `toolRuntimeUrl`: `http://localhost:8020`
+- `workflowEngineMetricsUrl`: `http://localhost:8030`
+- `prometheusUrl`: `http://localhost:9090`
+- `jaegerUrl`: `http://localhost:16686`
+- `grafanaUrl`: `http://localhost:3001`
+- `grafanaUsername`: `admin`
+- `grafanaPassword`: `aegisflow`
 - `correlationId`: `postman-manual-test`
 - `actorId`: `postman-operator`
 
@@ -427,6 +473,10 @@ Expected services:
 - `aegisflow-workflow-engine`
 - `aegisflow-agent-runtime`
 - `aegisflow-tool-runtime`
+- `aegisflow-otel-collector`
+- `aegisflow-jaeger`
+- `aegisflow-prometheus`
+- `aegisflow-grafana`
 
 ---
 
@@ -858,11 +908,104 @@ Recommended request order:
 - `Poll Rejection Workflow Until Human Review Required`
 - `Reject Workflow`
 - `Get Rejection Workflow Approvals`
+- `Gateway Metrics`
+- `Workflow Engine Metrics`
+- `Agent Runtime Metrics`
+- `Tool Runtime Metrics`
+- `Prometheus Targets`
+- `Prometheus Workflow Activity Query`
+- `Jaeger Services`
+- `Jaeger Gateway Traces`
+- `Grafana Health`
+- `Grafana AegisFlow Dashboards`
 - `Missing Workflow Returns 404`
 
 ---
 
-## 26. Open Temporal UI
+## 26. Validate Observability Through Postman
+
+Run the following Postman requests after at least one approval or rejection workflow has completed:
+
+```text
+Gateway Metrics
+Workflow Engine Metrics
+Agent Runtime Metrics
+Tool Runtime Metrics
+Prometheus Targets
+Prometheus Workflow Activity Query
+Jaeger Services
+Jaeger Gateway Traces
+Grafana Health
+Grafana AegisFlow Dashboards
+```
+
+Expected result:
+- service metrics endpoints return Prometheus text format
+- Prometheus reports `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime` scrape targets as `up`
+- Prometheus returns workflow activity metric samples after workflow execution
+- Jaeger lists `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime` after workflow execution
+- Jaeger trace search returns gateway traces
+- Grafana health returns `database` as `ok`
+- Grafana search returns the four provisioned AegisFlow dashboards
+
+---
+
+## 27. Inspect Observability UIs
+
+Open:
+
+```text
+Grafana: http://localhost:3001
+Prometheus: http://localhost:9090
+Jaeger: http://localhost:16686
+```
+
+Grafana local credentials:
+
+```text
+Username: admin
+Password: aegisflow
+```
+
+Expected:
+- Grafana loads the `AegisFlow` dashboard folder
+- Prometheus query UI can evaluate AegisFlow metrics such as `aegisflow_workflow_engine_activity_executions_total`
+- Jaeger can search traces for `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime`
+
+---
+
+## 28. Inspect Correlated Docker Logs
+
+Use the Postman `correlationId` value to inspect related logs:
+
+```powershell
+$correlationId = "postman-manual-test"
+$services = @(
+  "aegisflow-gateway-api",
+  "aegisflow-workflow-engine",
+  "aegisflow-agent-runtime",
+  "aegisflow-tool-runtime"
+)
+
+foreach ($service in $services) {
+  docker logs $service --since 15m 2>&1 |
+    ForEach-Object {
+      try { $_.ToString() | ConvertFrom-Json -ErrorAction Stop } catch { $null }
+    } |
+    Where-Object { $_.correlation_id -eq $correlationId } |
+    Select-Object timestamp, service, level, message, correlation_id, trace_id, workflow_id, agent_id, tool_id, approval_id, status
+}
+```
+
+Expected:
+- each service has structured JSON log entries for the workflow path
+- matching entries include the Postman correlation ID
+- trace IDs are present where requests or activities have active spans
+- logs contain bounded operational context only
+
+---
+
+## 29. Open Temporal UI
 
 Open:
 
@@ -878,7 +1021,7 @@ Expected:
 
 ---
 
-## 27. Manual Validation Coverage
+## 30. Manual Validation Coverage
 
 The Postman collection validates:
 - gateway health and readiness
@@ -902,6 +1045,12 @@ The Postman collection validates:
 - rejection decision submission
 - persisted approval record retrieval
 - missing workflow error behavior
+- service Prometheus metrics endpoints
+- Prometheus scrape target health
+- Prometheus workflow metric query results
+- Jaeger service registration and trace search
+- Grafana health and dashboard provisioning
+- correlation-based Docker log diagnostics
 
 Direct Postgres, Redpanda, and Temporal history inspection is not required for routine manual API testing.
 

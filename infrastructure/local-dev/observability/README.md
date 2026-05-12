@@ -97,8 +97,6 @@ Structured logs must not include borrower PII, raw document contents, secrets, p
 
 ## Current Boundary
 
-Phase 6 currently includes local observability infrastructure, Python service tracing, Prometheus metrics, provisioned Grafana dashboards, and structured local log diagnostics.
+Phase 6 includes local observability infrastructure, Python service tracing, Prometheus metrics, provisioned Grafana dashboards, structured local log diagnostics, and Postman/manual observability validation.
 
-Current remaining Phase 6 work:
-- Postman and manual observability validation documentation
-- final Phase 6 roadmap and current functionality closeout
+Production alerting, production log aggregation, SIEM integration, compliance reporting, AI evaluation, and replay scoring are outside the Phase 6 local implementation boundary.

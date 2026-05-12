@@ -534,23 +534,23 @@ Completion criteria:
 
 ## Workstream 8 - Postman, Manual Validation, And Documentation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- update Postman collection with observability validation requests where applicable
-- update manual validation documentation with Grafana, Prometheus, and trace backend checks
-- update `CURRENT_FUNCTIONALITY.md`
-- update `IMPLEMENTATION_ROADMAP.md`
-- update `OBSERVABILITY_STRATEGY.md` if implementation decisions refine the strategy
-- update `DEVELOPER_WORKFLOW.md` if startup or diagnostics commands change
-- add Phase 6 completion log after validation
+- update Postman collection with observability validation requests where applicable - Complete
+- update manual validation documentation with Grafana, Prometheus, and trace backend checks - Complete
+- update `CURRENT_FUNCTIONALITY.md` - Complete
+- update `IMPLEMENTATION_ROADMAP.md` - Complete
+- update `OBSERVABILITY_STRATEGY.md` if implementation decisions refine the strategy - Complete
+- update `DEVELOPER_WORKFLOW.md` if startup or diagnostics commands change - Complete
+- add Phase 6 completion log after validation - Complete
 
 Completion criteria:
-- manual tester can create a workflow and inspect related traces
-- manual tester can view metrics in Prometheus or Grafana
-- manual tester can validate approval and rejection paths remain observable
-- documentation describes implemented behavior, not aspirational behavior
-- business-facing boundary remains clear for mortgage stakeholders
+- manual tester can create a workflow and inspect related traces - Met
+- manual tester can view metrics in Prometheus or Grafana - Met
+- manual tester can validate approval and rejection paths remain observable - Met
+- documentation describes implemented behavior, not aspirational behavior - Met
+- business-facing boundary remains clear for mortgage stakeholders - Met
 
 ---
 
@@ -919,6 +919,43 @@ Boundary:
 
 Next step:
 - implement Workstream 8: Postman, Manual Validation, And Documentation
+
+## 2026-05-12 - Workstream 8
+
+Status:
+- added Postman collection variables for workflow-engine metrics, Prometheus, Jaeger, Grafana, and Grafana local credentials
+- added Postman requests for gateway-api, workflow-engine, agent-runtime, and tool-runtime metrics endpoints
+- added Postman request for Prometheus AegisFlow scrape target health
+- added Postman request for Prometheus workflow activity metric query validation
+- added Postman requests for Jaeger service discovery and gateway trace search
+- added Postman requests for Grafana health and provisioned AegisFlow dashboard discovery
+- updated current functionality documentation with Phase 6 runtime, observability services, metrics endpoints, manual UI checks, and correlated Docker log diagnostics
+- updated implementation roadmap with Phase 6 completion status, delivered observability capability, validation results, and remaining future boundaries
+- updated observability strategy with the implemented local stack, trace coverage, metrics strategy, dashboard strategy, logging strategy, and system-of-record boundary
+- updated developer workflow with current local stack startup, observability URLs, Grafana credentials, and Docker log diagnostics
+- validated Postman collection JSON structure after adding observability requests
+- validated local metrics endpoints for gateway-api, workflow-engine, agent-runtime, and tool-runtime
+- validated Prometheus reports AegisFlow scrape targets as `up`
+- validated Prometheus workflow activity metric query returns samples after workflow execution
+- validated Jaeger lists gateway-api, workflow-engine, agent-runtime, and tool-runtime services
+- validated Jaeger gateway trace search returns traces
+- validated Grafana health and provisioned AegisFlow dashboard discovery
+- executed local approval and rejection workflow validations and confirmed both paths completed
+- validated correlated Docker logs for the approval and rejection workflows across gateway-api, workflow-engine, agent-runtime, and tool-runtime
+
+Completed workstream:
+- Workstream 8 - Postman, Manual Validation, And Documentation
+
+Completed phase:
+- Phase 6 - Observability Integration
+
+Boundary:
+- Phase 6 provides local operational observability, not production observability operations
+- observability remains secondary to PostgreSQL, Temporal history, workflow timelines, approval records, and event records
+- production alerting, SIEM integration, production log aggregation, AI evaluation, and replay scoring remain future work
+
+Next step:
+- begin the next roadmap phase after Phase 6 closeout
 
 ---
 

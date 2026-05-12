@@ -471,22 +471,22 @@ Completion criteria:
 
 ## Workstream 3 - Deterministic Local Evaluators
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- implement deterministic agent output evaluator
-- implement deterministic tool usage evaluator
-- implement deterministic escalation evaluator
-- implement hallucination signal evaluator based on structured evidence consistency
-- define evaluator IDs and evaluator versions
-- define score statuses such as `PASS`, `WARN`, and `FAIL`
-- add unit tests for passing, warning, and failing scenarios
+- implement deterministic agent output evaluator - Complete
+- implement deterministic tool usage evaluator - Complete
+- implement deterministic escalation evaluator - Complete
+- implement hallucination signal evaluator based on structured evidence consistency - Complete
+- define evaluator IDs and evaluator versions - Complete
+- define score statuses such as `PASS`, `WARN`, and `FAIL` - Complete
+- add unit tests for passing, warning, and failing scenarios - Complete
 
 Completion criteria:
-- deterministic evaluators score existing local workflow evidence
-- evaluators produce bounded rationales and metadata
-- hallucination signal checks are evidence-based and reproducible
-- tests pass without external model dependencies
+- deterministic evaluators score existing local workflow evidence - Met
+- evaluators produce bounded rationales and metadata - Met
+- hallucination signal checks are evidence-based and reproducible - Met
+- tests pass without external model dependencies - Met
 
 ---
 
@@ -799,6 +799,35 @@ Boundary:
 
 Next step:
 - implement Workstream 3: Deterministic Local Evaluators
+
+## 2026-05-12 - Workstream 3
+
+Status:
+- added bounded workflow evidence dataclasses for workflow, agent execution, tool invocation, and scenario expectations
+- added deterministic evaluator protocol and reusable `EvaluationScore` result draft
+- defined evaluator version `v1`
+- defined score statuses `PASS`, `WARN`, and `FAIL`
+- defined severity values `informational`, `moderate`, and `critical`
+- implemented `agent-output-contract` evaluator for schema, validation, prompt/model metadata, confidence, and human review consistency checks
+- implemented `tool-usage-contract` evaluator for expected tool coverage and governed tool invocation contract checks
+- implemented `human-review-escalation` evaluator for review-state, agent review signal, and expected terminal decision consistency
+- implemented `evidence-consistency-signals` evaluator for unsupported tool claims and high-confidence validation failure signals
+- added deterministic evaluator runner for executing all local evaluators without external model dependencies
+- added unit tests covering passing, warning, and failing paths for all deterministic evaluators
+- rebuilt evaluation-service image with evaluator modules
+- validated evaluation-service automated tests with 20 passing tests
+
+Completed workstream:
+- Workstream 3 - Deterministic Local Evaluators
+
+Boundary:
+- Workstream 3 is side-effect free and does not read or write database records
+- evaluator result drafts are not persisted until later run orchestration workstreams
+- hallucination checks are deterministic evidence consistency signals, not external LLM-as-judge results
+- no external model provider dependency is introduced
+
+Next step:
+- implement Workstream 4: Judge Model Boundary
 
 ---
 

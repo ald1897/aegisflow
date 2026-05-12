@@ -62,6 +62,7 @@ The platform can currently:
 - invoke governed intake and document analysis agents
 - expose a governed tool-runtime service for approved mock tool execution
 - enforce tool permissions and schema validation at the tool-runtime boundary
+- record approved tool invocation activity during the workflow path
 - persist validated agent execution records
 - stop at `HUMAN_REVIEW_REQUIRED`
 - record workflow timeline entries
@@ -75,7 +76,7 @@ Current business capability:
 
 Current business boundary:
 - AegisFlow performs local deterministic document analysis simulation for workflow demonstration, not production document interpretation.
-- AegisFlow can execute synthetic mock tool calls through a governed service boundary, but those calls are not yet part of the end-to-end workflow path.
+- AegisFlow can execute synthetic mock tool calls through a governed service boundary and persist those calls during the workflow path.
 - AegisFlow is not yet making approval, denial, underwriting, or exception decisions.
 - AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
 - AegisFlow does not yet provide an operator-facing review console.
@@ -160,6 +161,7 @@ The platform currently supports:
 - deterministic mock tool execution
 - tool invocation persistence table
 - workflow-engine tool invocation recording activity
+- workflow-integrated tool invocation record production
 - tool invocation timeline and outbox event support
 - structured agent output validation
 - agent execution record persistence
@@ -173,10 +175,9 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, and agent-runtime integration with approved tools.
+The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, and workflow-engine persistence of agent-produced tool invocation telemetry.
 
 The platform does not yet implement:
-- workflow-engine persistence of agent-produced tool invocation telemetry
 - workflow tool invocation retrieval
 - human review UI
 - approval workflows
@@ -351,9 +352,12 @@ Completed deliverables:
 - intake agent invocation of `borrower_profile_lookup`
 - document analysis agent invocation of `document_fetch`
 - agent execution telemetry references to tool invocations
+- workflow-engine persistence of agent-produced tool invocation telemetry
+- standard Mortgage Exception Review production of tool invocation records
+- workflow timeline entries for standard path tool invocation activity
+- workflow event outbox records for standard path tool invocation activity
 
 Explicit non-scope for completed increments:
-- workflow-engine persistence of agent-produced tool invocation telemetry
 - gateway-api workflow tool invocation retrieval
 - real mortgage system connectivity
 
@@ -368,12 +372,14 @@ Validation completed:
 - Alembic migration `20260512_0004` applied successfully against local Postgres
 - local Postgres table validation confirmed `tool_invocation_records`
 - gateway-api pytest suite passed with 8 tests
-- workflow-engine pytest suite passed with 4 tests
+- workflow-engine pytest suite passed with 5 tests
 - agent-runtime pytest suite passed with 7 tests
 - live agent-runtime HTTP validation confirmed approved tool invocation through tool-runtime
+- local end-to-end workflow validation reached `HUMAN_REVIEW_REQUIRED`
+- local end-to-end workflow validation produced persisted records for `borrower_profile_lookup` and `document_fetch`
 
 Next deliverable:
-- Workstream 5 - Workflow Integration
+- Workstream 6 - Gateway API And Postman
 
 ---
 

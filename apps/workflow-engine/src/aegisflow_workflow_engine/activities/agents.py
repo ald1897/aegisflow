@@ -21,6 +21,7 @@ from aegisflow_workflow_engine.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_workflow_engine.activities.state_transitions import publish_workflow_event
+from aegisflow_workflow_engine.activities.tools import record_tool_invocation
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,14 @@ async def execute_agent(payload: dict) -> dict:
         )
         existing = existing_result.scalar_one_or_none()
         if existing is not None:
+            await _record_tool_invocations_from_agent_telemetry(
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                agent_id=agent_id,
+                agent_execution_id=existing.agent_execution_id,
+                telemetry=existing.execution_metadata,
+                workflow_state=workflow_state,
+            )
             return {
                 "workflow_id": workflow_id,
                 "agent_id": agent_id,
@@ -159,6 +168,14 @@ async def execute_agent(payload: dict) -> dict:
         await session.commit()
 
     await publish_workflow_event(event_id)
+    await _record_tool_invocations_from_agent_telemetry(
+        workflow_id=workflow_id,
+        correlation_id=correlation_id,
+        agent_id=agent_id,
+        agent_execution_id=agent_execution_id,
+        telemetry=response_payload["telemetry"],
+        workflow_state=workflow_state,
+    )
     logger.info("agent execution completed", extra={"workflow_id": workflow_id, "agent_id": agent_id})
     return {
         "workflow_id": workflow_id,
@@ -167,6 +184,52 @@ async def execute_agent(payload: dict) -> dict:
         "output": output_payload,
         "idempotent": False,
     }
+
+
+async def _record_tool_invocations_from_agent_telemetry(
+    *,
+    workflow_id: str,
+    correlation_id: str,
+    agent_id: str,
+    agent_execution_id: str,
+    telemetry: dict,
+    workflow_state: str,
+) -> list[dict]:
+    recorded_invocations = []
+    for invocation in telemetry.get("tool_invocations", []):
+        tool_telemetry = invocation.get("telemetry", {})
+        recorded_invocations.append(
+            await record_tool_invocation(
+                {
+                    "workflow_id": workflow_id,
+                    "correlation_id": correlation_id,
+                    "tool_invocation_id": invocation["tool_invocation_id"],
+                    "agent_execution_id": agent_execution_id,
+                    "agent_id": agent_id,
+                    "tool_id": invocation["tool_id"],
+                    "status": invocation["status"],
+                    "permission_status": invocation["permission_status"],
+                    "input_validation_status": invocation["input_validation_status"],
+                    "output_validation_status": invocation["output_validation_status"],
+                    "input_metadata": {
+                        "source": "agent_runtime_telemetry",
+                        "workflow_state": workflow_state,
+                        "idempotency_key": tool_telemetry.get("idempotency_key"),
+                    },
+                    "output_payload": {
+                        "source": "agent_runtime_telemetry",
+                        "tool_result_reference": invocation["tool_invocation_id"],
+                    },
+                    "execution_metadata": tool_telemetry
+                    | {
+                        "agent_runtime_recorded": True,
+                        "workflow_state": workflow_state,
+                    },
+                    "error_message": None,
+                }
+            )
+        )
+    return recorded_invocations
 
 
 async def _call_agent_runtime(agent_runtime_url: str, agent_id: str, payload: dict) -> dict:

@@ -17,6 +17,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, and initial Phase
 - governed tool-runtime service boundary
 - approved tool registry and schema validation
 - deterministic mock tool execution
+- workflow-integrated tool invocation persistence
 
 ---
 
@@ -132,7 +133,6 @@ The tool-runtime is an internal mediation boundary. It does not mutate workflow 
 
 Current Phase 4 limitation:
 - gateway-api does not yet expose workflow tool invocation history
-- workflow-engine does not yet persist agent-produced tool invocation telemetry into `tool_invocation_records`
 
 ---
 
@@ -152,11 +152,13 @@ HUMAN_REVIEW_REQUIRED
 
 The workflow stops at `HUMAN_REVIEW_REQUIRED` because human approval handling is not implemented yet.
 
-During Phase 3 execution:
+During current workflow execution:
 - `intake_agent` runs during `INTAKE_IN_PROGRESS`
 - `document_analysis_agent` runs during `DOCUMENT_ANALYSIS_PENDING`
 - agent outputs are validated before workflow progression uses them
 - agent execution records are persisted for operational traceability
+- approved agent tool invocations are persisted as workflow-owned tool invocation records
+- tool invocation records produce timeline entries and outbox events
 
 ---
 
@@ -199,7 +201,8 @@ Current tool invocation persistence boundary:
 - workflow-engine can idempotently record tool invocation results
 - tool invocation records can produce workflow timeline entries
 - tool invocation records can produce workflow event outbox records
-- agent-runtime integration with tool-runtime is not yet implemented
+- agent-produced tool invocation telemetry is persisted during the standard Mortgage Exception Review path
+- gateway-api does not yet expose workflow tool invocation history
 
 ---
 
@@ -221,8 +224,8 @@ Current event types:
 - `tool.invocation_failed`
 
 Current tool invocation event boundary:
-- tool invocation events are supported by the workflow-engine recording activity
-- tool invocation events are not yet produced by the standard Mortgage Exception Review workflow path
+- tool invocation events are produced when workflow-engine records agent-produced tool invocation telemetry
+- tool invocation events are persisted through the outbox model
 
 Event publication status is tracked in:
 
@@ -241,7 +244,6 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- workflow-engine persistence of agent-produced tool invocation telemetry
 - workflow tool invocation retrieval API
 - human approval UI
 - approve/reject actions
@@ -461,6 +463,7 @@ Expected timeline entries include:
 - `STATE_TRANSITION` to `RISK_REVIEW_PENDING`
 - `STATE_TRANSITION` to `HUMAN_REVIEW_REQUIRED`
 - `AGENT_EXECUTION_COMPLETED` entries for governed agent activity
+- `TOOL_INVOCATION_COMPLETED` entries for governed tool activity
 - `EVENT_PUBLISHED` entries for published workflow events
 
 ---
@@ -479,6 +482,7 @@ Expected result:
 - `document_analysis_agent` execution is present
 - each execution has `validation_status` set to `VALIDATED`
 - each execution references prompt version metadata
+- agent execution telemetry includes governed tool invocation references
 
 ---
 
@@ -546,6 +550,9 @@ The Postman collection validates:
 
 Direct Postgres, Redpanda, and Temporal history inspection is not required for routine manual API testing.
 
+Workflow tool invocation records are currently validated through automated tests and local smoke validation.
+The Postman workflow tool invocation retrieval request will be added when the gateway-api endpoint is implemented.
+
 ---
 
 # Automated Test Commands
@@ -563,7 +570,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-7 passed
+8 passed
 ```
 
 ---
@@ -611,7 +618,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-2 passed
+5 passed
 ```
 
 ---

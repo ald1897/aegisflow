@@ -537,18 +537,18 @@ Completion criteria:
 
 ## Workstream 5 - Workflow Integration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- update workflow-engine configuration for tool-runtime where needed
-- ensure Temporal activity retry behavior remains bounded
-- ensure workflow progression remains deterministic
-- ensure tool invocation side effects are replay-safe
+- update workflow-engine configuration for tool-runtime where needed - Complete
+- ensure Temporal activity retry behavior remains bounded - Complete
+- ensure workflow progression remains deterministic - Complete
+- ensure tool invocation side effects are replay-safe - Complete
 
 Completion criteria:
-- Mortgage Exception Review workflow completes Phase 4 path to `HUMAN_REVIEW_REQUIRED`
-- workflow state progression remains owned by workflow-engine
-- duplicate activity execution does not duplicate completed tool invocation records
+- Mortgage Exception Review workflow completes Phase 4 path to `HUMAN_REVIEW_REQUIRED` - Met
+- workflow state progression remains owned by workflow-engine - Met
+- duplicate activity execution does not duplicate completed tool invocation records - Met
 
 ---
 
@@ -784,6 +784,28 @@ Boundary:
 
 Next step:
 - implement Workstream 5: Workflow Integration
+
+## 2026-05-12 - Workstream 5
+
+Status:
+- connected agent-produced tool invocation telemetry to workflow-engine persistence
+- recorded governed tool invocations immediately after agent execution records are committed
+- preserved workflow-engine ownership of all workflow state progression
+- preserved replay safety through idempotent `tool_invocation_id` record writes
+- added regression coverage for telemetry-backed tool invocation record, timeline, and outbox creation
+- validated workflow-engine automated tests with 5 passing tests
+- validated local end-to-end Mortgage Exception Review execution to `HUMAN_REVIEW_REQUIRED`
+- confirmed local workflow execution produced persisted records for `borrower_profile_lookup` and `document_fetch`
+
+Completed workstream:
+- Workstream 5 - Workflow Integration
+
+Boundary:
+- gateway-api workflow tool invocation retrieval remains assigned to Workstream 6
+- Postman coverage for tool-runtime and workflow tool invocation retrieval remains assigned to Workstream 6
+
+Next step:
+- implement Workstream 6: Gateway API And Postman
 
 ---
 

@@ -166,7 +166,7 @@ They describe validated agent output produced inside a workflow. Workflow state 
 
 ## Tool Invocation Events
 
-Supported by the workflow-engine tool invocation recording activity:
+Produced by the workflow-engine when governed agent tool invocation telemetry is recorded:
 
 ```text
 tool.invocation_completed
@@ -195,5 +195,6 @@ Tool invocation events must not be interpreted as business decisions.
 They describe whether an approved tool invocation completed or failed inside a governed workflow context. Tool results provide supporting operational context only. Workflow state progression remains owned by the workflow engine, and critical mortgage actions still require human review.
 
 Current implementation boundary:
-- tool invocation event records can be written through the outbox model
-- standard Mortgage Exception Review execution does not yet invoke tools through agent-runtime
+- tool invocation event records are written through the outbox model
+- standard Mortgage Exception Review execution produces tool invocation events for approved agent tool use
+- gateway-api does not yet expose workflow tool invocation retrieval

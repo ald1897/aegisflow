@@ -512,23 +512,23 @@ Completion criteria:
 
 ## Workstream 5 - Evaluation Run Orchestration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- implement evaluation run creation endpoint
-- load workflow, agent execution, tool invocation, timeline, and approval records for a workflow
-- execute deterministic evaluators against the bounded evidence set
-- persist evaluation run and result records
-- handle missing workflows and incomplete workflows with structured errors
-- make evaluation run execution idempotent where practical for repeated local validation
-- add integration tests against seeded workflow evidence
+- implement evaluation run creation endpoint - Complete
+- load workflow, agent execution, tool invocation, timeline, and approval records for a workflow - Complete
+- execute deterministic evaluators against the bounded evidence set - Complete
+- persist evaluation run and result records - Complete
+- handle missing workflows and incomplete workflows with structured errors - Complete
+- make evaluation run execution idempotent where practical for repeated local validation - Complete
+- add integration tests against seeded workflow evidence - Complete
 
 Completion criteria:
-- a local workflow can receive an evaluation run
-- results are persisted and retrievable
-- missing and incomplete workflow cases are handled clearly
-- repeated evaluation does not corrupt workflow state or duplicate unsafe side effects
-- tests pass
+- a local workflow can receive an evaluation run - Met
+- results are persisted and retrievable - Met
+- missing and incomplete workflow cases are handled clearly - Met
+- repeated evaluation does not corrupt workflow state or duplicate unsafe side effects - Met
+- tests pass - Met
 
 ---
 
@@ -853,6 +853,35 @@ Boundary:
 
 Next step:
 - implement Workstream 5: Evaluation Run Orchestration
+
+## 2026-05-12 - Workstream 5
+
+Status:
+- added evaluation-service read models for workflow, timeline, agent execution, tool invocation, approval, and event evidence tables
+- added repository queries for workflow evidence loading and evaluation run retrieval
+- added evaluation run request, detail, and summary DTOs
+- added `POST /api/v1/evaluations/workflows/{workflow_id}/runs`
+- added `GET /api/v1/evaluations/runs/{evaluation_run_id}`
+- added `GET /api/v1/evaluations/workflows/{workflow_id}/runs`
+- implemented workflow evidence loading from persisted bounded records
+- executed deterministic local evaluators against workflow evidence
+- supported `judge_model_disabled` mode by adding the deterministic judge-boundary result to persisted scores
+- persisted evaluation run and result records without mutating workflow state
+- returned structured errors for missing workflows and workflows not ready for evaluation
+- preserved practical idempotency for repeated requests with an explicit `evaluation_run_id`
+- rebuilt the evaluation-service image
+- validated evaluation-service automated tests with 32 passing tests
+
+Completed workstream:
+- Workstream 5 - Evaluation Run Orchestration
+
+Boundary:
+- evaluation run creation is local evaluation only and does not approve, reject, complete, or mutate workflows
+- workflow evidence loading reads existing authoritative records and stores bounded evaluation references and scores
+- dataset listing, dataset scoring, gateway evaluation retrieval, Postman validation, evaluation dashboards, and phase closeout documentation remain assigned to later workstreams
+
+Next step:
+- implement Workstream 6: Dataset And Replay-Aware Evaluation
 
 ---
 

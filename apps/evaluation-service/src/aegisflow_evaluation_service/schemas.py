@@ -102,3 +102,36 @@ class EvaluationDatasetCaseRead(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class EvaluationRunRequest(BaseModel):
+    evaluation_run_id: UUID = Field(default_factory=uuid4)
+    evaluation_scope: str = Field(default="workflow", min_length=1, max_length=80)
+    evaluation_mode: str = Field(default="deterministic_local", min_length=1, max_length=80)
+    dataset_id: str | None = Field(default=None, max_length=120)
+    expected_agents: tuple[str, ...] = Field(default_factory=tuple)
+    expected_tools: tuple[str, ...] = Field(default_factory=tuple)
+    expected_human_review: bool | None = None
+    expected_terminal_decision: str | None = Field(default=None, max_length=40)
+    run_metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class EvaluationRunSummary(BaseModel):
+    evaluation_run_id: UUID
+    workflow_id: UUID
+    correlation_id: str
+    evaluation_scope: str
+    evaluation_mode: str
+    dataset_id: str | None
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    created_by: str
+    result_count: int
+    run_metadata: dict[str, Any]
+    created_at: datetime
+
+
+class EvaluationRunDetail(BaseModel):
+    run: EvaluationRunRead
+    results: list[EvaluationResultRead]

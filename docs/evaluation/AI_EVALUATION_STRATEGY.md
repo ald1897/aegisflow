@@ -410,3 +410,26 @@ Metrics Aggregation
         ↓
 Regression Tracking
 ```
+
+## Implemented Local Run Orchestration
+
+The Phase 7 local implementation can create evaluation runs for persisted workflow evidence.
+
+Implemented flow:
+- request an evaluation run for a workflow
+- load persisted workflow, timeline, agent execution, tool invocation, and approval evidence
+- reject missing workflows or workflows that have not reached a reviewable or terminal state
+- execute deterministic local evaluators against bounded evidence
+- optionally include the deterministic judge-boundary fallback when using `judge_model_disabled` mode
+- persist evaluation run and evaluation result records
+- retrieve a run with its results or list runs for a workflow
+
+Current implemented endpoints:
+
+```text
+POST /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/runs/{evaluation_run_id}
+GET /api/v1/evaluations/workflows/{workflow_id}/runs
+```
+
+Evaluation run orchestration is side-effect free with respect to workflow state. It reads authoritative records and writes evaluation records only.

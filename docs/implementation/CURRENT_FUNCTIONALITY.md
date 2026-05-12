@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, and Phase 6 observability capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the Phase 7 evaluation foundation through Workstream 5:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -28,8 +28,11 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - Prometheus metrics for service requests, workflow activities, agents, tools, approvals, and event publication
 - provisioned Grafana dashboards for local operational inspection
 - structured JSON logs with correlation ID and trace ID support
+- evaluation-service health, readiness, metrics, persistence, deterministic evaluators, judge-boundary fallback, and evaluation run orchestration
+- persisted evaluation runs and evaluation results for bounded workflow evidence
 
 Phase 6 is complete for the local simulation boundary.
+Phase 7 is partially complete through evaluation run orchestration.
 
 ---
 
@@ -173,6 +176,41 @@ The tool-runtime is an internal mediation boundary. It does not mutate workflow 
 
 Implemented Phase 4 gateway capability:
 - gateway-api exposes workflow tool invocation history through a DTO-based query endpoint
+
+---
+
+## evaluation-service
+
+The evaluation-service currently supports the Phase 7 local evaluation foundation.
+
+It provides:
+- health and readiness endpoints
+- Prometheus metrics endpoint
+- evaluation persistence for dataset cases, evaluation runs, and evaluation results
+- deterministic local evaluators for agent output contracts, governed tool usage, human review escalation, and evidence consistency signals
+- judge-model boundary with external judging disabled by default
+- deterministic local judge fallback for repeatable local validation
+- evaluation run orchestration for persisted workflow evidence
+- structured errors for missing workflows and workflows not ready for evaluation
+- idempotent run creation when an explicit `evaluation_run_id` is reused
+
+Implemented endpoints:
+
+```text
+GET /health
+GET /ready
+GET /metrics
+POST /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/runs/{evaluation_run_id}
+GET /api/v1/evaluations/workflows/{workflow_id}/runs
+```
+
+The evaluation-service reads workflow evidence but does not mutate workflow state, approve or reject workflows, bypass human review, or call production mortgage systems.
+
+Current Phase 7 boundary:
+- evaluation runs score bounded local workflow evidence only
+- external judge model calls are disabled by default
+- dataset listing, dataset scoring, gateway evaluation retrieval, Postman validation, and evaluation dashboards remain future Phase 7 workstreams
 
 ---
 
@@ -368,7 +406,7 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- AI evaluation
+- full Phase 7 evaluation dataset and replay-aware scoring
 - authentication and RBAC
 - advanced replay tooling
 - production alerting and paging

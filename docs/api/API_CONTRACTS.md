@@ -227,3 +227,30 @@ Tool invocation responses must:
 - expose input and output validation status
 - return validated synthetic or masked output
 - include telemetry metadata required for workflow persistence and audit correlation
+
+---
+
+## evaluation-service
+
+```text
+GET /health
+GET /ready
+GET /metrics
+POST /api/v1/evaluations/workflows/{workflow_id}/runs
+GET /api/v1/evaluations/runs/{evaluation_run_id}
+GET /api/v1/evaluations/workflows/{workflow_id}/runs
+```
+
+The evaluation-service API is an internal quality-governance boundary for local AI evaluation.
+
+Evaluation run creation must:
+- read workflow, timeline, agent execution, tool invocation, and approval evidence from persisted workflow records
+- execute deterministic local evaluators by default
+- persist evaluation run and evaluation result records
+- support explicit `evaluation_run_id` idempotency for repeated local validation
+- reject missing workflows with `workflow_not_found`
+- reject incomplete workflows with `workflow_not_ready_for_evaluation`
+
+Evaluation responses expose run metadata and bounded result records. They must not expose prompt content, raw document contents, borrower PII, secrets, approval comments as scoring metadata, or full model outputs.
+
+Evaluation results are quality signals only. They must not mutate workflow state, approve or reject workflows, bypass human review, or replace workflow timelines, approval records, or audit records.

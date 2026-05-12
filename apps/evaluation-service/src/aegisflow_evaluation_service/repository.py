@@ -2,9 +2,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aegisflow_evaluation_service.models import (
+    AgentExecutionRecord,
+    ApprovalRecord,
     EvaluationDatasetCase,
     EvaluationResult,
     EvaluationRun,
+    ToolInvocationRecord,
+    WorkflowRecord,
+    WorkflowTimelineEntry,
 )
 from aegisflow_evaluation_service.schemas import (
     EvaluationDatasetCaseCreate,
@@ -120,4 +125,39 @@ class EvaluationRepository:
             statement = statement.where(EvaluationDatasetCase.dataset_id == dataset_id)
         statement = statement.order_by(EvaluationDatasetCase.dataset_id.asc(), EvaluationDatasetCase.case_name.asc())
         result = await self.session.execute(statement)
+        return list(result.scalars().all())
+
+    async def get_workflow(self, workflow_id: str) -> WorkflowRecord | None:
+        return await self.session.get(WorkflowRecord, workflow_id)
+
+    async def list_agent_executions_for_workflow(self, workflow_id: str) -> list[AgentExecutionRecord]:
+        result = await self.session.execute(
+            select(AgentExecutionRecord)
+            .where(AgentExecutionRecord.workflow_id == workflow_id)
+            .order_by(AgentExecutionRecord.started_at.asc(), AgentExecutionRecord.agent_execution_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_tool_invocations_for_workflow(self, workflow_id: str) -> list[ToolInvocationRecord]:
+        result = await self.session.execute(
+            select(ToolInvocationRecord)
+            .where(ToolInvocationRecord.workflow_id == workflow_id)
+            .order_by(ToolInvocationRecord.started_at.asc(), ToolInvocationRecord.tool_invocation_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_timeline_entries_for_workflow(self, workflow_id: str) -> list[WorkflowTimelineEntry]:
+        result = await self.session.execute(
+            select(WorkflowTimelineEntry)
+            .where(WorkflowTimelineEntry.workflow_id == workflow_id)
+            .order_by(WorkflowTimelineEntry.created_at.asc(), WorkflowTimelineEntry.timeline_entry_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_approval_records_for_workflow(self, workflow_id: str) -> list[ApprovalRecord]:
+        result = await self.session.execute(
+            select(ApprovalRecord)
+            .where(ApprovalRecord.workflow_id == workflow_id)
+            .order_by(ApprovalRecord.reviewed_at.asc(), ApprovalRecord.approval_id.asc())
+        )
         return list(result.scalars().all())

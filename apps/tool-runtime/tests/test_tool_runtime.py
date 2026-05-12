@@ -32,6 +32,16 @@ async def test_list_tools_returns_registered_tools(client: AsyncClient) -> None:
     }
 
 
+async def test_metrics_endpoint_exposes_tool_runtime_metrics(client: AsyncClient) -> None:
+    await client.get("/health")
+
+    response = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "aegisflow_tool_runtime_http_requests_total" in response.text
+
+
 async def test_borrower_profile_lookup_returns_validated_output(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/tools/borrower_profile_lookup/invocations",

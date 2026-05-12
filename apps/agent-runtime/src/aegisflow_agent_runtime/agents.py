@@ -1,10 +1,14 @@
 from collections.abc import Callable
+from time import perf_counter
 from typing import Any, Protocol, TypedDict
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 
+from aegisflow_agent_runtime.metrics import record_agent_execution, record_graph_step
 from aegisflow_agent_runtime.prompts import PromptAsset, PromptRegistry
 from aegisflow_agent_runtime.registry import AGENT_REGISTRY
 from aegisflow_agent_runtime.schemas import (
@@ -15,6 +19,7 @@ from aegisflow_agent_runtime.schemas import (
     DocumentAnalysisAgentOutput,
     IntakeAgentOutput,
 )
+from aegisflow_agent_runtime.telemetry import set_span_attributes
 from aegisflow_agent_runtime.tools import ToolInvocationContext, ToolRuntimeClient, ToolRuntimeError
 
 
@@ -60,82 +65,137 @@ class AgentRuntime:
         return list(AGENT_REGISTRY.values())
 
     def execute(self, agent_id: str, request: AgentExecutionRequest) -> AgentExecutionResponse:
+        start_time = perf_counter()
+        tracer = trace.get_tracer(__name__)
         registry_entry = AGENT_REGISTRY.get(agent_id)
         if registry_entry is None:
+            record_agent_execution(
+                agent_id=agent_id,
+                status="failed",
+                validation_status="NOT_APPLICABLE",
+                requires_human_review=False,
+                duration_seconds=perf_counter() - start_time,
+            )
             raise AgentNotFoundError(agent_id)
 
         if request.workflow_state not in registry_entry.supported_workflow_states:
+            record_agent_execution(
+                agent_id=agent_id,
+                status="rejected",
+                validation_status=AgentValidationStatus.rejected.value,
+                requires_human_review=False,
+                duration_seconds=perf_counter() - start_time,
+            )
             raise UnsupportedWorkflowStateError(
                 f"{agent_id} does not support workflow state {request.workflow_state}"
             )
 
-        prompt = self.prompt_registry.load(registry_entry.prompt_id, registry_entry.prompt_version)
-        execution_id = str(uuid4())
-        tool_context = self._collect_tool_context(
-            agent_id=agent_id,
-            allowed_tools=registry_entry.allowed_tools,
-            agent_execution_id=execution_id,
-            request=request,
-        )
-        output_model, generator = self._agent_definition(agent_id)
-        graph = self._build_graph(generator=generator, output_model=output_model)
-        result = graph.invoke({"request": request, "prompt": prompt, "tool_context": tool_context})
-        output = result["output"]
-
-        return AgentExecutionResponse(
-            execution_id=execution_id,
-            agent_id=agent_id,
-            status=AgentExecutionStatus.completed,
-            validation_status=AgentValidationStatus.validated,
-            prompt_id=prompt.prompt_id,
-            prompt_version=prompt.version,
-            model_name="deterministic-langgraph-local-v1",
-            confidence_score=float(output["confidence_score"]),
-            requires_human_review=bool(output["requires_human_review"]),
-            output=output,
-            telemetry={
-                "workflow_id": request.workflow_id,
-                "correlation_id": request.correlation_id,
-                "workflow_state": request.workflow_state,
-                "prompt_path": str(prompt.path),
-                "allowed_tools": registry_entry.allowed_tools,
-                "tool_invocations": [
-                    {
-                        "tool_invocation_id": invocation.tool_invocation_id,
-                        "tool_id": invocation.tool_id,
-                        "status": invocation.status,
-                        "permission_status": invocation.permission_status,
-                        "input_validation_status": invocation.input_validation_status,
-                        "output_validation_status": invocation.output_validation_status,
-                        "telemetry": invocation.telemetry,
-                    }
-                    for invocation in tool_context.values()
-                ],
-            },
-        )
+        with tracer.start_as_current_span("agent_runtime.execute_agent") as span:
+            span.set_attribute("workflow_id", request.workflow_id)
+            span.set_attribute("correlation_id", request.correlation_id)
+            span.set_attribute("workflow_state", request.workflow_state)
+            span.set_attribute("workflow_type", request.workflow_type)
+            span.set_attribute("agent_id", agent_id)
+            span.set_attribute("prompt_id", registry_entry.prompt_id)
+            span.set_attribute("prompt_version", registry_entry.prompt_version)
+            try:
+                prompt = self.prompt_registry.load(registry_entry.prompt_id, registry_entry.prompt_version)
+                execution_id = str(uuid4())
+                tool_context = self._collect_tool_context(
+                    agent_id=agent_id,
+                    allowed_tools=registry_entry.allowed_tools,
+                    agent_execution_id=execution_id,
+                    request=request,
+                )
+                output_model, generator = self._agent_definition(agent_id)
+                graph = self._build_graph(agent_id=agent_id, generator=generator, output_model=output_model)
+                result = graph.invoke({"request": request, "prompt": prompt, "tool_context": tool_context})
+                output = result["output"]
+                response = AgentExecutionResponse(
+                    execution_id=execution_id,
+                    agent_id=agent_id,
+                    status=AgentExecutionStatus.completed,
+                    validation_status=AgentValidationStatus.validated,
+                    prompt_id=prompt.prompt_id,
+                    prompt_version=prompt.version,
+                    model_name="deterministic-langgraph-local-v1",
+                    confidence_score=float(output["confidence_score"]),
+                    requires_human_review=bool(output["requires_human_review"]),
+                    output=output,
+                    telemetry={
+                        "workflow_id": request.workflow_id,
+                        "correlation_id": request.correlation_id,
+                        "workflow_state": request.workflow_state,
+                        "prompt_path": str(prompt.path),
+                        "allowed_tools": registry_entry.allowed_tools,
+                        "tool_invocations": [
+                            {
+                                "tool_invocation_id": invocation.tool_invocation_id,
+                                "tool_id": invocation.tool_id,
+                                "status": invocation.status,
+                                "permission_status": invocation.permission_status,
+                                "input_validation_status": invocation.input_validation_status,
+                                "output_validation_status": invocation.output_validation_status,
+                                "telemetry": invocation.telemetry,
+                            }
+                            for invocation in tool_context.values()
+                        ],
+                    },
+                )
+                record_agent_execution(
+                    agent_id=agent_id,
+                    status=response.status.value,
+                    validation_status=response.validation_status.value,
+                    requires_human_review=response.requires_human_review,
+                    duration_seconds=perf_counter() - start_time,
+                )
+                span.set_attribute("agent_execution_id", execution_id)
+                span.set_attribute("agent.status", response.status.value)
+                span.set_attribute("agent.validation_status", response.validation_status.value)
+                span.set_attribute("agent.requires_human_review", response.requires_human_review)
+                span.set_attribute("agent.tool_invocation_count", len(tool_context))
+                return response
+            except Exception as exc:
+                span.record_exception(exc)
+                span.set_status(Status(StatusCode.ERROR))
+                record_agent_execution(
+                    agent_id=agent_id,
+                    status="failed",
+                    validation_status=AgentValidationStatus.rejected.value,
+                    requires_human_review=True,
+                    duration_seconds=perf_counter() - start_time,
+                )
+                raise
 
     def _build_graph(
         self,
         *,
+        agent_id: str,
         generator: Callable[[AgentExecutionRequest, PromptAsset, dict[str, ToolInvocationContext]], BaseModel],
         output_model: type[BaseModel],
     ):
         graph = StateGraph(AgentGraphState)
 
         def assemble_context(state: AgentGraphState) -> AgentGraphState:
-            return state
+            return _run_graph_step(agent_id, "assemble_context", lambda: state)
 
         def execute_agent(state: AgentGraphState) -> AgentGraphState:
-            request = state["request"]
-            prompt = state["prompt"]
-            state["output"] = generator(request, prompt, state.get("tool_context", {})).model_dump()
-            return state
+            def run() -> AgentGraphState:
+                request = state["request"]
+                prompt = state["prompt"]
+                state["output"] = generator(request, prompt, state.get("tool_context", {})).model_dump()
+                return state
+
+            return _run_graph_step(agent_id, "execute_agent", run)
 
         def validate_output(state: AgentGraphState) -> AgentGraphState:
-            validated = output_model.model_validate(state["output"])
-            state["output"] = validated.model_dump()
-            state["validation_status"] = AgentValidationStatus.validated.value
-            return state
+            def run() -> AgentGraphState:
+                validated = output_model.model_validate(state["output"])
+                state["output"] = validated.model_dump()
+                state["validation_status"] = AgentValidationStatus.validated.value
+                return state
+
+            return _run_graph_step(agent_id, "validate_output", run)
 
         graph.add_node("assemble_context", assemble_context)
         graph.add_node("execute_agent", execute_agent)
@@ -179,6 +239,30 @@ class AgentRuntime:
         if agent_id == "document_analysis_agent":
             return DocumentAnalysisAgentOutput, _execute_document_analysis_agent
         raise AgentNotFoundError(agent_id)
+
+
+def _run_graph_step(agent_id: str, step: str, callback: Callable[[], AgentGraphState]) -> AgentGraphState:
+    start_time = perf_counter()
+    status = "completed"
+    with trace.get_tracer(__name__).start_as_current_span(f"agent_runtime.graph.{step}") as span:
+        span.set_attribute("agent_id", agent_id)
+        span.set_attribute("agent.graph_step", step)
+        try:
+            result = callback()
+            set_span_attributes({"agent.graph_step.status": status})
+            return result
+        except Exception as exc:
+            status = "failed"
+            span.record_exception(exc)
+            span.set_status(Status(StatusCode.ERROR))
+            raise
+        finally:
+            record_graph_step(
+                agent_id=agent_id,
+                step=step,
+                status=status,
+                duration_seconds=perf_counter() - start_time,
+            )
 
 
 def _tool_requests_for_agent(

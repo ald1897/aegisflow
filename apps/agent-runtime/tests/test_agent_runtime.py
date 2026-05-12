@@ -45,6 +45,16 @@ async def test_list_agents_returns_registered_agents(client: AsyncClient) -> Non
     assert document["allowed_tools"] == ["document_fetch"]
 
 
+async def test_metrics_endpoint_exposes_agent_runtime_metrics(client: AsyncClient) -> None:
+    await client.get("/health")
+
+    response = await client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "text/plain" in response.headers["content-type"]
+    assert "aegisflow_agent_runtime_http_requests_total" in response.text
+
+
 async def test_intake_agent_returns_validated_output(client: AsyncClient) -> None:
     response = await client.post(
         "/api/v1/agents/intake_agent/executions",

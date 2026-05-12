@@ -1,8 +1,12 @@
 from hashlib import sha256
+from time import perf_counter
 from uuid import uuid5, NAMESPACE_URL
 
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from pydantic import ValidationError
 
+from aegisflow_tool_runtime.metrics import record_tool_handler_duration, record_tool_invocation
 from aegisflow_tool_runtime.registry import TOOL_REGISTRY
 from aegisflow_tool_runtime.schemas import (
     BorrowerProfileLookupInput,
@@ -17,6 +21,7 @@ from aegisflow_tool_runtime.schemas import (
     ToolInvocationStatus,
     ValidationStatus,
 )
+from aegisflow_tool_runtime.telemetry import set_span_attributes
 
 
 class ToolNotFoundError(Exception):
@@ -36,46 +41,128 @@ class ToolRuntime:
         return list(TOOL_REGISTRY.values())
 
     def invoke(self, tool_id: str, request: ToolInvocationRequest) -> ToolInvocationResponse:
+        start_time = perf_counter()
+        tracer = trace.get_tracer(__name__)
         tool = TOOL_REGISTRY.get(tool_id)
         if tool is None:
+            record_tool_invocation(
+                tool_id=tool_id,
+                status=ToolInvocationStatus.failed.value,
+                permission_status="UNKNOWN",
+                input_validation_status="NOT_APPLICABLE",
+                output_validation_status="NOT_APPLICABLE",
+                duration_seconds=perf_counter() - start_time,
+            )
             raise ToolNotFoundError(tool_id)
 
-        if request.agent_id not in tool.allowed_agents:
-            raise ToolPermissionDeniedError(f"{request.agent_id} is not allowed to invoke {tool_id}")
+        with tracer.start_as_current_span("tool_runtime.invoke_tool") as span:
+            span.set_attribute("workflow_id", request.workflow_id)
+            span.set_attribute("correlation_id", request.correlation_id)
+            span.set_attribute("agent_id", request.agent_id)
+            span.set_attribute("agent_execution_id", request.agent_execution_id or "")
+            span.set_attribute("tool_id", tool_id)
+            span.set_attribute("tool.data_classification", tool.data_classification)
+            span.set_attribute("tool.replay_safe", tool.replay_safe)
 
-        input_model, output_model, handler = self._tool_definition(tool_id)
-        try:
-            validated_input = input_model.model_validate(request.input)
-        except ValidationError as exc:
-            raise ToolInputValidationError(str(exc)) from exc
+            if request.agent_id not in tool.allowed_agents:
+                span.set_attribute("tool.permission_status", PermissionStatus.denied.value)
+                span.set_status(Status(StatusCode.ERROR))
+                record_tool_invocation(
+                    tool_id=tool_id,
+                    status=ToolInvocationStatus.failed.value,
+                    permission_status=PermissionStatus.denied.value,
+                    input_validation_status="NOT_APPLICABLE",
+                    output_validation_status="NOT_APPLICABLE",
+                    duration_seconds=perf_counter() - start_time,
+                )
+                raise ToolPermissionDeniedError(f"{request.agent_id} is not allowed to invoke {tool_id}")
 
-        output = handler(validated_input)
-        validated_output = output_model.model_validate(output.model_dump())
-        invocation_id = self._invocation_id(tool_id, request)
+            input_model, output_model, handler = self._tool_definition(tool_id)
+            try:
+                validated_input = input_model.model_validate(request.input)
+            except ValidationError as exc:
+                span.set_attribute("tool.permission_status", PermissionStatus.authorized.value)
+                span.set_attribute("tool.input_validation_status", ValidationStatus.rejected.value)
+                span.set_status(Status(StatusCode.ERROR))
+                record_tool_invocation(
+                    tool_id=tool_id,
+                    status=ToolInvocationStatus.failed.value,
+                    permission_status=PermissionStatus.authorized.value,
+                    input_validation_status=ValidationStatus.rejected.value,
+                    output_validation_status="NOT_APPLICABLE",
+                    duration_seconds=perf_counter() - start_time,
+                )
+                raise ToolInputValidationError(str(exc)) from exc
 
-        return ToolInvocationResponse(
-            tool_invocation_id=invocation_id,
-            tool_id=tool_id,
-            workflow_id=request.workflow_id,
-            correlation_id=request.correlation_id,
-            agent_id=request.agent_id,
-            agent_execution_id=request.agent_execution_id,
-            status=ToolInvocationStatus.completed,
-            permission_status=PermissionStatus.authorized,
-            input_validation_status=ValidationStatus.validated,
-            output_validation_status=ValidationStatus.validated,
-            output=validated_output.model_dump(),
-            telemetry={
-                "tool_id": tool_id,
-                "workflow_id": request.workflow_id,
-                "correlation_id": request.correlation_id,
-                "agent_id": request.agent_id,
-                "agent_execution_id": request.agent_execution_id,
-                "idempotency_key": request.idempotency_key,
-                "replay_safe": tool.replay_safe,
-                "data_classification": tool.data_classification,
-            },
-        )
+            handler_start_time = perf_counter()
+            try:
+                output = handler(validated_input)
+                record_tool_handler_duration(
+                    tool_id=tool_id,
+                    status="completed",
+                    duration_seconds=perf_counter() - handler_start_time,
+                )
+                validated_output = output_model.model_validate(output.model_dump())
+            except Exception as exc:
+                span.record_exception(exc)
+                span.set_status(Status(StatusCode.ERROR))
+                record_tool_handler_duration(
+                    tool_id=tool_id,
+                    status="failed",
+                    duration_seconds=perf_counter() - handler_start_time,
+                )
+                record_tool_invocation(
+                    tool_id=tool_id,
+                    status=ToolInvocationStatus.failed.value,
+                    permission_status=PermissionStatus.authorized.value,
+                    input_validation_status=ValidationStatus.validated.value,
+                    output_validation_status=ValidationStatus.rejected.value,
+                    duration_seconds=perf_counter() - start_time,
+                )
+                raise
+
+            invocation_id = self._invocation_id(tool_id, request)
+            response = ToolInvocationResponse(
+                tool_invocation_id=invocation_id,
+                tool_id=tool_id,
+                workflow_id=request.workflow_id,
+                correlation_id=request.correlation_id,
+                agent_id=request.agent_id,
+                agent_execution_id=request.agent_execution_id,
+                status=ToolInvocationStatus.completed,
+                permission_status=PermissionStatus.authorized,
+                input_validation_status=ValidationStatus.validated,
+                output_validation_status=ValidationStatus.validated,
+                output=validated_output.model_dump(),
+                telemetry={
+                    "tool_id": tool_id,
+                    "workflow_id": request.workflow_id,
+                    "correlation_id": request.correlation_id,
+                    "agent_id": request.agent_id,
+                    "agent_execution_id": request.agent_execution_id,
+                    "idempotency_key": request.idempotency_key,
+                    "replay_safe": tool.replay_safe,
+                    "data_classification": tool.data_classification,
+                },
+            )
+            record_tool_invocation(
+                tool_id=tool_id,
+                status=response.status.value,
+                permission_status=response.permission_status.value,
+                input_validation_status=response.input_validation_status.value,
+                output_validation_status=response.output_validation_status.value,
+                duration_seconds=perf_counter() - start_time,
+            )
+            set_span_attributes(
+                {
+                    "tool_invocation_id": invocation_id,
+                    "tool.status": response.status.value,
+                    "tool.permission_status": response.permission_status.value,
+                    "tool.input_validation_status": response.input_validation_status.value,
+                    "tool.output_validation_status": response.output_validation_status.value,
+                }
+            )
+            return response
 
     def _tool_definition(self, tool_id: str):
         if tool_id == "borrower_profile_lookup":

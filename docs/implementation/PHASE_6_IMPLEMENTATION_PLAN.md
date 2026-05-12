@@ -471,24 +471,24 @@ Completion criteria:
 
 ## Workstream 5 - agent-runtime And tool-runtime Instrumentation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- instrument agent-runtime FastAPI request handling
-- instrument agent graph execution spans
-- record bounded agent metadata such as agent ID, prompt ID, prompt version, validation status, and human review requirement
-- instrument tool-runtime FastAPI request handling
-- instrument tool permission checks
-- instrument tool input and output validation results
-- instrument deterministic mock tool handler latency
-- expose service metrics for agent and tool execution
+- instrument agent-runtime FastAPI request handling - Complete
+- instrument agent graph execution spans - Complete
+- record bounded agent metadata such as agent ID, prompt ID, prompt version, validation status, and human review requirement - Complete
+- instrument tool-runtime FastAPI request handling - Complete
+- instrument tool permission checks - Complete
+- instrument tool input and output validation results - Complete
+- instrument deterministic mock tool handler latency - Complete
+- expose service metrics for agent and tool execution - Complete
 
 Completion criteria:
-- agent-runtime traces show agent execution boundaries
-- tool-runtime traces show governed tool invocation boundaries
-- tool invocation telemetry does not include sensitive payloads
-- agent-runtime and tool-runtime metrics are visible in Prometheus
-- existing agent-runtime and tool-runtime tests continue to pass
+- agent-runtime traces show agent execution boundaries - Met
+- tool-runtime traces show governed tool invocation boundaries - Met
+- tool invocation telemetry does not include sensitive payloads - Met
+- agent-runtime and tool-runtime metrics are visible in Prometheus - Met
+- existing agent-runtime and tool-runtime tests continue to pass - Met
 
 ---
 
@@ -819,6 +819,40 @@ Boundary:
 
 Next step:
 - implement Workstream 5: agent-runtime And tool-runtime Instrumentation
+
+## 2026-05-12 - Workstream 5
+
+Status:
+- added agent-runtime HTTP telemetry middleware for request spans and request metrics
+- added agent-runtime `/metrics` endpoint with request, agent execution, graph step, and tool-runtime client metrics
+- added bounded agent execution spans with workflow ID, correlation ID, workflow type, workflow state, agent ID, prompt ID, prompt version, validation status, human review requirement, and tool invocation count
+- added LangGraph step spans and metrics for context assembly, agent execution, and output validation
+- added outbound tool-runtime client spans and metrics from agent-runtime, with W3C trace context propagation
+- added tool-runtime HTTP telemetry middleware for request spans and request metrics
+- added tool-runtime `/metrics` endpoint with request, governed tool invocation, and deterministic handler latency metrics
+- added bounded tool invocation spans for permission checks, input validation, output validation, handler execution, and invocation outcomes
+- added Prometheus scrape targets for `agent-runtime` and `tool-runtime`
+- rebuilt agent-runtime and tool-runtime images
+- validated agent-runtime automated tests with 8 passing tests
+- validated tool-runtime automated tests with 8 passing tests
+- validated local agent-runtime and tool-runtime `/metrics` endpoints
+- reloaded Prometheus and validated `agent-runtime` and `tool-runtime` scrape targets as `up`
+- executed a local intake agent request through agent-runtime to tool-runtime
+- validated Jaeger contains agent-runtime request, agent execution, graph step, outbound tool-runtime client, tool-runtime request, and governed tool invocation spans in the same trace
+
+Completed workstream:
+- Workstream 5 - agent-runtime And tool-runtime Instrumentation
+
+Boundary:
+- Workstream 5 telemetry uses bounded span attributes and low-cardinality metric labels
+- telemetry does not include raw document contents, borrower PII, secrets, prompt content, or unrestricted tool payloads
+- Grafana dashboards remain assigned to Workstream 6
+- log enrichment and local diagnostics remain assigned to Workstream 7
+- Postman observability validation and phase documentation closeout remain assigned to Workstream 8
+- telemetry remains operational metadata and is not authoritative workflow, approval, event, or audit data
+
+Next step:
+- implement Workstream 6: Dashboards And Operational Views
 
 ---
 

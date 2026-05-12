@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 
 from aegisflow_agent_runtime.agents import (
     AgentNotFoundError,
@@ -14,7 +14,8 @@ from aegisflow_agent_runtime.schemas import (
     AgentExecutionResponse,
     AgentRegistryResponse,
 )
-from aegisflow_agent_runtime.telemetry import configure_telemetry
+from aegisflow_agent_runtime.metrics import render_prometheus_metrics
+from aegisflow_agent_runtime.telemetry import AgentRuntimeTelemetryMiddleware, configure_telemetry
 from aegisflow_agent_runtime.tools import ToolRuntimeClient
 
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     logging.basicConfig(level=settings.log_level.upper())
     configure_telemetry(settings)
     app = FastAPI(title="AegisFlow Agent Runtime", version="0.1.0")
+    app.add_middleware(AgentRuntimeTelemetryMiddleware)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -51,6 +53,11 @@ def create_app() -> FastAPI:
             },
             "registered_agents": len(agents),
         }
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        content, media_type = render_prometheus_metrics()
+        return Response(content=content, media_type=media_type)
 
     @app.get("/api/v1/agents", response_model=AgentRegistryResponse)
     async def list_agents(runtime: AgentRuntime = Depends(get_agent_runtime)) -> AgentRegistryResponse:

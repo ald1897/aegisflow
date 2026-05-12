@@ -1,6 +1,6 @@
 import logging
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Response, status
 
 from aegisflow_tool_runtime.config import Settings, get_settings
 from aegisflow_tool_runtime.schemas import (
@@ -14,7 +14,8 @@ from aegisflow_tool_runtime.tools import (
     ToolPermissionDeniedError,
     ToolRuntime,
 )
-from aegisflow_tool_runtime.telemetry import configure_telemetry
+from aegisflow_tool_runtime.metrics import render_prometheus_metrics
+from aegisflow_tool_runtime.telemetry import ToolRuntimeTelemetryMiddleware, configure_telemetry
 
 
 def get_tool_runtime() -> ToolRuntime:
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
     logging.basicConfig(level=settings.log_level.upper())
     configure_telemetry(settings)
     app = FastAPI(title="AegisFlow Tool Runtime", version="0.1.0")
+    app.add_middleware(ToolRuntimeTelemetryMiddleware)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -47,6 +49,11 @@ def create_app() -> FastAPI:
             },
             "registered_tools": len(tools),
         }
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics() -> Response:
+        content, media_type = render_prometheus_metrics()
+        return Response(content=content, media_type=media_type)
 
     @app.get("/api/v1/tools", response_model=ToolRegistryResponse)
     async def list_tools(runtime: ToolRuntime = Depends(get_tool_runtime)) -> ToolRegistryResponse:

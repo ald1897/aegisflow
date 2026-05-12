@@ -448,24 +448,24 @@ Completion criteria:
 
 ## Workstream 4 - workflow-engine And Temporal Instrumentation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- instrument workflow-engine worker startup telemetry
-- instrument Temporal activities without introducing workflow replay nondeterminism
-- instrument workflow state transition activities
-- instrument agent execution activity calls
-- instrument tool invocation persistence activities
-- instrument approval decision activities
-- instrument event outbox publication from workflow-engine
-- document replay-safety rules for tracing inside workflow code
+- instrument workflow-engine worker startup telemetry - Complete
+- instrument Temporal activities without introducing workflow replay nondeterminism - Complete
+- instrument workflow state transition activities - Complete
+- instrument agent execution activity calls - Complete
+- instrument tool invocation persistence activities - Complete
+- instrument approval decision activities - Complete
+- instrument event outbox publication from workflow-engine - Complete
+- document replay-safety rules for tracing inside workflow code - Complete
 
 Completion criteria:
-- workflow-engine emits activity traces
-- state transition, agent execution, tool invocation, and approval decision activity spans are visible
-- Temporal workflow replay safety is preserved
-- workflow-engine metrics are visible in Prometheus
-- existing workflow-engine tests continue to pass
+- workflow-engine emits activity traces - Met
+- state transition, agent execution, tool invocation, and approval decision activity spans are visible - Met
+- Temporal workflow replay safety is preserved - Met
+- workflow-engine metrics are visible in Prometheus - Met
+- existing workflow-engine tests continue to pass - Met
 
 ---
 
@@ -770,6 +770,55 @@ Boundary:
 
 Next step:
 - implement Workstream 4: workflow-engine And Temporal Instrumentation
+
+## 2026-05-12 - Workstream 4
+
+Status:
+- added workflow-engine Prometheus metrics dependency
+- added workflow-engine metrics endpoint on port `8030`
+- added worker startup metric
+- added shared Temporal activity instrumentation helper for workflow-engine activities
+- added bounded activity spans for state transition, agent execution, tool invocation, approval recording, and human review decision activities
+- added activity execution counters and latency histograms
+- added workflow state transition metrics with low-cardinality prior state, new state, and status labels
+- added agent execution metrics with bounded agent, status, validation status, and human review labels
+- added tool invocation metrics with bounded tool, status, and permission labels
+- added approval decision metrics with decision and status labels
+- added workflow-engine event publication spans and metrics
+- added outbound agent-runtime client span inside workflow-engine agent activity
+- propagated W3C trace context from gateway-api Temporal workflow starts into workflow-engine activity payloads
+- passed trace context through deterministic workflow payload fields without calling telemetry APIs inside workflow definitions
+- exposed workflow-engine metrics port in local Docker Compose
+- added Prometheus scrape target for `workflow-engine`
+- rebuilt gateway-api and workflow-engine images
+- validated gateway-api tests against rebuilt image
+- validated workflow-engine tests against rebuilt image
+- validated local workflow-engine metrics endpoint
+- validated a Mortgage Exception Review workflow reaches `HUMAN_REVIEW_REQUIRED`
+- validated workflow-engine activity, state transition, agent, tool, and event publication metrics
+- validated approval path reaches `COMPLETED`
+- validated approval decision activity metrics and spans
+- validated Prometheus reports the `workflow-engine` scrape target as `up`
+- validated Jaeger contains workflow-engine activity and event publication spans
+- validated Jaeger contains a joined trace with both `gateway-api` and `workflow-engine`
+
+Completed workstream:
+- Workstream 4 - workflow-engine And Temporal Instrumentation
+
+Replay safety:
+- workflow definitions do not call OpenTelemetry or metrics APIs
+- workflow definitions only pass trace context as deterministic payload data
+- instrumentation is limited to activities, worker startup, outbound HTTP calls, and event publication side effects
+- telemetry does not alter workflow state, approval records, timelines, outbox records, or Temporal decisions
+
+Boundary:
+- agent-runtime and tool-runtime request handling and internal execution instrumentation remain assigned to Workstream 5
+- Grafana dashboards remain assigned to Workstream 6
+- log aggregation remains assigned to Workstream 7
+- telemetry remains operational metadata and is not authoritative workflow, approval, event, or audit data
+
+Next step:
+- implement Workstream 5: agent-runtime And tool-runtime Instrumentation
 
 ---
 

@@ -10,6 +10,7 @@ from aegisflow_workflow_engine.activities.decisions import apply_human_review_de
 from aegisflow_workflow_engine.activities.state_transitions import advance_workflow_state
 from aegisflow_workflow_engine.activities.tools import record_tool_invocation
 from aegisflow_workflow_engine.config import get_settings
+from aegisflow_workflow_engine.metrics import record_worker_start, start_metrics_endpoint
 from aegisflow_workflow_engine.telemetry import configure_telemetry
 from aegisflow_workflow_engine.workflows.human_review_decision import HumanReviewDecisionWorkflow
 from aegisflow_workflow_engine.workflows.mortgage_exception_review import MortgageExceptionReviewWorkflow
@@ -19,6 +20,7 @@ async def main() -> None:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
     configure_telemetry(settings)
+    start_metrics_endpoint(settings.metrics_port)
 
     logger = logging.getLogger(__name__)
     client: Client | None = None
@@ -34,6 +36,7 @@ async def main() -> None:
             await asyncio.sleep(2)
 
     if client is None:
+        record_worker_start(status="failed")
         raise RuntimeError(f"Unable to connect to Temporal at {settings.temporal_address}")
 
     worker = Worker(
@@ -52,6 +55,7 @@ async def main() -> None:
         "workflow-engine worker started on task queue %s",
         settings.temporal_task_queue,
     )
+    record_worker_start(status="started")
     await worker.run()
 
 

@@ -11,6 +11,7 @@ from aegisflow_gateway.telemetry.metrics import (
     record_approval_decision_dispatch,
     record_temporal_workflow_start,
 )
+from aegisflow_gateway.telemetry.tracing import inject_trace_context
 
 
 class TemporalWorkflowStarter:
@@ -55,6 +56,7 @@ class TemporalWorkflowStarter:
                     {
                         "workflow_id": str(workflow_id),
                         "correlation_id": correlation_id,
+                        "trace_context": inject_trace_context(),
                     },
                     id=temporal_workflow_id,
                     task_queue=self.settings.temporal_task_queue,
@@ -95,7 +97,7 @@ class TemporalWorkflowStarter:
                 client = await self._connect()
                 handle = await client.start_workflow(
                     "HumanReviewDecisionWorkflow",
-                    payload,
+                    payload | {"trace_context": inject_trace_context()},
                     id=temporal_workflow_id,
                     task_queue=self.settings.temporal_task_queue,
                 )

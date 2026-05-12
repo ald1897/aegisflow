@@ -1,8 +1,11 @@
 import logging
 from datetime import datetime, timezone
+from time import perf_counter
 from uuid import uuid4
 
 import httpx
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 from sqlalchemy import select
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -22,17 +25,20 @@ from aegisflow_workflow_engine.persistence.models import (
 )
 from aegisflow_workflow_engine.activities.state_transitions import publish_workflow_event
 from aegisflow_workflow_engine.activities.tools import record_tool_invocation
-from aegisflow_workflow_engine.telemetry import inject_trace_context
+from aegisflow_workflow_engine.metrics import record_agent_execution
+from aegisflow_workflow_engine.telemetry import inject_trace_context, instrument_activity, set_span_attributes
 
 logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="execute_agent")
+@instrument_activity("execute_agent")
 async def execute_agent(payload: dict) -> dict:
     agent_id = payload["agent_id"]
     workflow_id = payload["workflow_id"]
     correlation_id = payload["correlation_id"]
     workflow_state = payload["workflow_state"]
+    activity_start_time = perf_counter()
     now = datetime.now(timezone.utc)
 
     async with SessionLocal() as session:
@@ -61,6 +67,22 @@ async def execute_agent(payload: dict) -> dict:
                 agent_execution_id=existing.agent_execution_id,
                 telemetry=existing.execution_metadata,
                 workflow_state=workflow_state,
+            )
+            record_agent_execution(
+                agent_id=agent_id,
+                status="idempotent",
+                validation_status=existing.validation_status,
+                requires_human_review=existing.requires_human_review,
+                duration_seconds=perf_counter() - activity_start_time,
+            )
+            set_span_attributes(
+                {
+                    "agent_execution_id": existing.agent_execution_id,
+                    "agent.status": existing.status,
+                    "agent.validation_status": existing.validation_status,
+                    "agent.requires_human_review": existing.requires_human_review,
+                    "idempotent": True,
+                }
             )
             return {
                 "workflow_id": workflow_id,
@@ -178,6 +200,24 @@ async def execute_agent(payload: dict) -> dict:
         workflow_state=workflow_state,
     )
     logger.info("agent execution completed", extra={"workflow_id": workflow_id, "agent_id": agent_id})
+    record_agent_execution(
+        agent_id=agent_id,
+        status=response_payload["status"],
+        validation_status=response_payload["validation_status"],
+        requires_human_review=response_payload["requires_human_review"],
+        duration_seconds=perf_counter() - activity_start_time,
+    )
+    set_span_attributes(
+        {
+            "agent_execution_id": agent_execution_id,
+            "agent.status": response_payload["status"],
+            "agent.validation_status": response_payload["validation_status"],
+            "agent.requires_human_review": response_payload["requires_human_review"],
+            "prompt_id": response_payload["prompt_id"],
+            "prompt_version": response_payload["prompt_version"],
+            "idempotent": False,
+        }
+    )
     return {
         "workflow_id": workflow_id,
         "agent_id": agent_id,
@@ -236,14 +276,29 @@ async def _record_tool_invocations_from_agent_telemetry(
 async def _call_agent_runtime(agent_runtime_url: str, agent_id: str, payload: dict) -> dict:
     try:
         async with httpx.AsyncClient(base_url=agent_runtime_url, timeout=10.0) as client:
-            response = await client.post(
-                f"/api/v1/agents/{agent_id}/executions",
-                headers=inject_trace_context(),
-                json=payload,
-            )
-            response.raise_for_status()
-            return response.json()
+            with trace.get_tracer(__name__).start_as_current_span(
+                "workflow_engine.http.call_agent_runtime",
+                kind=SpanKind.CLIENT,
+            ) as span:
+                span.set_attribute("agent_id", agent_id)
+                span.set_attribute("workflow_id", payload["workflow_id"])
+                span.set_attribute("correlation_id", payload["correlation_id"])
+                span.set_attribute("http.method", "POST")
+                span.set_attribute("http.route", "/api/v1/agents/{agent_id}/executions")
+                response = await client.post(
+                    f"/api/v1/agents/{agent_id}/executions",
+                    headers=inject_trace_context(),
+                    json=payload,
+                )
+                span.set_attribute("http.status_code", response.status_code)
+                if response.status_code >= 500:
+                    span.set_status(Status(StatusCode.ERROR))
+                response.raise_for_status()
+                return response.json()
     except httpx.HTTPError as exc:
+        span = trace.get_current_span()
+        if span.is_recording():
+            span.set_status(Status(StatusCode.ERROR))
         raise ApplicationError(
             f"Agent runtime call failed for {agent_id}: {exc}",
             non_retryable=False,

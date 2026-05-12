@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from time import perf_counter
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -19,17 +20,21 @@ from aegisflow_workflow_engine.persistence.models import (
     WorkflowRecord,
     WorkflowTimelineEntry,
 )
+from aegisflow_workflow_engine.metrics import record_tool_invocation as record_tool_invocation_metric
+from aegisflow_workflow_engine.telemetry import instrument_activity, set_span_attributes
 
 logger = logging.getLogger(__name__)
 
 
 @activity.defn(name="record_tool_invocation")
+@instrument_activity("record_tool_invocation")
 async def record_tool_invocation(payload: dict) -> dict:
     workflow_id = payload["workflow_id"]
     correlation_id = payload["correlation_id"]
     tool_invocation_id = payload["tool_invocation_id"]
     tool_id = payload["tool_id"]
     status = payload["status"]
+    activity_start_time = perf_counter()
     now = datetime.now(timezone.utc)
     started_at = _coerce_datetime(payload.get("started_at")) or now
     completed_at = _coerce_datetime(payload.get("completed_at")) or now
@@ -139,6 +144,20 @@ async def record_tool_invocation(payload: dict) -> dict:
 
     if existing_event_id is not None:
         await publish_workflow_event(existing_event_id)
+        record_tool_invocation_metric(
+            tool_id=tool_id,
+            status="idempotent",
+            permission_status=payload.get("permission_status", "UNKNOWN"),
+            duration_seconds=perf_counter() - activity_start_time,
+        )
+        set_span_attributes(
+            {
+                "tool_invocation_id": tool_invocation_id,
+                "tool.status": existing_status,
+                "tool.permission_status": payload.get("permission_status"),
+                "idempotent": True,
+            }
+        )
         return {
             "workflow_id": workflow_id,
             "tool_invocation_id": tool_invocation_id,
@@ -149,6 +168,22 @@ async def record_tool_invocation(payload: dict) -> dict:
 
     await publish_workflow_event(event_id)
     logger.info("tool invocation recorded", extra={"workflow_id": workflow_id, "tool_id": tool_id})
+    record_tool_invocation_metric(
+        tool_id=tool_id,
+        status=status,
+        permission_status=payload["permission_status"],
+        duration_seconds=perf_counter() - activity_start_time,
+    )
+    set_span_attributes(
+        {
+            "tool_invocation_id": tool_invocation_id,
+            "tool.status": status,
+            "tool.permission_status": payload["permission_status"],
+            "tool.input_validation_status": payload["input_validation_status"],
+            "tool.output_validation_status": payload["output_validation_status"],
+            "idempotent": False,
+        }
+    )
     return {
         "workflow_id": workflow_id,
         "tool_invocation_id": tool_invocation_id,

@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone
+from time import perf_counter
 from uuid import uuid4
 
 from sqlalchemy import select
@@ -19,6 +20,8 @@ from aegisflow_workflow_engine.persistence.models import (
     WorkflowRecord,
     WorkflowTimelineEntry,
 )
+from aegisflow_workflow_engine.metrics import record_approval_decision as record_approval_decision_metric
+from aegisflow_workflow_engine.telemetry import instrument_activity, set_span_attributes
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +29,14 @@ TERMINAL_DECISIONS = {"APPROVED", "REJECTED"}
 
 
 @activity.defn(name="record_approval_decision")
+@instrument_activity("record_approval_decision")
 async def record_approval_decision(payload: dict) -> dict:
     workflow_id = payload["workflow_id"]
     correlation_id = payload["correlation_id"]
     approval_id = payload["approval_id"]
     decision = payload["decision"]
     reviewed_by = payload["reviewed_by"]
+    activity_start_time = perf_counter()
     reviewed_at = _coerce_datetime(payload.get("reviewed_at")) or datetime.now(timezone.utc)
     now = datetime.now(timezone.utc)
 
@@ -133,6 +138,18 @@ async def record_approval_decision(payload: dict) -> dict:
 
     if existing_event_id is not None:
         await publish_workflow_event(existing_event_id)
+        record_approval_decision_metric(
+            decision=existing_decision or decision,
+            status="idempotent",
+            duration_seconds=perf_counter() - activity_start_time,
+        )
+        set_span_attributes(
+            {
+                "approval_id": approval_id,
+                "approval.decision": existing_decision,
+                "idempotent": True,
+            }
+        )
         return {
             "workflow_id": workflow_id,
             "approval_id": approval_id,
@@ -142,6 +159,19 @@ async def record_approval_decision(payload: dict) -> dict:
 
     await publish_workflow_event(event_id)
     logger.info("approval decision recorded", extra={"workflow_id": workflow_id, "approval_id": approval_id})
+    record_approval_decision_metric(
+        decision=decision,
+        status="recorded",
+        duration_seconds=perf_counter() - activity_start_time,
+    )
+    set_span_attributes(
+        {
+            "approval_id": approval_id,
+            "approval.decision": decision,
+            "reviewed_by": reviewed_by,
+            "idempotent": False,
+        }
+    )
     return {
         "workflow_id": workflow_id,
         "approval_id": approval_id,

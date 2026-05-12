@@ -9,12 +9,14 @@ class MortgageExceptionReviewWorkflow:
     async def run(self, payload: dict) -> dict:
         workflow_id = payload["workflow_id"]
         correlation_id = payload["correlation_id"]
+        trace_context = payload.get("trace_context", {})
 
         await workflow.execute_activity(
             "advance_workflow_state",
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "target_state": "INTAKE_IN_PROGRESS",
                 "transition_reason": "phase_3_start_intake_agent",
                 "message": "Workflow advanced to intake agent execution",
@@ -26,6 +28,7 @@ class MortgageExceptionReviewWorkflow:
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "agent_id": "intake_agent",
                 "workflow_state": "INTAKE_IN_PROGRESS",
             },
@@ -37,6 +40,7 @@ class MortgageExceptionReviewWorkflow:
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "target_state": intake_result["output"]["recommended_next_state"],
                 "transition_reason": "phase_3_intake_agent_validated",
                 "message": "Workflow advanced using validated intake agent output",
@@ -48,6 +52,7 @@ class MortgageExceptionReviewWorkflow:
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "agent_id": "document_analysis_agent",
                 "workflow_state": "DOCUMENT_ANALYSIS_PENDING",
             },
@@ -59,6 +64,7 @@ class MortgageExceptionReviewWorkflow:
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "target_state": document_result["output"]["recommended_next_state"],
                 "transition_reason": "phase_3_document_analysis_agent_validated",
                 "message": "Workflow advanced using validated document analysis agent output",
@@ -71,6 +77,7 @@ class MortgageExceptionReviewWorkflow:
             {
                 "workflow_id": workflow_id,
                 "correlation_id": correlation_id,
+                "trace_context": trace_context,
                 "target_state": "HUMAN_REVIEW_REQUIRED",
                 "transition_reason": "phase_3_human_review_required",
                 "message": "Workflow requires human review after governed agent execution",

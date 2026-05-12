@@ -28,3 +28,9 @@ scrape_configs:
     static_configs:
       - targets:
           - gateway-api:8000
+
+  - job_name: workflow-engine
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - workflow-engine:8030

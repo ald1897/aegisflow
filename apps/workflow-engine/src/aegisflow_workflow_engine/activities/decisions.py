@@ -7,6 +7,7 @@ from aegisflow_workflow_engine.activities.state_transitions import advance_workf
 from aegisflow_workflow_engine.domain import WorkflowState
 from aegisflow_workflow_engine.persistence.database import SessionLocal
 from aegisflow_workflow_engine.persistence.models import WorkflowRecord
+from aegisflow_workflow_engine.telemetry import instrument_activity, set_span_attributes
 
 
 DECISION_TO_STATE = {
@@ -16,6 +17,7 @@ DECISION_TO_STATE = {
 
 
 @activity.defn(name="apply_human_review_decision")
+@instrument_activity("apply_human_review_decision")
 async def apply_human_review_decision(payload: dict) -> dict:
     workflow_id = payload["workflow_id"]
     correlation_id = payload["correlation_id"]
@@ -58,6 +60,14 @@ async def apply_human_review_decision(payload: dict) -> dict:
         )
 
     final_state = await _get_workflow_state(workflow_id)
+    set_span_attributes(
+        {
+            "approval_id": payload["approval_id"],
+            "approval.decision": decision,
+            "workflow.final_state": final_state.value,
+            "idempotent": approval_result["idempotent"] and final_state == WorkflowState.completed,
+        }
+    )
     return {
         "workflow_id": workflow_id,
         "approval_id": payload["approval_id"],

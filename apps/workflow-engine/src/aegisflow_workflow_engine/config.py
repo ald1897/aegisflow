@@ -24,6 +24,7 @@ class Settings(BaseSettings):
         default="http://localhost:4318",
         validation_alias="OTEL_EXPORTER_OTLP_ENDPOINT",
     )
+    metrics_port: int = Field(default=8030, validation_alias="METRICS_PORT")
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

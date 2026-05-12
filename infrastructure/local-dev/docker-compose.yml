@@ -179,6 +179,9 @@ services:
       ENABLE_AGENT_RUNTIME: "true"
       ENABLE_TELEMETRY: "true"
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      METRICS_PORT: "8030"
+    ports:
+      - "8030:8030"
     depends_on:
       postgres:
         condition: service_healthy

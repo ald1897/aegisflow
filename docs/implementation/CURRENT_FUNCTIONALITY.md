@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, and Phase 3 capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, and initial Phase 4 capabilities:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -14,6 +14,9 @@ The current implementation includes Phase 1, Phase 2, and Phase 3 capabilities:
 - governed LangGraph agent runtime
 - structured agent output validation
 - agent execution record persistence
+- governed tool-runtime service boundary
+- approved tool registry and schema validation
+- deterministic mock tool execution
 
 ---
 
@@ -30,6 +33,7 @@ The local Docker Compose stack currently runs:
 - gateway-api
 - workflow-engine
 - agent-runtime
+- tool-runtime
 
 ---
 
@@ -86,6 +90,43 @@ POST /api/v1/agents/{agent_id}/executions
 ```
 
 The agent-runtime is an internal workflow participant. It does not approve, reject, complete, or mutate workflows directly.
+
+---
+
+## tool-runtime
+
+The tool-runtime currently supports governed internal tool execution for approved mock tools.
+
+It provides:
+- registered tool discovery
+- agent-to-tool permission enforcement
+- request schema validation
+- response schema validation
+- deterministic mock tool handlers
+- replay-safe invocation telemetry
+- masked and synthetic operational outputs
+
+Implemented tools:
+- `borrower_profile_lookup`
+- `document_fetch`
+- `fraud_signal_lookup`
+
+Implemented endpoints:
+
+```text
+GET /health
+GET /ready
+GET /api/v1/tools
+POST /api/v1/tools/{tool_id}/invocations
+```
+
+The tool-runtime is an internal mediation boundary. It does not mutate workflow state, approve mortgage actions, expose arbitrary tools, or call production mortgage systems.
+
+Current Phase 4 limitation:
+- tool invocations are not yet persisted in Postgres
+- tool invocation events are not yet emitted through the outbox model
+- agent-runtime does not yet invoke tool-runtime during workflow execution
+- gateway-api does not yet expose workflow tool invocation history
 
 ---
 
@@ -176,7 +217,10 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- tool-runtime mediation
+- workflow-integrated tool invocation persistence
+- tool invocation event publication
+- agent-runtime tool usage during workflow execution
+- workflow tool invocation retrieval API
 - human approval UI
 - approve/reject actions
 - workflow completion after human review
@@ -248,6 +292,7 @@ Expected services:
 - `aegisflow-gateway-api`
 - `aegisflow-workflow-engine`
 - `aegisflow-agent-runtime`
+- `aegisflow-tool-runtime`
 
 ---
 
@@ -513,6 +558,22 @@ Expected result:
 
 ```text
 5 passed
+```
+
+---
+
+## tool-runtime Tests
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -v "${PWD}\apps\tool-runtime\tests:/app/tests" `
+  tool-runtime sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected result:
+
+```text
+7 passed
 ```
 
 ---

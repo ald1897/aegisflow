@@ -455,43 +455,43 @@ Tool results must not directly mutate workflow state.
 
 ## Workstream 1 - Tool Runtime Service
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- create `apps/tool-runtime`
-- add FastAPI application
-- add service configuration
-- add Dockerfile
-- add health endpoint
-- add readiness endpoint
-- add tool registry endpoint
-- add tool invocation endpoint
-- add unit tests
+- create `apps/tool-runtime` - Complete
+- add FastAPI application - Complete
+- add service configuration - Complete
+- add Dockerfile - Complete
+- add health endpoint - Complete
+- add readiness endpoint - Complete
+- add tool registry endpoint - Complete
+- add tool invocation endpoint - Complete
+- add unit tests - Complete
 
 Completion criteria:
-- service builds in Docker
-- service starts locally on port `8020`
-- tests validate tool registry and invocation behavior
+- service builds in Docker - Met
+- service starts locally on port `8020` - Met
+- tests validate tool registry and invocation behavior - Met
 
 ---
 
 ## Workstream 2 - Tool Registry And Contracts
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define tool registry model
-- define tool permission model
-- define request and response schemas
-- implement input validation
-- implement output validation
-- define deterministic mock handlers
+- define tool registry model - Complete
+- define tool permission model - Complete
+- define request and response schemas - Complete
+- implement input validation - Complete
+- implement output validation - Complete
+- define deterministic mock handlers - Complete
 
 Completion criteria:
-- each initial tool has explicit input and output schemas
-- invalid input fails safely
-- unregistered tool invocation is rejected
-- unauthorized agent-to-tool pairing is rejected
+- each initial tool has explicit input and output schemas - Met
+- invalid input fails safely - Met
+- unregistered tool invocation is rejected - Met
+- unauthorized agent-to-tool pairing is rejected - Met
 
 ---
 
@@ -713,6 +713,26 @@ Status:
 
 Next step:
 - implement Workstream 1: Tool Runtime Service
+
+## 2026-05-12
+
+Status:
+- implemented `tool-runtime` as a dedicated FastAPI service
+- added Docker Compose support for local execution on port `8020`
+- implemented health, readiness, tool registry, and governed invocation endpoints
+- implemented explicit tool registry entries for `borrower_profile_lookup`, `document_fetch`, and `fraud_signal_lookup`
+- implemented agent-to-tool permission enforcement
+- implemented input and output schema validation for all initial tools
+- implemented deterministic mock tool handlers using synthetic and masked operational data
+- validated local service startup, readiness, tool discovery, and borrower profile invocation through HTTP
+- validated tool-runtime automated tests with 7 passing tests
+
+Completed workstreams:
+- Workstream 1 - Tool Runtime Service
+- Workstream 2 - Tool Registry And Contracts
+
+Next step:
+- implement Workstream 3: Persistence And Events
 
 ---
 

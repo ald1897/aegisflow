@@ -99,6 +99,17 @@ services:
     ports:
       - "8010:8010"
 
+  tool-runtime:
+    build:
+      context: ../../apps/tool-runtime
+    container_name: aegisflow-tool-runtime
+    environment:
+      SERVICE_NAME: tool-runtime
+      ENVIRONMENT: local
+      LOG_LEVEL: INFO
+    ports:
+      - "8020:8020"
+
   temporal:
     image: temporalio/auto-setup:1.24.2
     container_name: aegisflow-temporal

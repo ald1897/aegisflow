@@ -60,6 +60,8 @@ The platform can currently:
 - start durable Temporal workflow execution
 - advance the workflow through controlled operational states
 - invoke governed intake and document analysis agents
+- expose a governed tool-runtime service for approved mock tool execution
+- enforce tool permissions and schema validation at the tool-runtime boundary
 - persist validated agent execution records
 - stop at `HUMAN_REVIEW_REQUIRED`
 - record workflow timeline entries
@@ -73,6 +75,7 @@ Current business capability:
 
 Current business boundary:
 - AegisFlow performs local deterministic document analysis simulation for workflow demonstration, not production document interpretation.
+- AegisFlow can execute synthetic mock tool calls through a governed service boundary, but those calls are not yet part of the end-to-end workflow path.
 - AegisFlow is not yet making approval, denial, underwriting, or exception decisions.
 - AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
 - AegisFlow does not yet provide an operator-facing review console.
@@ -147,6 +150,11 @@ The platform currently supports:
 - Temporal workflow execution
 - deterministic workflow state progression
 - governed LangGraph agent execution
+- governed tool-runtime service startup
+- approved tool registry
+- tool input and output schema validation
+- agent-to-tool permission enforcement
+- deterministic mock tool execution
 - structured agent output validation
 - agent execution record persistence
 - workflow timeline retrieval
@@ -159,10 +167,12 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation and the initial Phase 4 tool-runtime service boundary.
 
 The platform does not yet implement:
-- tool-runtime mediation
+- workflow-integrated tool invocation persistence
+- agent-runtime tool usage during workflow execution
+- workflow tool invocation retrieval
 - human review UI
 - approval workflows
 - distributed tracing
@@ -305,6 +315,48 @@ Validation completed:
 - local end-to-end workflow validation reached `HUMAN_REVIEW_REQUIRED`
 - timeline contained `AGENT_EXECUTION_COMPLETED` entries
 - persisted agent execution records contained `intake_agent` and `document_analysis_agent` with `VALIDATED` status
+
+---
+
+## Phase 4 - Tool Runtime MVP
+
+Status: In Progress
+
+Implementation started: 2026-05-12
+
+Completed deliverables:
+- tool-runtime FastAPI service
+- Docker Compose service definition for local execution on port `8020`
+- tool-runtime health and readiness endpoints
+- approved tool registry endpoint
+- governed tool invocation endpoint
+- `borrower_profile_lookup` mock tool
+- `document_fetch` mock tool
+- `fraud_signal_lookup` mock tool
+- agent-to-tool permission enforcement
+- input and output schema validation
+- deterministic synthetic and masked tool outputs
+- replay-safe invocation telemetry metadata
+
+Explicit non-scope for completed increment:
+- tool invocation persistence
+- workflow timeline entries for tool invocation activity
+- tool invocation outbox events
+- agent-runtime integration with tool-runtime
+- gateway-api workflow tool invocation retrieval
+- real mortgage system connectivity
+
+Validation completed:
+- tool-runtime Docker image built successfully
+- tool-runtime started locally on port `8020`
+- health endpoint returned `ok`
+- readiness endpoint returned `ok` with 3 registered tools
+- tool registry endpoint returned approved tool definitions
+- borrower profile lookup invocation completed with authorized access and validated input/output
+- tool-runtime pytest suite passed with 7 tests
+
+Next deliverable:
+- Workstream 3 - Persistence And Events
 
 ---
 

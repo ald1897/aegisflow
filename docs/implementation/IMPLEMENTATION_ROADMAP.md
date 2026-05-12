@@ -900,6 +900,14 @@ Implement production-grade observability.
 
 ---
 
+Detailed continuous implementation planning is tracked in:
+
+```text
+docs/implementation/PHASE_6_IMPLEMENTATION_PLAN.md
+```
+
+---
+
 # Goals
 
 Implement:

@@ -774,6 +774,12 @@ Agents should:
 
 Implement operational governance interfaces.
 
+Detailed continuous implementation planning is tracked in:
+
+```text
+docs/implementation/PHASE_5_IMPLEMENTATION_PLAN.md
+```
+
 ---
 
 # Goals

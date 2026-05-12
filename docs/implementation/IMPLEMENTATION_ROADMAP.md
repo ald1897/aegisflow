@@ -134,6 +134,7 @@ The following phases have been completed in the local implementation:
 - Phase 1 - Local Runtime Foundation
 - Phase 2 - Workflow Engine MVP
 - Phase 3 - Agent Runtime MVP
+- Phase 4 - Tool Runtime MVP
 
 ---
 
@@ -177,7 +178,7 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, workflow-engine persistence of agent-produced tool invocation telemetry, and gateway-api retrieval of workflow tool invocation history.
+The current implementation includes the Phase 3 governed agent runtime foundation, the Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, agent-runtime integration with approved tools, workflow-engine persistence of agent-produced tool invocation telemetry, and gateway-api retrieval of workflow tool invocation history.
 
 The platform does not yet implement:
 - human review UI
@@ -327,9 +328,11 @@ Validation completed:
 
 ## Phase 4 - Tool Runtime MVP
 
-Status: In Progress
+Status: Completed
 
 Implementation started: 2026-05-12
+
+Completion date: 2026-05-12
 
 Completed deliverables:
 - tool-runtime FastAPI service
@@ -385,7 +388,7 @@ Validation completed:
 - local gateway-api retrieval returned persisted `borrower_profile_lookup` and `document_fetch` records for a workflow
 
 Next deliverable:
-- Workstream 7 - Documentation And Roadmap Updates
+- Phase 5 - Human Review UI
 
 ---
 

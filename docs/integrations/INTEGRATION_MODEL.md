@@ -283,6 +283,36 @@ The tool-runtime is responsible for:
 
 ---
 
+# Implemented Local Tool Runtime Boundary
+
+The local Phase 4 implementation provides a governed tool-runtime service for deterministic mock integrations.
+
+Implemented endpoints:
+
+```text
+GET /health
+GET /ready
+GET /api/v1/tools
+POST /api/v1/tools/{tool_id}/invocations
+```
+
+Implemented tools:
+- `borrower_profile_lookup`
+- `document_fetch`
+- `fraud_signal_lookup`
+
+The implemented local boundary enforces:
+- registered tools only
+- agent-to-tool permission checks
+- input schema validation
+- output schema validation
+- replay-safe telemetry metadata
+- synthetic and masked operational data
+
+The local implementation does not connect to production mortgage systems.
+
+---
+
 # Tool Invocation Flow
 
 ```text

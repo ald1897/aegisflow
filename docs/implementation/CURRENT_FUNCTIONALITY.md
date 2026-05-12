@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, and initial Phase 4 capabilities:
+The current implementation includes Phase 1, Phase 2, Phase 3, and Phase 4 capabilities:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -96,7 +96,7 @@ POST /api/v1/agents/{agent_id}/executions
 
 The agent-runtime is an internal workflow participant. It does not approve, reject, complete, or mutate workflows directly.
 
-Current Phase 4 agent-runtime capability:
+Implemented Phase 4 agent-runtime capability:
 - agents can request approved tools through tool-runtime when `ENABLE_TOOL_RUNTIME` is enabled
 - agent outputs remain schema-validated after tool context is used
 - agent execution telemetry includes tool invocation references
@@ -133,7 +133,7 @@ POST /api/v1/tools/{tool_id}/invocations
 
 The tool-runtime is an internal mediation boundary. It does not mutate workflow state, approve mortgage actions, expose arbitrary tools, or call production mortgage systems.
 
-Current Phase 4 capability:
+Implemented Phase 4 gateway capability:
 - gateway-api exposes workflow tool invocation history through a DTO-based query endpoint
 
 ---
@@ -421,7 +421,7 @@ Expected result:
 
 ---
 
-## 7. Run Tool Runtime Ready
+## 8. Run Tool Runtime Ready
 
 Run the Postman request:
 
@@ -437,7 +437,7 @@ Expected result:
 
 ---
 
-## 8. List Registered Tools
+## 9. List Registered Tools
 
 Run the Postman request:
 
@@ -453,7 +453,7 @@ Expected result:
 
 ---
 
-## 9. Invoke Governed Tools Directly
+## 10. Invoke Governed Tools Directly
 
 Run the following Postman requests:
 
@@ -472,7 +472,7 @@ Expected result:
 
 ---
 
-## 10. Create A Workflow
+## 11. Create A Workflow
 
 Run the Postman request:
 
@@ -493,7 +493,7 @@ The request test script stores the created `workflow_id` as the `workflowId` col
 
 ---
 
-## 11. Poll Workflow Progression
+## 12. Poll Workflow Progression
 
 Run the Postman request:
 
@@ -522,7 +522,7 @@ HUMAN_REVIEW_REQUIRED
 
 ---
 
-## 12. Retrieve The Workflow Timeline
+## 13. Retrieve The Workflow Timeline
 
 Run the Postman request:
 
@@ -542,7 +542,7 @@ Expected timeline entries include:
 
 ---
 
-## 13. Retrieve Workflow Agent Executions
+## 14. Retrieve Workflow Agent Executions
 
 Run the Postman request:
 
@@ -560,7 +560,7 @@ Expected result:
 
 ---
 
-## 14. Retrieve Workflow Tool Invocations
+## 15. Retrieve Workflow Tool Invocations
 
 Run the Postman request:
 
@@ -578,7 +578,7 @@ Expected result:
 
 ---
 
-## 15. Validate Missing Workflow Behavior
+## 16. Validate Missing Workflow Behavior
 
 Run the Postman request:
 
@@ -592,7 +592,7 @@ Expected result:
 
 ---
 
-## 16. Run The Collection
+## 17. Run The Collection
 
 The collection can be run end-to-end in Postman Collection Runner.
 
@@ -616,7 +616,7 @@ Recommended request order:
 
 ---
 
-## 17. Open Temporal UI
+## 18. Open Temporal UI
 
 Open:
 
@@ -632,7 +632,7 @@ Expected:
 
 ---
 
-## 18. Manual Validation Coverage
+## 19. Manual Validation Coverage
 
 The Postman collection validates:
 - gateway health and readiness

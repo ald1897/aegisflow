@@ -321,6 +321,28 @@ Every tool invocation must validate:
 
 ---
 
+# Implemented Local Tool Controls
+
+The local Phase 4 implementation enforces tool controls at the tool-runtime boundary.
+
+Current enforced controls:
+- only registered tools can be invoked
+- each tool declares allowed agents
+- requests must match the registered input schema
+- responses must match the registered output schema
+- tool outputs use synthetic and masked data
+- tool invocation telemetry carries correlation metadata
+
+Current local tool access:
+- `intake_agent` may invoke `borrower_profile_lookup`
+- `document_analysis_agent` may invoke `document_fetch`
+- `document_analysis_agent` may invoke `fraud_signal_lookup`
+
+Tool output remains supporting context only.
+Tool output must not approve, deny, complete, or otherwise decide a mortgage workflow.
+
+---
+
 # Tool Constraints
 
 Tools should:

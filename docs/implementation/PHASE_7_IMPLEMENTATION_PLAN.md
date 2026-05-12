@@ -492,21 +492,21 @@ Completion criteria:
 
 ## Workstream 4 - Judge Model Boundary
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define LLM-as-judge evaluator interface and result schema
-- add evaluator ID, evaluator version, rubric ID, and rubric version metadata
-- implement deterministic local fallback judge for tests and local validation
-- add configuration switch for external judge model enablement, defaulting to disabled
-- document provider integration as future work unless explicitly enabled
-- add tests proving default local validation does not call external models
+- define LLM-as-judge evaluator interface and result schema - Complete
+- add evaluator ID, evaluator version, rubric ID, and rubric version metadata - Complete
+- implement deterministic local fallback judge for tests and local validation - Complete
+- add configuration switch for external judge model enablement, defaulting to disabled - Complete
+- document provider integration as future work unless explicitly enabled - Complete
+- add tests proving default local validation does not call external models - Complete
 
 Completion criteria:
-- judge-style scoring has a stable internal contract
-- external model judging is disabled by default
-- local tests can exercise judge result persistence deterministically
-- sensitive prompt, document, borrower, and full-output payloads are not persisted by judge results
+- judge-style scoring has a stable internal contract - Met
+- external model judging is disabled by default - Met
+- local tests can exercise judge result persistence deterministically - Met
+- sensitive prompt, document, borrower, and full-output payloads are not persisted by judge results - Met
 
 ---
 
@@ -828,6 +828,31 @@ Boundary:
 
 Next step:
 - implement Workstream 4: Judge Model Boundary
+
+## 2026-05-12 - Workstream 4
+
+Status:
+- added the internal judge-model evaluator protocol and request/result contract
+- added explicit evaluator ID, evaluator version, rubric ID, and rubric version metadata for judge-style scores
+- added deterministic local judge fallback for reproducible local validation
+- added `ENABLE_EXTERNAL_JUDGE_MODEL` and `EXTERNAL_JUDGE_MODEL_PROVIDER` settings, with external judging disabled by default
+- added an external judge boundary that fails closed when disabled and keeps provider integration as future work
+- converted judge results into existing evaluation result records for deterministic persistence
+- added tests for default-disabled external judging, fallback PASS/WARN/FAIL behavior, bounded metadata, and judge result persistence
+- rebuilt the evaluation-service image
+- validated evaluation-service automated tests with 26 passing tests
+
+Completed workstream:
+- Workstream 4 - Judge Model Boundary
+
+Boundary:
+- no external model provider is called by default
+- judge-style scoring is an evaluation quality signal only and does not mutate workflow state or affect mortgage decisions
+- run orchestration endpoints, workflow evidence loading, dataset scoring, gateway/Postman coverage, and dashboards remain assigned to later workstreams
+- judge result metadata stores rubric references and bounded scoring context, not prompt content, raw documents, borrower PII, secrets, or full model outputs
+
+Next step:
+- implement Workstream 5: Evaluation Run Orchestration
 
 ---
 

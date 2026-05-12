@@ -276,6 +276,23 @@ LLM-as-judge systems provide automated qualitative evaluation of:
 
 ---
 
+# Implemented Local Judge Boundary
+
+The Phase 7 local implementation defines a judge-model boundary without enabling external model calls by default.
+
+Implemented behavior:
+- judge requests use bounded workflow evidence and optional expectations
+- judge results include evaluator ID, evaluator version, rubric ID, rubric version, score name, score value, status, severity, rationale, and bounded metadata
+- `ENABLE_EXTERNAL_JUDGE_MODEL` defaults to disabled
+- local validation uses a deterministic fallback judge for reproducible PASS, WARN, and FAIL results
+- external provider integration is future work and must be explicitly enabled before any provider path is used
+
+Judge results are evaluation quality signals only. They do not approve, reject, complete, or mutate workflows.
+
+Judge metadata must not persist prompt content, raw document contents, borrower PII, secrets, approval comments, or full model outputs.
+
+---
+
 # Evaluation Principles
 
 Judge models should:

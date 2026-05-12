@@ -72,13 +72,15 @@ It provides:
 - agent registry lookup
 - versioned prompt loading
 - deterministic local prompt execution simulation
+- governed tool-runtime client support
+- agent-to-tool permission metadata
 - structured output validation
 - confidence metadata
 - human review requirement metadata
 
 Implemented agents:
-- `intake_agent`
-- `document_analysis_agent`
+- `intake_agent` with approved access to `borrower_profile_lookup`
+- `document_analysis_agent` with approved access to `document_fetch`
 
 Implemented endpoints:
 
@@ -90,6 +92,12 @@ POST /api/v1/agents/{agent_id}/executions
 ```
 
 The agent-runtime is an internal workflow participant. It does not approve, reject, complete, or mutate workflows directly.
+
+Current Phase 4 agent-runtime capability:
+- agents can request approved tools through tool-runtime when `ENABLE_TOOL_RUNTIME` is enabled
+- agent outputs remain schema-validated after tool context is used
+- agent execution telemetry includes tool invocation references
+- tool failures degrade safely without granting agents decision authority
 
 ---
 
@@ -123,9 +131,8 @@ POST /api/v1/tools/{tool_id}/invocations
 The tool-runtime is an internal mediation boundary. It does not mutate workflow state, approve mortgage actions, expose arbitrary tools, or call production mortgage systems.
 
 Current Phase 4 limitation:
-- agent-runtime does not yet invoke tool-runtime during workflow execution
 - gateway-api does not yet expose workflow tool invocation history
-- normal workflow execution does not yet produce tool invocation records
+- workflow-engine does not yet persist agent-produced tool invocation telemetry into `tool_invocation_records`
 
 ---
 
@@ -234,7 +241,7 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- agent-runtime tool usage during workflow execution
+- workflow-engine persistence of agent-produced tool invocation telemetry
 - workflow tool invocation retrieval API
 - human approval UI
 - approve/reject actions
@@ -572,7 +579,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-5 passed
+7 passed
 ```
 
 ---

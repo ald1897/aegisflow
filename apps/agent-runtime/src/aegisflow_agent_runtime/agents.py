@@ -1,4 +1,5 @@
-from typing import Any, TypedDict
+from collections.abc import Callable
+from typing import Any, Protocol, TypedDict
 from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
@@ -14,13 +15,28 @@ from aegisflow_agent_runtime.schemas import (
     DocumentAnalysisAgentOutput,
     IntakeAgentOutput,
 )
+from aegisflow_agent_runtime.tools import ToolInvocationContext, ToolRuntimeClient, ToolRuntimeError
 
 
 class AgentGraphState(TypedDict, total=False):
     request: AgentExecutionRequest
     prompt: PromptAsset
+    tool_context: dict[str, ToolInvocationContext]
     output: dict[str, Any]
     validation_status: str
+
+
+class ToolClient(Protocol):
+    def invoke(
+        self,
+        *,
+        tool_id: str,
+        agent_id: str,
+        agent_execution_id: str,
+        request: AgentExecutionRequest,
+        input_payload: dict[str, Any],
+    ) -> ToolInvocationContext | None:
+        pass
 
 
 class AgentNotFoundError(Exception):
@@ -31,9 +47,14 @@ class UnsupportedWorkflowStateError(Exception):
     pass
 
 
+class UnauthorizedToolRequestError(Exception):
+    pass
+
+
 class AgentRuntime:
-    def __init__(self, prompt_registry: PromptRegistry) -> None:
+    def __init__(self, prompt_registry: PromptRegistry, tool_client: ToolClient | None = None) -> None:
         self.prompt_registry = prompt_registry
+        self.tool_client = tool_client or ToolRuntimeClient("http://localhost:8020", enabled=False)
 
     def list_agents(self) -> list:
         return list(AGENT_REGISTRY.values())
@@ -49,13 +70,20 @@ class AgentRuntime:
             )
 
         prompt = self.prompt_registry.load(registry_entry.prompt_id, registry_entry.prompt_version)
+        execution_id = str(uuid4())
+        tool_context = self._collect_tool_context(
+            agent_id=agent_id,
+            allowed_tools=registry_entry.allowed_tools,
+            agent_execution_id=execution_id,
+            request=request,
+        )
         output_model, generator = self._agent_definition(agent_id)
         graph = self._build_graph(generator=generator, output_model=output_model)
-        result = graph.invoke({"request": request, "prompt": prompt})
+        result = graph.invoke({"request": request, "prompt": prompt, "tool_context": tool_context})
         output = result["output"]
 
         return AgentExecutionResponse(
-            execution_id=str(uuid4()),
+            execution_id=execution_id,
             agent_id=agent_id,
             status=AgentExecutionStatus.completed,
             validation_status=AgentValidationStatus.validated,
@@ -71,10 +99,27 @@ class AgentRuntime:
                 "workflow_state": request.workflow_state,
                 "prompt_path": str(prompt.path),
                 "allowed_tools": registry_entry.allowed_tools,
+                "tool_invocations": [
+                    {
+                        "tool_invocation_id": invocation.tool_invocation_id,
+                        "tool_id": invocation.tool_id,
+                        "status": invocation.status,
+                        "permission_status": invocation.permission_status,
+                        "input_validation_status": invocation.input_validation_status,
+                        "output_validation_status": invocation.output_validation_status,
+                        "telemetry": invocation.telemetry,
+                    }
+                    for invocation in tool_context.values()
+                ],
             },
         )
 
-    def _build_graph(self, *, generator, output_model: type[BaseModel]):
+    def _build_graph(
+        self,
+        *,
+        generator: Callable[[AgentExecutionRequest, PromptAsset, dict[str, ToolInvocationContext]], BaseModel],
+        output_model: type[BaseModel],
+    ):
         graph = StateGraph(AgentGraphState)
 
         def assemble_context(state: AgentGraphState) -> AgentGraphState:
@@ -83,7 +128,7 @@ class AgentRuntime:
         def execute_agent(state: AgentGraphState) -> AgentGraphState:
             request = state["request"]
             prompt = state["prompt"]
-            state["output"] = generator(request, prompt).model_dump()
+            state["output"] = generator(request, prompt, state.get("tool_context", {})).model_dump()
             return state
 
         def validate_output(state: AgentGraphState) -> AgentGraphState:
@@ -101,6 +146,33 @@ class AgentRuntime:
         graph.add_edge("validate_output", END)
         return graph.compile()
 
+    def _collect_tool_context(
+        self,
+        *,
+        agent_id: str,
+        allowed_tools: list[str],
+        agent_execution_id: str,
+        request: AgentExecutionRequest,
+    ) -> dict[str, ToolInvocationContext]:
+        tool_requests = _tool_requests_for_agent(agent_id, request)
+        context: dict[str, ToolInvocationContext] = {}
+        for tool_id, input_payload in tool_requests.items():
+            if tool_id not in allowed_tools:
+                raise UnauthorizedToolRequestError(f"{agent_id} is not allowed to invoke {tool_id}")
+            try:
+                invocation = self.tool_client.invoke(
+                    tool_id=tool_id,
+                    agent_id=agent_id,
+                    agent_execution_id=agent_execution_id,
+                    request=request,
+                    input_payload=input_payload,
+                )
+            except ToolRuntimeError:
+                continue
+            if invocation is not None:
+                context[tool_id] = invocation
+        return context
+
     def _agent_definition(self, agent_id: str):
         if agent_id == "intake_agent":
             return IntakeAgentOutput, _execute_intake_agent
@@ -109,9 +181,41 @@ class AgentRuntime:
         raise AgentNotFoundError(agent_id)
 
 
-def _execute_intake_agent(request: AgentExecutionRequest, prompt: PromptAsset) -> IntakeAgentOutput:
+def _tool_requests_for_agent(
+    agent_id: str,
+    request: AgentExecutionRequest,
+) -> dict[str, dict[str, Any]]:
+    case_reference = request.metadata.get("case_reference")
+    if not case_reference:
+        return {}
+    if agent_id == "intake_agent":
+        return {
+            "borrower_profile_lookup": {
+                "workflow_id": request.workflow_id,
+                "correlation_id": request.correlation_id,
+                "case_reference": case_reference,
+            }
+        }
+    if agent_id == "document_analysis_agent":
+        return {
+            "document_fetch": {
+                "workflow_id": request.workflow_id,
+                "correlation_id": request.correlation_id,
+                "case_reference": case_reference,
+                "requested_document_types": ["income_verification", "exception_rationale"],
+            }
+        }
+    return {}
+
+
+def _execute_intake_agent(
+    request: AgentExecutionRequest,
+    prompt: PromptAsset,
+    tool_context: dict[str, ToolInvocationContext],
+) -> IntakeAgentOutput:
     del prompt
     case_reference = request.metadata.get("case_reference")
+    borrower_profile = tool_context.get("borrower_profile_lookup")
     missing_fields = [
         field_name
         for field_name in ("case_reference", "channel")
@@ -125,7 +229,7 @@ def _execute_intake_agent(request: AgentExecutionRequest, prompt: PromptAsset) -
         missing_fields=missing_fields,
         recommended_next_state="DOCUMENT_ANALYSIS_PENDING",
         summary=(
-            "Mortgage exception intake contains enough routing context for document analysis."
+            _intake_summary(borrower_profile)
             if ready
             else "Mortgage exception intake is missing required routing context; downstream review must preserve human oversight."
         ),
@@ -137,11 +241,16 @@ def _execute_intake_agent(request: AgentExecutionRequest, prompt: PromptAsset) -
 def _execute_document_analysis_agent(
     request: AgentExecutionRequest,
     prompt: PromptAsset,
+    tool_context: dict[str, ToolInvocationContext],
 ) -> DocumentAnalysisAgentOutput:
     del prompt
+    document_fetch = tool_context.get("document_fetch")
     provided_documents = set(request.metadata.get("documents", []))
     required_documents = {"income_verification", "exception_rationale"}
-    missing_documents = sorted(required_documents - provided_documents)
+    available_documents = set(provided_documents)
+    if document_fetch is not None:
+        available_documents.update(document_fetch.output.get("available_document_types", []))
+    missing_documents = sorted(required_documents - available_documents)
     complete = not missing_documents
     risk_flags = [] if complete else ["missing_supporting_documentation"]
     return DocumentAnalysisAgentOutput(
@@ -155,10 +264,31 @@ def _execute_document_analysis_agent(
         risk_level="LOW" if complete else "MEDIUM",
         recommended_next_state="RISK_REVIEW_PENDING",
         summary=(
-            "Document metadata appears sufficient for risk review preparation."
+            _document_summary(document_fetch)
             if complete
             else "Document metadata indicates missing support; risk review should preserve human oversight."
         ),
         confidence_score=0.88 if complete else 0.83,
         requires_human_review=True,
+    )
+
+
+def _intake_summary(invocation: ToolInvocationContext | None) -> str:
+    if invocation is None:
+        return "Mortgage exception intake contains enough routing context for document analysis."
+    profile_status = invocation.output.get("profile_status", "UNKNOWN")
+    profile_completeness = invocation.output.get("profile_completeness", "UNKNOWN")
+    return (
+        "Mortgage exception intake contains enough routing context for document analysis. "
+        f"Governed borrower profile context returned {profile_status} with {profile_completeness} completeness."
+    )
+
+
+def _document_summary(invocation: ToolInvocationContext | None) -> str:
+    if invocation is None:
+        return "Document metadata appears sufficient for risk review preparation."
+    available = invocation.output.get("available_document_types", [])
+    return (
+        "Document metadata appears sufficient for risk review preparation. "
+        f"Governed document metadata lookup returned {len(available)} available required document types."
     )

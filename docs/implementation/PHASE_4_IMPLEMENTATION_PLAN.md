@@ -517,21 +517,21 @@ Completion criteria:
 
 ## Workstream 4 - Agent Runtime Integration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add tool-runtime client to agent-runtime
-- add tool access metadata to agent registry
-- update intake agent to request `borrower_profile_lookup`
-- update document analysis agent to request `document_fetch`
-- include tool invocation references in agent execution telemetry
-- preserve structured output validation
+- add tool-runtime client to agent-runtime - Complete
+- add tool access metadata to agent registry - Complete
+- update intake agent to request `borrower_profile_lookup` - Complete
+- update document analysis agent to request `document_fetch` - Complete
+- include tool invocation references in agent execution telemetry - Complete
+- preserve structured output validation - Complete
 
 Completion criteria:
-- agents only call tools listed in their registry permissions
-- agent outputs remain schema-valid
-- tool failures degrade safely
-- agent execution records retain tool context references
+- agents only call tools listed in their registry permissions - Met
+- agent outputs remain schema-valid - Met
+- tool failures degrade safely - Met
+- agent execution records retain tool context references - Met
 
 ---
 
@@ -758,6 +758,32 @@ Boundary:
 
 Next step:
 - implement Workstream 4: Agent Runtime Integration
+
+## 2026-05-12 - Workstream 4
+
+Status:
+- added agent-runtime tool client configuration for `TOOL_RUNTIME_URL` and `ENABLE_TOOL_RUNTIME`
+- added governed tool-runtime client to agent-runtime
+- updated agent registry tool permissions for `intake_agent` and `document_analysis_agent`
+- updated `intake_agent` to request `borrower_profile_lookup`
+- updated `document_analysis_agent` to request `document_fetch`
+- preserved registered tool access only; dynamic tool discovery remains prohibited
+- added tool invocation references to agent execution telemetry
+- preserved structured Pydantic output validation after tool context use
+- wired local Docker Compose agent-runtime to tool-runtime
+- validated agent-runtime automated tests with 7 passing tests
+- validated live agent-runtime HTTP execution against tool-runtime for intake and document analysis agents
+
+Completed workstream:
+- Workstream 4 - Agent Runtime Integration
+
+Boundary:
+- workflow-engine does not yet record agent-produced tool invocation telemetry into `tool_invocation_records`
+- standard Mortgage Exception Review execution can receive agent telemetry with tool references, but Workstream 5 must connect that telemetry to workflow persistence
+- gateway-api workflow tool invocation retrieval remains assigned to Workstream 6
+
+Next step:
+- implement Workstream 5: Workflow Integration
 
 ---
 

@@ -96,8 +96,13 @@ services:
       ENVIRONMENT: local
       LOG_LEVEL: INFO
       PROMPTS_PATH: /app/prompts
+      TOOL_RUNTIME_URL: http://tool-runtime:8020
+      ENABLE_TOOL_RUNTIME: "true"
     ports:
       - "8010:8010"
+    depends_on:
+      tool-runtime:
+        condition: service_started
 
   tool-runtime:
     build:

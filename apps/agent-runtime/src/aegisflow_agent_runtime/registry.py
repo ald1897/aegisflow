@@ -9,7 +9,7 @@ AGENT_REGISTRY: dict[str, AgentRegistryEntry] = {
         prompt_id="intake-agent",
         prompt_version="1",
         supported_workflow_states=["INTAKE_IN_PROGRESS"],
-        allowed_tools=[],
+        allowed_tools=["borrower_profile_lookup"],
         confidence_threshold=0.75,
     ),
     "document_analysis_agent": AgentRegistryEntry(
@@ -19,7 +19,7 @@ AGENT_REGISTRY: dict[str, AgentRegistryEntry] = {
         prompt_id="document-analysis-agent",
         prompt_version="1",
         supported_workflow_states=["DOCUMENT_ANALYSIS_PENDING"],
-        allowed_tools=[],
+        allowed_tools=["document_fetch"],
         confidence_threshold=0.80,
     ),
 }

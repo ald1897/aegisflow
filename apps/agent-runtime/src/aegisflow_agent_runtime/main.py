@@ -14,10 +14,14 @@ from aegisflow_agent_runtime.schemas import (
     AgentExecutionResponse,
     AgentRegistryResponse,
 )
+from aegisflow_agent_runtime.tools import ToolRuntimeClient
 
 
 def get_agent_runtime(settings: Settings = Depends(get_settings)) -> AgentRuntime:
-    return AgentRuntime(PromptRegistry(settings.prompts_path))
+    return AgentRuntime(
+        PromptRegistry(settings.prompts_path),
+        ToolRuntimeClient(settings.tool_runtime_url, enabled=settings.enable_tool_runtime),
+    )
 
 
 def create_app() -> FastAPI:

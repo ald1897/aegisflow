@@ -154,6 +154,9 @@ The platform currently supports:
 - approved tool registry
 - tool input and output schema validation
 - agent-to-tool permission enforcement
+- agent-runtime tool-runtime client integration
+- intake agent borrower profile lookup support
+- document analysis agent document metadata lookup support
 - deterministic mock tool execution
 - tool invocation persistence table
 - workflow-engine tool invocation recording activity
@@ -170,10 +173,10 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, and Phase 4 persistence support for tool invocation records.
+The current implementation includes the Phase 3 governed agent runtime foundation, the initial Phase 4 tool-runtime service boundary, Phase 4 persistence support for tool invocation records, and agent-runtime integration with approved tools.
 
 The platform does not yet implement:
-- agent-runtime tool usage during workflow execution
+- workflow-engine persistence of agent-produced tool invocation telemetry
 - workflow tool invocation retrieval
 - human review UI
 - approval workflows
@@ -344,9 +347,13 @@ Completed deliverables:
 - tool invocation timeline entry support
 - `tool.invocation_completed` and `tool.invocation_failed` outbox event support
 - idempotent tool invocation record writes
+- agent-runtime tool client configuration
+- intake agent invocation of `borrower_profile_lookup`
+- document analysis agent invocation of `document_fetch`
+- agent execution telemetry references to tool invocations
 
 Explicit non-scope for completed increments:
-- agent-runtime integration with tool-runtime
+- workflow-engine persistence of agent-produced tool invocation telemetry
 - gateway-api workflow tool invocation retrieval
 - real mortgage system connectivity
 
@@ -362,9 +369,11 @@ Validation completed:
 - local Postgres table validation confirmed `tool_invocation_records`
 - gateway-api pytest suite passed with 8 tests
 - workflow-engine pytest suite passed with 4 tests
+- agent-runtime pytest suite passed with 7 tests
+- live agent-runtime HTTP validation confirmed approved tool invocation through tool-runtime
 
 Next deliverable:
-- Workstream 4 - Agent Runtime Integration
+- Workstream 5 - Workflow Integration
 
 ---
 

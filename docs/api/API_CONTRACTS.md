@@ -160,3 +160,11 @@ Agent execution responses must:
 - expose validation status
 - expose confidence metadata
 - preserve whether human review is required
+- include governed tool invocation references in telemetry when tools are used
+
+Current Phase 4 agent-runtime tool behavior:
+- `intake_agent` may invoke `borrower_profile_lookup`
+- `document_analysis_agent` may invoke `document_fetch`
+- tool invocations must occur through tool-runtime
+- tool invocation telemetry must include tool identifier, invocation identifier, validation status, permission status, and correlation metadata
+- tool output remains supporting context and must not be interpreted as final mortgage decision authority

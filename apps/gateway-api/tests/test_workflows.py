@@ -13,6 +13,8 @@ from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
     ApprovalRecord,
     Base,
+    EvaluationResult,
+    EvaluationRun,
     ToolInvocationRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
@@ -342,6 +344,78 @@ async def test_get_workflow_approvals_returns_persisted_records(
     assert body["approvals"][0]["decision"] == "APPROVED"
     assert body["approvals"][0]["reviewed_by"] == "operator-1"
     assert body["approvals"][0]["metadata"] == {"review_channel": "operator_console"}
+
+
+async def test_get_workflow_evaluations_returns_persisted_runs_and_results(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "evaluation-query-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    now = utc_now()
+    async with session_factory() as session:
+        session.add(
+            EvaluationRun(
+                evaluation_run_id="00000000-0000-0000-0000-000000000501",
+                workflow_id=workflow_id,
+                correlation_id="evaluation-query-test",
+                evaluation_scope="workflow",
+                evaluation_mode="dataset_replay",
+                dataset_id="mortgage-exception-local-v1",
+                status="COMPLETED",
+                started_at=now,
+                completed_at=now,
+                created_by="evaluation-service",
+                run_metadata={
+                    "dataset_case_id": "mortgage-exception-local-v1:approval",
+                    "replay_boundary": "dataset_evaluation_only",
+                },
+                created_at=now,
+            )
+        )
+        session.add(
+            EvaluationResult(
+                evaluation_result_id="00000000-0000-0000-0000-000000000502",
+                evaluation_run_id="00000000-0000-0000-0000-000000000501",
+                workflow_id=workflow_id,
+                agent_execution_id=None,
+                prompt_id=None,
+                prompt_version=None,
+                model_name=None,
+                evaluator_id="dataset-replay-contract",
+                evaluator_version="v1",
+                score_name="dataset_case_alignment",
+                score_value=1.0,
+                score_status="PASS",
+                severity="informational",
+                rationale="Workflow evidence satisfied the selected local dataset case.",
+                result_metadata={"expected_tools": ["borrower_profile_lookup", "document_fetch"]},
+                created_at=now,
+            )
+        )
+        await session.commit()
+
+    response = await client.get(f"/api/v1/workflows/{workflow_id}/evaluations")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["workflow_id"] == workflow_id
+    assert body["count"] == 1
+    assert body["runs"][0]["evaluation_mode"] == "dataset_replay"
+    assert body["runs"][0]["dataset_id"] == "mortgage-exception-local-v1"
+    assert body["runs"][0]["metadata"]["dataset_case_id"] == "mortgage-exception-local-v1:approval"
+    assert body["runs"][0]["results"][0]["evaluator_id"] == "dataset-replay-contract"
+    assert body["runs"][0]["results"][0]["score_status"] == "PASS"
+    assert body["runs"][0]["results"][0]["metadata"]["expected_tools"] == [
+        "borrower_profile_lookup",
+        "document_fetch",
+    ]
 
 
 async def test_get_workflow_review_context_aggregates_review_records(

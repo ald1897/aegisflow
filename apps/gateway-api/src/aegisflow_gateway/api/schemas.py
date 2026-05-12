@@ -170,3 +170,44 @@ class ApprovalDecisionResponse(BaseModel):
     workflow: WorkflowResponse
     approval: ApprovalRecordResponse
     decision_result: dict[str, Any]
+
+
+class EvaluationResultResponse(BaseModel):
+    evaluation_result_id: UUID
+    evaluation_run_id: UUID
+    workflow_id: UUID
+    agent_execution_id: UUID | None
+    prompt_id: str | None
+    prompt_version: str | None
+    model_name: str | None
+    evaluator_id: str
+    evaluator_version: str
+    score_name: str
+    score_value: float
+    score_status: str
+    severity: str
+    rationale: str
+    metadata: dict[str, Any]
+    created_at: datetime
+
+
+class EvaluationRunSummaryResponse(BaseModel):
+    evaluation_run_id: UUID
+    workflow_id: UUID
+    correlation_id: str
+    evaluation_scope: str
+    evaluation_mode: str
+    dataset_id: str | None
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    created_by: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    results: list[EvaluationResultResponse]
+
+
+class WorkflowEvaluationsResponse(BaseModel):
+    workflow_id: UUID
+    runs: list[EvaluationRunSummaryResponse]
+    count: int

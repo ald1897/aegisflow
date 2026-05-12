@@ -10,6 +10,8 @@ from aegisflow_gateway.api.schemas import (
     ApprovalDecisionRequest,
     ApprovalDecisionResponse,
     ApprovalRecordResponse,
+    EvaluationResultResponse,
+    EvaluationRunSummaryResponse,
     HealthResponse,
     HumanReviewQueueItemResponse,
     HumanReviewQueueResponse,
@@ -17,6 +19,7 @@ from aegisflow_gateway.api.schemas import (
     ToolInvocationRecordResponse,
     WorkflowApprovalsResponse,
     WorkflowAgentExecutionsResponse,
+    WorkflowEvaluationsResponse,
     WorkflowCreateRequest,
     WorkflowReviewContextResponse,
     WorkflowResponse,
@@ -29,6 +32,8 @@ from aegisflow_gateway.persistence.database import check_database, get_session
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
     ApprovalRecord,
+    EvaluationResult,
+    EvaluationRun,
     ToolInvocationRecord,
     WorkflowRecord,
     WorkflowTimelineEntry,
@@ -131,6 +136,45 @@ def approval_to_response(approval: ApprovalRecord) -> ApprovalRecordResponse:
         metadata=approval.approval_metadata,
         correlation_id=approval.correlation_id,
         created_at=approval.created_at,
+    )
+
+
+def evaluation_result_to_response(result: EvaluationResult) -> EvaluationResultResponse:
+    return EvaluationResultResponse(
+        evaluation_result_id=UUID(result.evaluation_result_id),
+        evaluation_run_id=UUID(result.evaluation_run_id),
+        workflow_id=UUID(result.workflow_id),
+        agent_execution_id=UUID(result.agent_execution_id) if result.agent_execution_id else None,
+        prompt_id=result.prompt_id,
+        prompt_version=result.prompt_version,
+        model_name=result.model_name,
+        evaluator_id=result.evaluator_id,
+        evaluator_version=result.evaluator_version,
+        score_name=result.score_name,
+        score_value=result.score_value,
+        score_status=result.score_status,
+        severity=result.severity,
+        rationale=result.rationale,
+        metadata=result.result_metadata,
+        created_at=result.created_at,
+    )
+
+
+def evaluation_run_to_response(run: EvaluationRun, results: list[EvaluationResult]) -> EvaluationRunSummaryResponse:
+    return EvaluationRunSummaryResponse(
+        evaluation_run_id=UUID(run.evaluation_run_id),
+        workflow_id=UUID(run.workflow_id),
+        correlation_id=run.correlation_id,
+        evaluation_scope=run.evaluation_scope,
+        evaluation_mode=run.evaluation_mode,
+        dataset_id=run.dataset_id,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        created_by=run.created_by,
+        metadata=run.run_metadata,
+        created_at=run.created_at,
+        results=[evaluation_result_to_response(result) for result in results],
     )
 
 
@@ -328,6 +372,23 @@ async def get_workflow_approvals(
         workflow_id=workflow_id,
         approvals=[approval_to_response(approval) for approval in approvals],
     )
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/evaluations",
+    response_model=WorkflowEvaluationsResponse,
+)
+async def get_workflow_evaluations(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowEvaluationsResponse:
+    service = WorkflowService(session)
+    runs = await service.list_evaluation_runs(workflow_id)
+    run_responses = []
+    for run in runs:
+        results = await service.list_evaluation_results(run.evaluation_run_id)
+        run_responses.append(evaluation_run_to_response(run, results))
+    return WorkflowEvaluationsResponse(workflow_id=workflow_id, runs=run_responses, count=len(run_responses))
 
 
 @router.post(

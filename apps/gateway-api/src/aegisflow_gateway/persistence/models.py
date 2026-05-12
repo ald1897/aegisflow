@@ -215,6 +215,60 @@ class ApprovalRecord(Base):
     workflow: Mapped[WorkflowRecord] = relationship(back_populates="approval_records")
 
 
+class EvaluationRun(Base):
+    __tablename__ = "evaluation_runs"
+
+    evaluation_run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    evaluation_scope: Mapped[str] = mapped_column(String(80), nullable=False)
+    evaluation_mode: Mapped[str] = mapped_column(String(80), nullable=False)
+    dataset_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    run_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
+class EvaluationResult(Base):
+    __tablename__ = "evaluation_results"
+
+    evaluation_result_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    evaluation_run_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("evaluation_runs.evaluation_run_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    agent_execution_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("agent_execution_records.agent_execution_id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    prompt_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    prompt_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    model_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    evaluator_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    evaluator_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    score_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    score_value: Mapped[float] = mapped_column(Float, nullable=False)
+    score_status: Mapped[str] = mapped_column(String(40), nullable=False)
+    severity: Mapped[str] = mapped_column(String(40), nullable=False)
+    rationale: Mapped[str] = mapped_column(String(1000), nullable=False)
+    result_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+
 Index("ix_workflow_timeline_entries_workflow_id", WorkflowTimelineEntry.workflow_id)
 Index("ix_workflow_timeline_entries_created_at", WorkflowTimelineEntry.created_at)
 Index("ix_workflow_event_outbox_workflow_id", WorkflowEventOutbox.workflow_id)
@@ -228,3 +282,10 @@ Index("ix_tool_invocation_records_tool_id", ToolInvocationRecord.tool_id)
 Index("ix_approval_records_workflow_id", ApprovalRecord.workflow_id)
 Index("ix_approval_records_reviewed_by", ApprovalRecord.reviewed_by)
 Index("ix_approval_records_decision", ApprovalRecord.decision)
+Index("ix_evaluation_runs_workflow_id", EvaluationRun.workflow_id)
+Index("ix_evaluation_runs_dataset_id", EvaluationRun.dataset_id)
+Index("ix_evaluation_runs_status", EvaluationRun.status)
+Index("ix_evaluation_results_workflow_id", EvaluationResult.workflow_id)
+Index("ix_evaluation_results_evaluation_run_id", EvaluationResult.evaluation_run_id)
+Index("ix_evaluation_results_evaluator_id", EvaluationResult.evaluator_id)
+Index("ix_evaluation_results_score_status", EvaluationResult.score_status)

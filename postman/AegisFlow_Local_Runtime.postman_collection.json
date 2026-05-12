@@ -95,6 +95,41 @@
       "key": "jaegerUrl",
       "value": "http://localhost:16686",
       "type": "string"
+    },
+    {
+      "key": "evaluationServiceUrl",
+      "value": "http://localhost:8040",
+      "type": "string"
+    },
+    {
+      "key": "approvalWorkflowId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rejectionWorkflowId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "evaluationRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "approvalEvaluationRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rejectionEvaluationRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "evaluationDatasetCaseId",
+      "value": "mortgage-exception-local-v1:approval",
+      "type": "string"
     }
   ],
   "item": [
@@ -306,6 +341,160 @@
               "  pm.expect(json.status).to.eql(\"ok\");",
               "  pm.expect(json.checks.tool_registry).to.eql(\"ok\");",
               "  pm.expect(json.registered_tools).to.eql(3);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Evaluation Service Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/health",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"evaluation service health returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"evaluation service is healthy\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.service).to.eql(\"evaluation-service\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Evaluation Service Ready",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/ready",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "ready"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"evaluation service ready returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"evaluation database is ready\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.status).to.eql(\"ok\");",
+              "  pm.expect(json.checks.database).to.eql(\"ok\");",
+              "  pm.expect(json.checks.evaluation_registry).to.eql(\"ok\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Evaluation Datasets",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/datasets",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "datasets"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"evaluation datasets returned\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"local mortgage evaluation dataset is available\", function () {",
+              "  const datasets = pm.response.json();",
+              "  const dataset = datasets.find((entry) => entry.dataset_id === \"mortgage-exception-local-v1\");",
+              "  pm.expect(dataset).to.exist;",
+              "  pm.expect(dataset.workflow_type).to.eql(\"MORTGAGE_EXCEPTION_REVIEW\");",
+              "  pm.expect(dataset.case_count).to.be.at.least(3);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Evaluation Dataset Cases",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/datasets/mortgage-exception-local-v1/cases",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "datasets",
+            "mortgage-exception-local-v1",
+            "cases"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"evaluation dataset cases returned\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"approval and rejection dataset cases are available\", function () {",
+              "  const cases = pm.response.json();",
+              "  const caseIds = cases.map((caseEntry) => caseEntry.dataset_case_id);",
+              "  pm.expect(caseIds).to.include(\"mortgage-exception-local-v1:approval\");",
+              "  pm.expect(caseIds).to.include(\"mortgage-exception-local-v1:rejection\");",
+              "  pm.expect(caseIds).to.include(\"mortgage-exception-local-v1:human-review\");",
+              "  pm.collectionVariables.set(\"evaluationDatasetCaseId\", \"mortgage-exception-local-v1:approval\");",
               "});"
             ]
           }
@@ -983,6 +1172,7 @@
               "",
               "const json = pm.response.json();",
               "pm.collectionVariables.set(\"lastDecision\", \"APPROVED\");",
+              "pm.collectionVariables.set(\"approvalWorkflowId\", json.workflow.workflow_id);",
               "pm.collectionVariables.set(\"approvalId\", json.approval.approval_id);",
               "",
               "pm.test(\"approval response records human decision\", function () {",
@@ -1043,6 +1233,200 @@
               "    pm.expect(matchingApproval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
               "    pm.expect(matchingApproval.metadata.review_channel).to.eql(\"postman\");",
               "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Approval Evaluation Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"evaluation_mode\": \"dataset_replay\",\n  \"dataset_id\": \"mortgage-exception-local-v1\",\n  \"dataset_case_id\": \"mortgage-exception-local-v1:approval\",\n  \"run_metadata\": {\n    \"validation_scope\": \"phase_7_workstream_7\",\n    \"review_channel\": \"postman\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/workflows/{{approvalWorkflowId}}/runs",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Create Approval Evaluation Run completes\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"evaluation run has deterministic passing dataset result\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set(\"approvalEvaluationRunId\", json.run.evaluation_run_id);",
+              "  pm.collectionVariables.set(\"evaluationRunId\", json.run.evaluation_run_id);",
+              "  pm.expect(json.run.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.run.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.run.evaluation_mode).to.eql(\"dataset_replay\");",
+              "  pm.expect(json.run.dataset_id).to.eql(\"mortgage-exception-local-v1\");",
+              "  pm.expect(json.run.run_metadata.dataset_case_id).to.eql(\"mortgage-exception-local-v1:approval\");",
+              "  const datasetResult = json.results.find((result) => result.evaluator_id === \"dataset-replay-contract\");",
+              "  pm.expect(datasetResult).to.exist;",
+              "  pm.expect(datasetResult.score_name).to.eql(\"dataset_case_alignment\");",
+              "  pm.expect(datasetResult.score_status).to.eql(\"PASS\");",
+              "  pm.expect(datasetResult.score_value).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Approval Evaluation Run",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/runs/{{approvalEvaluationRunId}}",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "runs",
+            "{{approvalEvaluationRunId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Get Approval Evaluation Run returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"evaluation run detail includes persisted results\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.run.evaluation_run_id).to.eql(pm.collectionVariables.get(\"approvalEvaluationRunId\"));",
+              "  pm.expect(json.run.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.results.length).to.be.above(0);",
+              "  pm.expect(json.results.map((result) => result.evaluator_id)).to.include(\"dataset-replay-contract\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Approval Workflow Evaluation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/workflows/{{approvalWorkflowId}}/runs",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"List Approval Workflow Evaluation Runs returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow evaluation run list includes created run\", function () {",
+              "  const runs = pm.response.json();",
+              "  const matchingRun = runs.find((run) => run.evaluation_run_id === pm.collectionVariables.get(\"approvalEvaluationRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "  pm.expect(matchingRun.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(matchingRun.result_count).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway Approval Workflow Evaluations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/evaluations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "evaluations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Gateway Approval Workflow Evaluations returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"gateway exposes persisted evaluation run and results\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.count).to.be.above(0);",
+              "  const matchingRun = json.runs.find((run) => run.evaluation_run_id === pm.collectionVariables.get(\"approvalEvaluationRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "  pm.expect(matchingRun.results.length).to.be.above(0);",
+              "  pm.expect(matchingRun.results.map((result) => result.evaluator_id)).to.include(\"dataset-replay-contract\");",
               "});"
             ]
           }
@@ -1209,6 +1593,7 @@
               "",
               "const json = pm.response.json();",
               "pm.collectionVariables.set(\"lastDecision\", \"REJECTED\");",
+              "pm.collectionVariables.set(\"rejectionWorkflowId\", json.workflow.workflow_id);",
               "pm.collectionVariables.set(\"rejectionApprovalId\", json.approval.approval_id);",
               "",
               "pm.test(\"rejection response records human decision\", function () {",
@@ -1266,6 +1651,200 @@
               "  pm.expect(matchingApproval.decision).to.eql(\"REJECTED\");",
               "  pm.expect(matchingApproval.reviewed_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
               "  pm.expect(matchingApproval.metadata.review_channel).to.eql(\"postman\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Rejection Evaluation Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"evaluation_mode\": \"dataset_replay\",\n  \"dataset_id\": \"mortgage-exception-local-v1\",\n  \"dataset_case_id\": \"mortgage-exception-local-v1:rejection\",\n  \"run_metadata\": {\n    \"validation_scope\": \"phase_7_workstream_7\",\n    \"review_channel\": \"postman\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/workflows/{{rejectionWorkflowId}}/runs",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Create Rejection Evaluation Run completes\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"evaluation run has deterministic passing dataset result\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set(\"rejectionEvaluationRunId\", json.run.evaluation_run_id);",
+              "  pm.collectionVariables.set(\"evaluationRunId\", json.run.evaluation_run_id);",
+              "  pm.expect(json.run.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect(json.run.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.run.evaluation_mode).to.eql(\"dataset_replay\");",
+              "  pm.expect(json.run.dataset_id).to.eql(\"mortgage-exception-local-v1\");",
+              "  pm.expect(json.run.run_metadata.dataset_case_id).to.eql(\"mortgage-exception-local-v1:rejection\");",
+              "  const datasetResult = json.results.find((result) => result.evaluator_id === \"dataset-replay-contract\");",
+              "  pm.expect(datasetResult).to.exist;",
+              "  pm.expect(datasetResult.score_name).to.eql(\"dataset_case_alignment\");",
+              "  pm.expect(datasetResult.score_status).to.eql(\"PASS\");",
+              "  pm.expect(datasetResult.score_value).to.eql(1);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Rejection Evaluation Run",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/runs/{{rejectionEvaluationRunId}}",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "runs",
+            "{{rejectionEvaluationRunId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Get Rejection Evaluation Run returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"evaluation run detail includes persisted results\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.run.evaluation_run_id).to.eql(pm.collectionVariables.get(\"rejectionEvaluationRunId\"));",
+              "  pm.expect(json.run.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.results.length).to.be.above(0);",
+              "  pm.expect(json.results.map((result) => result.evaluator_id)).to.include(\"dataset-replay-contract\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Rejection Workflow Evaluation Runs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/api/v1/evaluations/workflows/{{rejectionWorkflowId}}/runs",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "evaluations",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"List Rejection Workflow Evaluation Runs returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow evaluation run list includes created run\", function () {",
+              "  const runs = pm.response.json();",
+              "  const matchingRun = runs.find((run) => run.evaluation_run_id === pm.collectionVariables.get(\"rejectionEvaluationRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "  pm.expect(matchingRun.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(matchingRun.result_count).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway Rejection Workflow Evaluations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{rejectionWorkflowId}}/evaluations",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "evaluations"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Gateway Rejection Workflow Evaluations returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"gateway exposes persisted evaluation run and results\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect(json.count).to.be.above(0);",
+              "  const matchingRun = json.runs.find((run) => run.evaluation_run_id === pm.collectionVariables.get(\"rejectionEvaluationRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "  pm.expect(matchingRun.results.length).to.be.above(0);",
+              "  pm.expect(matchingRun.results.map((result) => result.evaluator_id)).to.include(\"dataset-replay-contract\");",
               "});"
             ]
           }
@@ -1409,6 +1988,40 @@
       ]
     },
     {
+      "name": "Evaluation Service Metrics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{evaluationServiceUrl}}/metrics",
+          "host": [
+            "{{evaluationServiceUrl}}"
+          ],
+          "path": [
+            "metrics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Evaluation Service Metrics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"Evaluation Service Metrics exposes expected Prometheus metrics\", function () {",
+              "  const body = pm.response.text();",
+              "  pm.expect(body).to.include(\"aegisflow_evaluation_service_http_requests_total\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Prometheus Targets",
       "request": {
         "method": "GET",
@@ -1438,7 +2051,7 @@
               "pm.test(\"AegisFlow scrape targets are healthy\", function () {",
               "  const json = pm.response.json();",
               "  const activeTargets = json.data.activeTargets || [];",
-              "  const jobs = [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\"];",
+              "  const jobs = [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\", \"evaluation-service\"];",
               "  for (const job of jobs) {",
               "    const target = activeTargets.find((entry) => entry.labels && entry.labels.job === job);",
               "    pm.expect(target, `${job} target`).to.exist;",
@@ -1522,7 +2135,7 @@
               "pm.test(\"Jaeger contains AegisFlow services after local workflow execution\", function () {",
               "  const json = pm.response.json();",
               "  const services = json.data || [];",
-              "  [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\"].forEach((service) => {",
+              "  [\"gateway-api\", \"workflow-engine\", \"agent-runtime\", \"tool-runtime\", \"evaluation-service\"].forEach((service) => {",
               "    pm.expect(services, `${service} traces`).to.include(service);",
               "  });",
               "});"

@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the Phase 7 evaluation foundation through Workstream 5:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the Phase 7 evaluation foundation through Workstream 7:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -31,9 +31,11 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - evaluation-service health, readiness, metrics, persistence, deterministic evaluators, judge-boundary fallback, and evaluation run orchestration
 - local evaluation dataset listing and replay-aware dataset case scoring
 - persisted evaluation runs and evaluation results for bounded workflow evidence
+- gateway-api retrieval of persisted workflow evaluation runs and results
+- Postman validation for approval and rejection workflow evaluation runs
 
 Phase 6 is complete for the local simulation boundary.
-Phase 7 is partially complete through evaluation run orchestration.
+Phase 7 is partially complete through gateway and Postman validation.
 
 ---
 
@@ -51,6 +53,7 @@ The local Docker Compose stack currently runs:
 - workflow-engine
 - agent-runtime
 - tool-runtime
+- evaluation-service
 - operator-console
 - OpenTelemetry Collector
 - Jaeger
@@ -73,6 +76,7 @@ The gateway API currently supports:
 - workflow review context retrieval
 - workflow approval record retrieval
 - workflow approval and rejection decision submission
+- workflow evaluation run and result retrieval
 - correlation ID propagation
 - structured JSON logs
 - Temporal workflow startup
@@ -97,7 +101,10 @@ GET /api/v1/reviews/human-review-queue
 GET /api/v1/workflows/{workflow_id}/review-context
 GET /api/v1/workflows/{workflow_id}/approvals
 POST /api/v1/workflows/{workflow_id}/approvals
+GET /api/v1/workflows/{workflow_id}/evaluations
 ```
+
+The workflow evaluations endpoint is read-only. It returns persisted evaluation-service records for operator and Postman validation ergonomics, but it does not create evaluation runs, change workflow state, or participate in mortgage decisions.
 
 ---
 
@@ -216,7 +223,8 @@ Current Phase 7 boundary:
 - evaluation runs score bounded local workflow evidence only
 - external judge model calls are disabled by default
 - dataset replay is side-effect-free scoring against persisted records, not full Temporal replay or failure recovery
-- gateway evaluation retrieval, Postman validation, and evaluation dashboards remain future Phase 7 workstreams
+- gateway evaluation retrieval and Postman validation are implemented for approval and rejection workflows
+- evaluation dashboards remain a future Phase 7 workstream
 
 ---
 
@@ -412,7 +420,7 @@ PUBLISHED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- full Phase 7 evaluation dataset and replay-aware scoring
+- evaluation-specific Grafana dashboard panels
 - authentication and RBAC
 - advanced replay tooling
 - production alerting and paging
@@ -451,6 +459,8 @@ The collection includes:
 - workflow approval record retrieval
 - workflow approval submission
 - workflow rejection submission
+- evaluation-service health, readiness, dataset, run creation, run retrieval, workflow run listing, and metrics validation
+- gateway workflow evaluation retrieval validation
 - separate approval and rejection workflow validation
 - missing workflow error validation
 - gateway-api metrics validation
@@ -465,6 +475,7 @@ The collection includes:
 The collection uses `http://localhost:8000` as the default `baseUrl`.
 The collection uses `http://localhost:8010` as the default `agentRuntimeUrl`.
 The collection uses `http://localhost:8020` as the default `toolRuntimeUrl`.
+The collection uses `http://localhost:8040` as the default `evaluationServiceUrl`.
 The collection uses `http://localhost:8030` as the default `workflowEngineMetricsUrl`.
 The collection uses `http://localhost:9090` as the default `prometheusUrl`.
 The collection uses `http://localhost:16686` as the default `jaegerUrl`.
@@ -474,6 +485,7 @@ Recommended collection variables:
 - `baseUrl`: `http://localhost:8000`
 - `agentRuntimeUrl`: `http://localhost:8010`
 - `toolRuntimeUrl`: `http://localhost:8020`
+- `evaluationServiceUrl`: `http://localhost:8040`
 - `workflowEngineMetricsUrl`: `http://localhost:8030`
 - `prometheusUrl`: `http://localhost:9090`
 - `jaegerUrl`: `http://localhost:16686`
@@ -490,6 +502,12 @@ The collection automatically captures:
 - `lastDecision`
 - `approvalId`
 - `rejectionApprovalId`
+- `approvalWorkflowId`
+- `rejectionWorkflowId`
+- `approvalEvaluationRunId`
+- `rejectionEvaluationRunId`
+- `evaluationRunId`
+- `evaluationDatasetCaseId`
 
 ---
 
@@ -517,6 +535,7 @@ Expected services:
 - `aegisflow-workflow-engine`
 - `aegisflow-agent-runtime`
 - `aegisflow-tool-runtime`
+- `aegisflow-evaluation-service`
 - `aegisflow-otel-collector`
 - `aegisflow-jaeger`
 - `aegisflow-prometheus`
@@ -843,6 +862,27 @@ Expected result:
 
 ---
 
+## Approval Evaluation Validation
+
+Run the following Postman requests after the approval record is persisted:
+
+```text
+Create Approval Evaluation Run
+Get Approval Evaluation Run
+List Approval Workflow Evaluation Runs
+Gateway Approval Workflow Evaluations
+```
+
+Expected result:
+- evaluation-service returns a `COMPLETED` `dataset_replay` run for the captured approval workflow
+- `dataset_id` is `mortgage-exception-local-v1`
+- `run_metadata.dataset_case_id` is `mortgage-exception-local-v1:approval`
+- results include `dataset-replay-contract`
+- `dataset_case_alignment` has `score_status` of `PASS` and `score_value` of `1`
+- gateway-api returns the same persisted run and bounded result records through the workflow evaluations endpoint
+
+---
+
 ## 20. Create A Separate Workflow For Rejection
 
 Run the Postman request:
@@ -910,6 +950,27 @@ Expected result:
 
 ---
 
+## Rejection Evaluation Validation
+
+Run the following Postman requests after the rejection record is persisted:
+
+```text
+Create Rejection Evaluation Run
+Get Rejection Evaluation Run
+List Rejection Workflow Evaluation Runs
+Gateway Rejection Workflow Evaluations
+```
+
+Expected result:
+- evaluation-service returns a `COMPLETED` `dataset_replay` run for the captured rejection workflow
+- `dataset_id` is `mortgage-exception-local-v1`
+- `run_metadata.dataset_case_id` is `mortgage-exception-local-v1:rejection`
+- results include `dataset-replay-contract`
+- `dataset_case_alignment` has `score_status` of `PASS` and `score_value` of `1`
+- gateway-api returns the same persisted run and bounded result records through the workflow evaluations endpoint
+
+---
+
 ## 24. Validate Missing Workflow Behavior
 
 Run the Postman request:
@@ -935,6 +996,10 @@ Recommended request order:
 - `List Registered Agents`
 - `Tool Runtime Health`
 - `Tool Runtime Ready`
+- `Evaluation Service Health`
+- `Evaluation Service Ready`
+- `List Evaluation Datasets`
+- `List Evaluation Dataset Cases`
 - `List Registered Tools`
 - `Invoke Borrower Profile Lookup`
 - `Invoke Document Fetch`
@@ -948,14 +1013,23 @@ Recommended request order:
 - `Get Workflow Review Context`
 - `Approve Workflow`
 - `Get Workflow Approvals`
+- `Create Approval Evaluation Run`
+- `Get Approval Evaluation Run`
+- `List Approval Workflow Evaluation Runs`
+- `Gateway Approval Workflow Evaluations`
 - `Create Mortgage Exception Review Workflow For Rejection`
 - `Poll Rejection Workflow Until Human Review Required`
 - `Reject Workflow`
 - `Get Rejection Workflow Approvals`
+- `Create Rejection Evaluation Run`
+- `Get Rejection Evaluation Run`
+- `List Rejection Workflow Evaluation Runs`
+- `Gateway Rejection Workflow Evaluations`
 - `Gateway Metrics`
 - `Workflow Engine Metrics`
 - `Agent Runtime Metrics`
 - `Tool Runtime Metrics`
+- `Evaluation Service Metrics`
 - `Prometheus Targets`
 - `Prometheus Workflow Activity Query`
 - `Jaeger Services`
@@ -975,6 +1049,7 @@ Gateway Metrics
 Workflow Engine Metrics
 Agent Runtime Metrics
 Tool Runtime Metrics
+Evaluation Service Metrics
 Prometheus Targets
 Prometheus Workflow Activity Query
 Jaeger Services
@@ -985,9 +1060,9 @@ Grafana AegisFlow Dashboards
 
 Expected result:
 - service metrics endpoints return Prometheus text format
-- Prometheus reports `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime` scrape targets as `up`
+- Prometheus reports `gateway-api`, `workflow-engine`, `agent-runtime`, `tool-runtime`, and `evaluation-service` scrape targets as `up`
 - Prometheus returns workflow activity metric samples after workflow execution
-- Jaeger lists `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime` after workflow execution
+- Jaeger lists `gateway-api`, `workflow-engine`, `agent-runtime`, `tool-runtime`, and `evaluation-service` after workflow execution and evaluation requests
 - Jaeger trace search returns gateway traces
 - Grafana health returns `database` as `ok`
 - Grafana search returns the four provisioned AegisFlow dashboards
@@ -1028,7 +1103,8 @@ $services = @(
   "aegisflow-gateway-api",
   "aegisflow-workflow-engine",
   "aegisflow-agent-runtime",
-  "aegisflow-tool-runtime"
+  "aegisflow-tool-runtime",
+  "aegisflow-evaluation-service"
 )
 
 foreach ($service in $services) {
@@ -1087,6 +1163,10 @@ The Postman collection validates:
 - workflow review context aggregation
 - approval decision submission
 - rejection decision submission
+- approval evaluation run creation and retrieval
+- rejection evaluation run creation and retrieval
+- gateway workflow evaluation retrieval
+- deterministic dataset replay `PASS` validation for approval and rejection paths
 - persisted approval record retrieval
 - missing workflow error behavior
 - service Prometheus metrics endpoints
@@ -1115,7 +1195,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-15 passed
+17 passed
 ```
 
 ---

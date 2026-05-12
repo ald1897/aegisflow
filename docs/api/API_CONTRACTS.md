@@ -130,6 +130,7 @@ GET /api/v1/reviews/human-review-queue
 GET /api/v1/workflows/{workflow_id}/review-context
 GET /api/v1/workflows/{workflow_id}/approvals
 POST /api/v1/workflows/{workflow_id}/approvals
+GET /api/v1/workflows/{workflow_id}/evaluations
 ```
 
 The gateway-api remains the primary API surface for workflow initiation and operational query access.
@@ -157,6 +158,8 @@ Current approval decision behavior:
 - rejected decisions transition the local workflow through `REJECTED` to `COMPLETED`
 - duplicate or non-reviewable workflow decisions are rejected by workflow review validation
 - approval and rejection requests are available to the operator-console and Postman validation collection through gateway-api only
+
+The workflow evaluations endpoint returns persisted evaluation runs and bounded evaluation results associated with a workflow. It is read-only gateway access for operator and Postman ergonomics. It must not create evaluation runs, mutate workflow state, approve or reject workflows, or expose raw prompt content, document contents, borrower PII, secrets, approval comments, or full model outputs.
 
 ---
 

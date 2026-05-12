@@ -14,6 +14,8 @@ from aegisflow_gateway.domain.workflows import (
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
     ApprovalRecord,
+    EvaluationResult,
+    EvaluationRun,
     ToolInvocationRecord,
     WorkflowEventOutbox,
     WorkflowRecord,
@@ -176,3 +178,20 @@ class WorkflowService:
                 status_code=409,
             )
         return workflow
+
+    async def list_evaluation_runs(self, workflow_id: UUID) -> list[EvaluationRun]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(EvaluationRun)
+            .where(EvaluationRun.workflow_id == str(workflow_id))
+            .order_by(EvaluationRun.started_at.asc(), EvaluationRun.evaluation_run_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def list_evaluation_results(self, evaluation_run_id: UUID | str) -> list[EvaluationResult]:
+        result = await self.session.execute(
+            select(EvaluationResult)
+            .where(EvaluationResult.evaluation_run_id == str(evaluation_run_id))
+            .order_by(EvaluationResult.created_at.asc(), EvaluationResult.evaluation_result_id.asc())
+        )
+        return list(result.scalars().all())

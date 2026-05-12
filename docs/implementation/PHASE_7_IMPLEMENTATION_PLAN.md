@@ -556,20 +556,20 @@ Completion criteria:
 
 ## Workstream 7 - Gateway And Postman Validation
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add gateway-api evaluation retrieval endpoint if needed for operator and Postman ergonomics
-- add Postman requests for evaluation-service health, readiness, metrics, run creation, run retrieval, workflow run listing, dataset listing, and dataset case retrieval
-- extend current manual validation flow to run an evaluation after approval and rejection workflows
-- document expected evaluation results for the local deterministic scenario
-- validate Postman collection JSON
+- add gateway-api evaluation retrieval endpoint if needed for operator and Postman ergonomics - Complete
+- add Postman requests for evaluation-service health, readiness, metrics, run creation, run retrieval, workflow run listing, dataset listing, and dataset case retrieval - Complete
+- extend current manual validation flow to run an evaluation after approval and rejection workflows - Complete
+- document expected evaluation results for the local deterministic scenario - Complete
+- validate Postman collection JSON - Complete
 
 Completion criteria:
-- Postman can create and retrieve evaluation runs
-- Postman can validate deterministic scores after workflow execution
-- manual validation covers approval and rejection evaluation paths
-- collection JSON validates
+- Postman can create and retrieve evaluation runs - Met
+- Postman can validate deterministic scores after workflow execution - Met
+- manual validation covers approval and rejection evaluation paths - Met
+- collection JSON validates - Met
 
 ---
 
@@ -910,6 +910,31 @@ Boundary:
 
 Next step:
 - implement Workstream 7: Gateway And Postman Validation
+
+## 2026-05-12 - Workstream 7
+
+Status:
+- added read-only gateway-api retrieval for persisted workflow evaluation runs and results at `GET /api/v1/workflows/{workflow_id}/evaluations`
+- added gateway DTOs and read models for evaluation runs and evaluation results
+- added workflow service queries for evaluation run and result retrieval
+- added automated gateway coverage for persisted evaluation retrieval
+- expanded the Postman collection with evaluation-service health, readiness, metrics, dataset listing, dataset case listing, run creation, run retrieval, workflow run listing, and gateway evaluation retrieval
+- extended the manual Postman approval path to create and validate an approval dataset replay evaluation run
+- extended the manual Postman rejection path to create and validate a rejection dataset replay evaluation run
+- documented expected deterministic `dataset-replay-contract` `PASS` results for local approval and rejection scenarios
+- validated the Postman collection JSON and test script syntax
+- rebuilt the gateway-api image and validated gateway-api tests with 17 passing tests
+
+Completed workstream:
+- Workstream 7 - Gateway And Postman Validation
+
+Boundary:
+- gateway evaluation retrieval is read-only and does not create evaluation runs
+- evaluation-service remains the evaluation run creation boundary
+- evaluation results are quality telemetry only and do not mutate workflow state, approve workflows, reject workflows, or bypass human review
+
+Next step:
+- implement Workstream 8: Evaluation Observability And Dashboards
 
 ---
 

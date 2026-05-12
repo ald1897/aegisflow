@@ -75,6 +75,8 @@ services:
       KAFKA_WORKFLOW_EVENTS_TOPIC: workflow-events
       ENABLE_EVENT_PUBLISHING: "true"
       CORS_ALLOWED_ORIGINS: '["http://localhost:3000"]'
+      ENABLE_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "8000:8000"
     depends_on:
@@ -111,6 +113,8 @@ services:
       PROMPTS_PATH: /app/prompts
       TOOL_RUNTIME_URL: http://tool-runtime:8020
       ENABLE_TOOL_RUNTIME: "true"
+      ENABLE_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "8010:8010"
     depends_on:
@@ -125,6 +129,8 @@ services:
       SERVICE_NAME: tool-runtime
       ENVIRONMENT: local
       LOG_LEVEL: INFO
+      ENABLE_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     ports:
       - "8020:8020"
 
@@ -171,6 +177,8 @@ services:
       ENABLE_EVENT_PUBLISHING: "true"
       AGENT_RUNTIME_URL: http://agent-runtime:8010
       ENABLE_AGENT_RUNTIME: "true"
+      ENABLE_TELEMETRY: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
     depends_on:
       postgres:
         condition: service_healthy

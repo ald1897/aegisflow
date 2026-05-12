@@ -8,11 +8,13 @@ from aegisflow_gateway.config import get_settings
 from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowReviewActionError
 from aegisflow_gateway.telemetry.correlation import CorrelationIdMiddleware
 from aegisflow_gateway.telemetry.logging import configure_logging
+from aegisflow_gateway.telemetry.tracing import configure_telemetry
 
 
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
+    configure_telemetry(settings)
 
     app = FastAPI(title=settings.api_title, version=settings.api_version)
     app.add_middleware(

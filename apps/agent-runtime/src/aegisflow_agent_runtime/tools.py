@@ -4,6 +4,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from aegisflow_agent_runtime.schemas import AgentExecutionRequest
+from aegisflow_agent_runtime.telemetry import inject_trace_context
 
 
 class ToolRuntimeError(Exception):
@@ -48,7 +49,11 @@ class ToolRuntimeClient:
         }
         try:
             with httpx.Client(base_url=self.base_url, timeout=10.0) as client:
-                response = client.post(f"/api/v1/tools/{tool_id}/invocations", json=invocation_request)
+                response = client.post(
+                    f"/api/v1/tools/{tool_id}/invocations",
+                    headers=inject_trace_context(),
+                    json=invocation_request,
+                )
                 response.raise_for_status()
         except httpx.HTTPError as exc:
             raise ToolRuntimeError(f"Tool runtime invocation failed for {tool_id}: {exc}") from exc

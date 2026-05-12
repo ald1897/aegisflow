@@ -22,6 +22,7 @@ from aegisflow_workflow_engine.persistence.models import (
 )
 from aegisflow_workflow_engine.activities.state_transitions import publish_workflow_event
 from aegisflow_workflow_engine.activities.tools import record_tool_invocation
+from aegisflow_workflow_engine.telemetry import inject_trace_context
 
 logger = logging.getLogger(__name__)
 
@@ -235,7 +236,11 @@ async def _record_tool_invocations_from_agent_telemetry(
 async def _call_agent_runtime(agent_runtime_url: str, agent_id: str, payload: dict) -> dict:
     try:
         async with httpx.AsyncClient(base_url=agent_runtime_url, timeout=10.0) as client:
-            response = await client.post(f"/api/v1/agents/{agent_id}/executions", json=payload)
+            response = await client.post(
+                f"/api/v1/agents/{agent_id}/executions",
+                headers=inject_trace_context(),
+                json=payload,
+            )
             response.raise_for_status()
             return response.json()
     except httpx.HTTPError as exc:

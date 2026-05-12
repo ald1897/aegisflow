@@ -240,6 +240,24 @@ Password: aegisflow
 
 ---
 
+## Application Telemetry Configuration
+
+Workstream 2 adds the following common telemetry environment variables to Python services:
+- `ENABLE_TELEMETRY`
+- `OTEL_EXPORTER_OTLP_ENDPOINT`
+
+Default local behavior:
+- telemetry is disabled by default in service settings
+- Docker Compose enables telemetry for local application containers
+- OTLP HTTP traces are exported to the OpenTelemetry Collector at `http://otel-collector:4318`
+- service resource attributes include `service.name` and `deployment.environment`
+
+Telemetry configuration must remain no-op when disabled.
+
+Local automated tests must be able to run without the observability stack.
+
+---
+
 ## Telemetry Ownership
 
 Each service owns telemetry emission for its own execution boundary.
@@ -387,22 +405,22 @@ Completion criteria:
 
 ## Workstream 2 - Shared Telemetry Configuration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add OpenTelemetry dependencies to Python services
-- define common telemetry environment variables
-- create service-local telemetry configuration helpers or a shared internal helper where practical
-- configure resource attributes including service name and environment
-- configure OTLP export to the OpenTelemetry Collector
-- preserve no-op behavior when telemetry is disabled
-- add trace context propagation utilities for outbound HTTP clients
+- add OpenTelemetry dependencies to Python services - Complete
+- define common telemetry environment variables - Complete
+- create service-local telemetry configuration helpers or a shared internal helper where practical - Complete
+- configure resource attributes including service name and environment - Complete
+- configure OTLP export to the OpenTelemetry Collector - Complete
+- preserve no-op behavior when telemetry is disabled - Complete
+- add trace context propagation utilities for outbound HTTP clients - Complete
 
 Completion criteria:
-- each Python service can enable or disable telemetry through environment variables
-- services can export traces to the OpenTelemetry Collector
-- local tests can run without requiring observability infrastructure
-- telemetry configuration does not change business behavior
+- each Python service can enable or disable telemetry through environment variables - Met
+- services can export traces to the OpenTelemetry Collector - Met
+- local tests can run without requiring observability infrastructure - Met
+- telemetry configuration does not change business behavior - Met
 
 ---
 
@@ -686,6 +704,38 @@ Boundary:
 
 Next step:
 - implement Workstream 2: Shared Telemetry Configuration
+
+## 2026-05-12 - Workstream 2
+
+Status:
+- added OpenTelemetry dependencies to `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime`
+- added common telemetry settings for `ENABLE_TELEMETRY` and `OTEL_EXPORTER_OTLP_ENDPOINT`
+- added service-local telemetry helpers for OTLP HTTP trace export
+- configured telemetry resource attributes for service name and deployment environment
+- preserved disabled-by-default telemetry behavior in service settings
+- enabled telemetry for Python application containers in local Docker Compose
+- added trace context injection utilities for outbound HTTP clients
+- propagated trace context from `workflow-engine` to `agent-runtime`
+- propagated trace context from `agent-runtime` to `tool-runtime`
+- rebuilt Python service images with telemetry dependencies installed
+- validated gateway-api, workflow-engine, agent-runtime, and tool-runtime tests against rebuilt images
+- validated synthetic gateway-api span export through OpenTelemetry Collector into Jaeger
+- recreated local Python service containers with telemetry enabled
+- validated gateway-api, agent-runtime, and tool-runtime health endpoints after telemetry enablement
+- validated workflow-engine container startup after telemetry enablement
+
+Completed workstream:
+- Workstream 2 - Shared Telemetry Configuration
+
+Boundary:
+- automatic FastAPI request instrumentation is assigned to later workstreams
+- service metrics endpoints are assigned to later workstreams
+- Temporal activity instrumentation is assigned to Workstream 4
+- agent and tool execution span design is assigned to Workstream 5
+- telemetry remains operational metadata and is not authoritative workflow or audit data
+
+Next step:
+- implement Workstream 3: gateway-api Instrumentation
 
 ---
 

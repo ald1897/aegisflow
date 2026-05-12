@@ -10,6 +10,7 @@ from aegisflow_workflow_engine.activities.decisions import apply_human_review_de
 from aegisflow_workflow_engine.activities.state_transitions import advance_workflow_state
 from aegisflow_workflow_engine.activities.tools import record_tool_invocation
 from aegisflow_workflow_engine.config import get_settings
+from aegisflow_workflow_engine.telemetry import configure_telemetry
 from aegisflow_workflow_engine.workflows.human_review_decision import HumanReviewDecisionWorkflow
 from aegisflow_workflow_engine.workflows.mortgage_exception_review import MortgageExceptionReviewWorkflow
 
@@ -17,6 +18,7 @@ from aegisflow_workflow_engine.workflows.mortgage_exception_review import Mortga
 async def main() -> None:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
+    configure_telemetry(settings)
 
     logger = logging.getLogger(__name__)
     client: Client | None = None

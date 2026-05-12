@@ -14,6 +14,7 @@ from aegisflow_agent_runtime.schemas import (
     AgentExecutionResponse,
     AgentRegistryResponse,
 )
+from aegisflow_agent_runtime.telemetry import configure_telemetry
 from aegisflow_agent_runtime.tools import ToolRuntimeClient
 
 
@@ -27,6 +28,7 @@ def get_agent_runtime(settings: Settings = Depends(get_settings)) -> AgentRuntim
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
+    configure_telemetry(settings)
     app = FastAPI(title="AegisFlow Agent Runtime", version="0.1.0")
 
     @app.get("/health")

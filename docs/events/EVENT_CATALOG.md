@@ -243,3 +243,47 @@ Current implementation boundary:
 - approval decision integration can advance workflow state through `APPROVED` or `REJECTED` to `COMPLETED`
 - gateway-api exposes approval decision submission and routes decisions through workflow-engine-owned Temporal decision execution
 - operator-console and Postman validation submit approval decisions through gateway-api; they do not emit approval events directly
+
+---
+
+## Recovery Events
+
+Produced by workflow-engine-owned recovery activity when workflow projection reconciliation completes:
+
+```text
+recovery.action_completed
+```
+
+Recovery events represent operational remediation facts, not mortgage business decisions.
+
+They must include:
+- `event_id`
+- `event_type`
+- `event_version`
+- `workflow_id`
+- `correlation_id`
+- recovery action identifier
+- action type
+- prior state
+- reconciled state
+
+Current implementation boundary:
+- recovery completion events are written through the outbox model by workflow-engine recovery activity logic
+- gateway-api recovery requests create auditable recovery records but do not directly emit workflow recovery completion events
+- recovery events do not approve, reject, complete, underwrite, service, or update downstream mortgage systems
+- replay never emits recovery events
+
+---
+
+## Event Outbox Publication Status
+
+The current local outbox publication statuses are:
+
+```text
+PENDING
+PUBLISHED
+FAILED
+DEAD_LETTERED
+```
+
+`DEAD_LETTERED` is a local recovery status for explicitly selected failed outbox records that should not continue publishing attempts. Publishers skip dead-lettered events.

@@ -217,6 +217,15 @@ The current local Grafana stack provisions:
 
 Dashboards are operational views only. They do not replace PostgreSQL records, Temporal history, workflow timeline entries, approval records, or outbox events.
 
+Phase 8 replay and recovery validation confirmed:
+- gateway-api exposes replay and recovery metric families through `/metrics`
+- Prometheus returns replay run, recovery action, outbox retry, and stuck-workflow diagnostic samples
+- Jaeger returns gateway replay and recovery traces
+- Grafana provisions and lists `AegisFlow - Replay And Recovery`
+- Docker logs contain bounded replay and recovery entries with correlation ID and trace ID
+
+Replay and recovery telemetry is aggregate operational visibility. It must not become the authoritative record for replay runs, recovery actions, workflow state, approval decisions, or outbox event facts.
+
 ---
 
 # Logging Strategy

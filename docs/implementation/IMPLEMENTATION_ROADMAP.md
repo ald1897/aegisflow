@@ -107,7 +107,7 @@ Current business boundary:
 Business meaning:
 - the platform has moved from design into a working local operational prototype
 - the current implementation proves the control framework, human review loop, and measurable local AI quality signals, not final production mortgage automation
-- the system is ready for full replay/recovery tooling and production-style hardening work
+- the system is ready for production-style hardening work after completing the local replay and recovery foundation
 
 ---
 
@@ -121,7 +121,7 @@ Planned future capability includes:
 - richer operational dashboards for review queues and bottlenecks
 - production-grade observability for operational oversight
 - expanded AI evaluation and replay-based quality measurement
-- failure recovery and replay tooling
+- production-grade replay, recovery, and incident response controls beyond the local recovery boundary
 - service hardening for production-style deployment boundaries
 
 Future business value:
@@ -157,6 +157,7 @@ The following phases have been completed in the local implementation:
 - Phase 5 - Human Review UI
 - Phase 6 - Observability Integration
 - Phase 7 - AI Evaluation Layer
+- Phase 8 - Replay and Failure Recovery
 
 ---
 
@@ -223,6 +224,17 @@ The platform currently supports:
 - read-only gateway workflow evaluation retrieval endpoint
 - Postman validation for approval and rejection evaluation runs
 - evaluation-service run/result traces, metrics, logs, and Grafana evaluation dashboard
+- replay and recovery persistence tables for replay runs, replay steps, and recovery actions
+- workflow evidence reconstruction for persisted workflow, timeline, outbox, agent, tool, approval, and evaluation records
+- side-effect-free replay run creation for history reconstruction and deterministic validation
+- read-only replay diagnostics
+- outbox failure classification, explicit retry, and explicit dead-letter handling
+- workflow recovery dry-run checks and auditable workflow projection reconciliation requests
+- workflow-engine-owned projection reconciliation activity for accepted workflow recovery
+- gateway-api replay and recovery endpoints
+- operator-console read-only replay and recovery summaries
+- Postman validation for replay diagnostics, replay run creation/retrieval/listing, safe seeded outbox recovery, and unsupported recovery rejection
+- replay and recovery traces, metrics, structured logs, and Grafana dashboard
 - trace context propagation from gateway-api through workflow-engine, agent-runtime, and tool-runtime
 - structured JSON logs with correlation and trace metadata
 - Postman observability validation for metrics, Prometheus, Jaeger, and Grafana
@@ -235,16 +247,16 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, the Phase 5 human review foundation, the Phase 6 local observability foundation, and the completed Phase 7 local evaluation layer.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, the Phase 5 human review foundation, the Phase 6 local observability foundation, the completed Phase 7 local evaluation layer, and the completed Phase 8 local replay and recovery foundation.
 
 Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- full workflow replay and failure recovery tooling
 - production identity provider and RBAC integration
 - production alerting and paging
 - production log aggregation
 - external judge-model provider integration enabled by default
+- production autonomous recovery, broad activity replay, or Temporal history mutation tooling
 - production mortgage system integrations
 
 These capabilities remain assigned to later roadmap phases.
@@ -541,7 +553,7 @@ Validation completed:
 - Postman collection JSON validated successfully with Phase 6 observability requests
 
 Next deliverable:
-- Phase 8 - Replay and Failure Recovery
+- Phase 7 - AI Evaluation Layer
 
 ---
 
@@ -597,6 +609,61 @@ Validation completed:
 
 Next deliverable:
 - Phase 8 - Replay and Failure Recovery
+
+---
+
+## Phase 8 - Replay and Failure Recovery
+
+Status: Completed
+
+Implementation started: 2026-05-12
+
+Completion date: 2026-05-13
+
+Completed deliverables:
+- `workflow_replay_runs`, `workflow_replay_steps`, and `workflow_recovery_actions` persistence tables
+- side-effect-free workflow evidence reconstruction and deterministic replay validation
+- replay run creation, retrieval, workflow replay listing, and read-only replay diagnostics through gateway-api
+- outbox failure classification for pending, published, failed, retryable, retry-exhausted, and dead-lettered records
+- explicit local outbox retry and dead-letter recovery actions with auditable recovery records
+- workflow recovery checks and auditable workflow projection reconciliation requests
+- workflow-engine-owned `reconcile_workflow_projection` recovery activity for accepted projection reconciliation
+- recovery timeline entries and `recovery.action_completed` outbox events for completed workflow recovery
+- operator-console read-only replay and recovery summaries in the workflow review workspace
+- Postman validation for replay diagnostics, replay run creation/retrieval/listing, safe seeded outbox recovery, recovery retrieval, and unsupported recovery rejection
+- local PowerShell helper for seeding a retryable outbox failure scenario against Docker Postgres
+- replay and recovery traces, metrics, bounded structured logs, and `AegisFlow - Replay And Recovery` Grafana dashboard
+- Phase 8 documentation closeout across current functionality, roadmap, workflow, state machine, data, API, security, observability, event, and developer workflow docs
+
+Explicit non-scope:
+- production autonomous recovery
+- production identity provider and RBAC enforcement
+- broad activity replay or unrestricted workflow restart
+- Temporal history mutation
+- agent, tool, approval, or external integration re-execution during replay
+- recovery actions that create mortgage approval, rejection, underwriting, credit, compliance, servicing, or downstream system decisions
+- storage of raw document contents, borrower PII, secrets, prompt content, approval comments as diagnostic metadata, or full model outputs in replay and recovery records
+
+Validation completed:
+- gateway-api pytest suite passed with 41 tests
+- workflow-engine pytest suite passed with 15 tests
+- operator-console production build passed
+- Postman collection JSON parsed successfully
+- Postman pre-request and test scripts parsed successfully
+- Grafana replay/recovery dashboard JSON parsed successfully
+- Docker Compose configuration validated
+- gateway-api and workflow-engine Python source compilation succeeded
+- local live approval workflow replay smoke validation completed through gateway-api
+- local live seeded outbox retry recovery action completed through gateway-api
+- unsupported recovery action returned structured `workflow_recovery_not_allowed` error
+- Prometheus exposed replay and recovery metric families through gateway-api `/metrics`
+- Prometheus returned replay, recovery, outbox retry, and stuck-workflow diagnostic samples
+- Jaeger returned gateway replay and recovery traces
+- Grafana listed `AegisFlow - Replay And Recovery`
+- Docker logs contained bounded replay and recovery entries with correlation ID and trace ID
+
+Next deliverable:
+- Phase 9 - Service Separation and Hardening
 
 ---
 
@@ -1163,7 +1230,7 @@ All AI outputs should:
 
 # Phase 8 - Replay and Failure Recovery
 
-Status: In Progress.
+Status: Completed in the local implementation.
 
 Detailed continuous implementation planning is tracked in:
 
@@ -1185,7 +1252,7 @@ Implement:
 - dead-letter handling
 - recovery tooling
 
-Completed local deliverables through Workstream 9:
+Completed local deliverables through Workstream 10:
 - replay and recovery persistence model
 - workflow evidence reconstruction
 - deterministic replay validation
@@ -1201,6 +1268,8 @@ Completed local deliverables through Workstream 9:
 - gateway-api replay and recovery traces, metrics, and bounded structured logs
 - gateway-api low-cardinality metrics for replay runs, replay steps, recovery actions, outbox status, outbox retries, and stuck-workflow diagnostics
 - `AegisFlow - Replay And Recovery` Grafana dashboard
+- current functionality, roadmap, workflow, data model, API, security, observability, event, and developer workflow documentation updates
+- Phase 8 completion log with automated and manual validation results
 
 ---
 
@@ -1231,6 +1300,13 @@ The platform should:
 - replay workflows safely
 - recover from transient failures
 - preserve operational history
+
+Current local boundary:
+- replay reconstructs and validates persisted records only
+- replay does not rerun Temporal activities, agents, tools, approvals, event publication, or external integrations
+- outbox recovery is explicit and bounded to retryable or dead-letterable local outbox records
+- workflow projection reconciliation remains workflow-engine owned
+- production autonomous recovery and broad activity replay remain future hardening work
 
 ---
 

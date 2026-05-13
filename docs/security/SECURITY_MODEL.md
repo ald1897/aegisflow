@@ -582,6 +582,30 @@ Replay execution should require:
 - audit logging
 - operational traceability
 
+## Implemented Local Replay And Recovery Controls
+
+Phase 8 implements a local development authorization boundary for replay and recovery operations.
+
+Current enforced controls:
+- replay run creation requires `X-Actor-ID`
+- recovery action creation requires `X-Actor-ID`
+- workflow recovery requests require a reason
+- outbox recovery requires an explicit `workflow_event_outbox` target resource
+- recovery checks are dry-run reads and do not create recovery action records
+- replay diagnostics and replay/recovery retrieval endpoints are read-only
+- unsupported or unsafe recovery commands are rejected with structured errors
+- gateway-api does not directly mutate workflow state for workflow recovery outcomes
+- workflow projection reconciliation state mutation is owned by workflow-engine recovery activity logic
+- outbox retry uses the existing publisher boundary and rejects already-published or dead-lettered events
+- dead-letter recovery marks only explicitly selected dead-letterable local outbox records
+
+Current local boundary:
+- `X-Actor-ID` is a local development actor boundary, not production authentication
+- production identity provider integration is not yet implemented
+- production RBAC policy enforcement is not yet implemented
+- replay and recovery actions do not approve, reject, underwrite, service, or update downstream mortgage systems
+- replay and recovery records store bounded metadata only and exclude raw documents, unrestricted borrower PII, secrets, prompt content, approval comments as diagnostic metadata, and full model outputs
+
 ---
 
 # Replay Safety

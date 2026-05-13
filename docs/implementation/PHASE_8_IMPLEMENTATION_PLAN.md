@@ -615,20 +615,20 @@ Completion criteria:
 Status: Completed
 
 Tasks:
-- add gateway replay run creation endpoint
-- add gateway replay run retrieval endpoint
-- add gateway workflow replay run listing endpoint
-- add gateway workflow replay diagnostics endpoint
-- add gateway recovery action creation and retrieval endpoints
-- add operator-console read-only replay/recovery summaries if time allows
-- keep recovery mutation controls behind explicit operator action, not passive page load
-- add API and UI tests where surfaces are changed
+- add gateway replay run creation endpoint - Complete
+- add gateway replay run retrieval endpoint - Complete
+- add gateway workflow replay run listing endpoint - Complete
+- add gateway workflow replay diagnostics endpoint - Complete
+- add gateway recovery action creation and retrieval endpoints - Complete
+- add operator-console read-only replay/recovery summaries if time allows - Complete
+- keep recovery mutation controls behind explicit operator action, not passive page load - Complete
+- add API and UI tests where surfaces are changed - Complete
 
 Completion criteria:
-- replay and recovery records are accessible through gateway-api
-- operator-facing data is bounded and understandable
-- no read endpoint creates replay or recovery side effects
-- tests pass
+- replay and recovery records are accessible through gateway-api - Met
+- operator-facing data is bounded and understandable - Met
+- no read endpoint creates replay or recovery side effects - Met
+- tests pass - Met
 
 ---
 
@@ -680,25 +680,25 @@ Completion criteria:
 
 ## Workstream 10 - Documentation And Phase Closeout
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- update `CURRENT_FUNCTIONALITY.md`
-- update `IMPLEMENTATION_ROADMAP.md`
-- update `WORKFLOW_ENGINE.md` with implemented replay and recovery behavior
-- update `WORKFLOW_STATE_MACHINE.md` if recovery states or transitions are added
-- update `DATA_MODEL.md` for implemented replay and recovery records
-- update `API_CONTRACTS.md` for replay and recovery endpoints
-- update `SECURITY_MODEL.md` for local recovery authorization boundaries
-- update `OBSERVABILITY_STRATEGY.md` for replay and recovery telemetry
-- update `DEVELOPER_WORKFLOW.md` with replay and recovery validation commands
-- add Phase 8 completion log after validation
+- update `CURRENT_FUNCTIONALITY.md` - Complete
+- update `IMPLEMENTATION_ROADMAP.md` - Complete
+- update `WORKFLOW_ENGINE.md` with implemented replay and recovery behavior - Complete
+- update `WORKFLOW_STATE_MACHINE.md` if recovery states or transitions are added - Complete
+- update `DATA_MODEL.md` for implemented replay and recovery records - Complete
+- update `API_CONTRACTS.md` for replay and recovery endpoints - Complete
+- update `SECURITY_MODEL.md` for local recovery authorization boundaries - Complete
+- update `OBSERVABILITY_STRATEGY.md` for replay and recovery telemetry - Complete
+- update `DEVELOPER_WORKFLOW.md` with replay and recovery validation commands - Complete
+- add Phase 8 completion log after validation - Complete
 
 Completion criteria:
-- documentation describes implemented behavior, not aspirational behavior
-- business-facing recovery boundary remains clear
-- manual tester can run local replay and safe recovery validation
-- automated tests and manual validation are recorded
+- documentation describes implemented behavior, not aspirational behavior - Met
+- business-facing recovery boundary remains clear - Met
+- manual tester can run local replay and safe recovery validation - Met
+- automated tests and manual validation are recorded - Met
 
 ---
 
@@ -813,20 +813,20 @@ Mitigation:
 # Phase 8 Completion Criteria
 
 Phase 8 is complete when:
-- replay and recovery persistence tables exist and are tested
-- workflow evidence reconstruction works for local approval and rejection workflows
-- deterministic replay validation produces persisted replay runs and steps
-- replay run creation is side-effect free
-- replay and recovery retrieval endpoints are available through gateway-api
-- safe outbox recovery behavior is implemented and tested
-- unsupported recovery actions are rejected with structured errors
-- recovery actions require local actor identity and reason
-- any workflow state mutation routes through workflow-engine-owned logic
-- Postman validates replay and safe recovery workflows
-- replay and recovery emit traces, metrics, and structured logs
-- Grafana or dashboard panels expose replay and recovery activity
-- replay and recovery avoid sensitive payload exposure
-- documentation and roadmap are updated
+- replay and recovery persistence tables exist and are tested - Met
+- workflow evidence reconstruction works for local approval and rejection workflows - Met
+- deterministic replay validation produces persisted replay runs and steps - Met
+- replay run creation is side-effect free - Met
+- replay and recovery retrieval endpoints are available through gateway-api - Met
+- safe outbox recovery behavior is implemented and tested - Met
+- unsupported recovery actions are rejected with structured errors - Met
+- recovery actions require local actor identity and reason - Met
+- any workflow state mutation routes through workflow-engine-owned logic - Met
+- Postman validates replay and safe recovery workflows - Met
+- replay and recovery emit traces, metrics, and structured logs - Met
+- Grafana or dashboard panels expose replay and recovery activity - Met
+- replay and recovery avoid sensitive payload exposure - Met
+- documentation and roadmap are updated - Met
 
 ---
 
@@ -1130,6 +1130,34 @@ Boundary:
 
 Next step:
 - implement Workstream 10: Documentation And Phase Closeout
+
+## 2026-05-13 - Workstream 10
+
+Status:
+- updated current functionality documentation to describe completed Phase 8 local replay and recovery capability
+- updated the implementation roadmap with Phase 8 completion status, delivered replay/recovery capability, validation results, and remaining future boundaries
+- updated workflow engine and workflow state machine documentation for side-effect-free replay, outbox recovery, workflow-engine-owned recovery, and the lack of new workflow lifecycle states
+- updated data model documentation for replay/recovery records, outbox `DEAD_LETTERED` status, and recovery action outcomes
+- updated API, event, security, observability, and developer workflow documentation for implemented replay and recovery contracts
+- preserved the business boundary that replay and recovery do not approve, reject, complete, underwrite, or mutate mortgage decisions
+
+Validation:
+- gateway-api pytest suite passed with 41 tests
+- workflow-engine pytest suite passed with 15 tests
+- operator-console production build passed
+- Postman collection JSON and script syntax parsed successfully
+- Grafana replay/recovery dashboard JSON parsed successfully
+- Docker Compose configuration validated
+- local live replay and seeded outbox recovery smoke validations completed during Workstreams 8 and 9
+
+Completed workstream:
+- Workstream 10 - Documentation And Phase Closeout
+
+Completed phase:
+- Phase 8 - Replay and Failure Recovery
+
+Next step:
+- begin Phase 9 planning when ready
 
 ---
 

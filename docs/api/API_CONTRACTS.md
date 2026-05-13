@@ -177,6 +177,27 @@ The recovery check endpoint returns dry-run workflow recovery eligibility for su
 
 The recovery action endpoints expose explicit operator-triggered recovery actions. `POST /api/v1/workflows/{workflow_id}/recovery-actions` requires `X-Actor-ID` and a reason. Supported local actions are bounded to retrying retryable outbox events, marking dead-letterable outbox events, and requesting workflow projection reconciliation. Outbox recovery requires an explicit `workflow_event_outbox` target. Workflow projection reconciliation requests are auditable gateway records only; any workflow state mutation remains owned by workflow-engine recovery logic. Recovery retrieval and listing endpoints are read-only.
 
+Implemented replay modes:
+- `history_reconstruction`
+- `deterministic_validation`
+
+Implemented local recovery action types:
+- `retry_outbox_event`
+- `mark_outbox_event_dead_lettered`
+- `reconcile_workflow_projection`
+- `resume_stuck_workflow_check` as a dry-run check only
+
+Implemented structured recovery errors include:
+- `actor_required` for replay or recovery creation requests missing `X-Actor-ID`
+- `recovery_target_required` for outbox recovery requests without an explicit outbox target
+- `recovery_actor_required` for workflow recovery commands without a local actor
+- `recovery_reason_required` for workflow recovery commands without a reason
+- `workflow_recovery_not_allowed` for unsupported or unsafe recovery commands
+- `workflow_recovery_dry_run_only` for recovery checks that cannot be created as mutating actions
+- `outbox_event_not_retryable` when an outbox event is not eligible for retry
+
+Replay and recovery responses expose bounded operational metadata only. They must not expose raw document contents, borrower PII, secrets, prompt content, approval comments as diagnostic metadata, or full model outputs.
+
 ---
 
 ## agent-runtime

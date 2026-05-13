@@ -679,6 +679,9 @@ The local implementation currently persists:
 - evaluation dataset cases
 - evaluation runs
 - evaluation results
+- workflow replay runs
+- workflow replay steps
+- workflow recovery actions
 
 Approval records currently preserve:
 - approval identity
@@ -994,7 +997,22 @@ The Phase 8 local implementation persists replay and recovery foundation data in
 
 Replay and recovery records preserve references, statuses, timestamps, actor identity, and bounded diagnostic context. They must not store raw document contents, unrestricted borrower PII, secrets, prompt content, approval comments as diagnostic metadata, full model outputs, or unrestricted integration payloads.
 
-The current local replay and recovery persistence foundation does not itself mutate workflow state, retry events, perform Temporal replay, execute agents, execute tools, or dispatch approvals.
+Implemented replay behavior creates `workflow_replay_runs` and `workflow_replay_steps` only. It reconstructs and validates persisted evidence and does not mutate workflow state, retry events, perform Temporal replay, execute agents, execute tools, or dispatch approvals.
+
+Implemented recovery behavior uses `workflow_recovery_actions` for explicit operator-triggered recovery records:
+- `retry_outbox_event` retries a selected retryable `workflow_event_outbox` record through the existing publisher boundary
+- `mark_outbox_event_dead_lettered` marks a selected dead-letterable local outbox record as `DEAD_LETTERED`
+- `reconcile_workflow_projection` records an auditable gateway request and relies on workflow-engine-owned recovery activity logic for any workflow state projection mutation
+- `resume_stuck_workflow_check` is a dry-run diagnostic check only
+- unsupported or unsafe recovery commands are rejected with structured errors
+
+The `workflow_event_outbox` publish status model currently includes:
+- `PENDING`
+- `PUBLISHED`
+- `FAILED`
+- `DEAD_LETTERED`
+
+Workflow projection reconciliation can update a workflow record's current state to the latest persisted transition, but only through workflow-engine recovery logic. It also writes a `RECOVERY_ACTION_RECORDED` timeline entry and a `recovery.action_completed` outbox event. Recovery actions do not create mortgage approval, rejection, underwriting, credit, compliance, servicing, or downstream system decisions.
 
 ---
 

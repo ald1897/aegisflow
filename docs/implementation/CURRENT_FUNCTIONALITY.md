@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the completed Phase 7 local evaluation layer:
+The current implementation includes Phase 1 through Phase 8:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -45,6 +45,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 
 Phase 6 is complete for the local simulation boundary.
 Phase 7 is complete for the local evaluation boundary.
+Phase 8 is complete for the local replay and recovery boundary.
 
 ---
 
@@ -427,6 +428,8 @@ Current event types:
 - `workflow.approved`
 - `workflow.rejected`
 - `workflow.completed`
+- `workflow.failed`
+- `recovery.action_completed`
 - `agent.execution_completed`
 - `tool.invocation_completed`
 - `tool.invocation_failed`
@@ -454,13 +457,19 @@ Successful local publication sets outbox records to:
 PUBLISHED
 ```
 
+Explicit local recovery can also mark selected failed outbox records as:
+
+```text
+DEAD_LETTERED
+```
+
 ---
 
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
 - authentication and RBAC
-- advanced replay tooling
+- production autonomous recovery, broad activity replay, and Temporal history mutation tooling
 - production alerting and paging
 - production log aggregation
 - external judge-model provider integration

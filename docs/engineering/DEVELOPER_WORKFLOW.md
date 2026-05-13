@@ -738,7 +738,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected current result:
 
 ```text
-17 passed
+41 passed
 ```
 
 Local Postman validation lives in:
@@ -804,6 +804,42 @@ Useful local replay and recovery observability checks:
 - Prometheus query: `aegisflow_gateway_outbox_retries_total`
 - Jaeger service: `gateway-api` with spans such as `gateway.replay.run.create` and `gateway.recovery.outbox.retry`
 - Grafana dashboard: `AegisFlow - Replay And Recovery`
+
+Run the replay and recovery gateway-api test suite from the repository root:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -e ENABLE_TEMPORAL_START=false `
+  -e ENABLE_EVENT_PUBLISHING=false `
+  -v "${PWD}\apps\gateway-api\tests:/app/tests" `
+  gateway-api sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected current result:
+
+```text
+41 passed
+```
+
+Run workflow-engine tests when changing workflow-owned recovery behavior:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -v "${PWD}\apps\workflow-engine\tests:/app/tests" `
+  workflow-engine sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected current result:
+
+```text
+15 passed
+```
+
+For documentation or local infrastructure closeout, also validate:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml config --quiet
+```
 
 ---
 

@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from datetime import timedelta
 from uuid import UUID
 
 import pytest
@@ -55,6 +56,7 @@ async def app_context() -> AsyncIterator[tuple[object, async_sessionmaker[AsyncS
 
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
+
     def override_get_settings() -> Settings:
         settings = Settings()
         settings.enable_event_publishing = False
@@ -544,6 +546,328 @@ async def test_recovery_action_can_be_persisted_and_listed(
         recovery_action_count = len((await session.execute(select(WorkflowRecoveryAction))).scalars().all())
 
     assert recovery_action_count == 1
+
+
+async def _seed_workflow_evidence(
+    session: AsyncSession,
+    workflow_id: str,
+    *,
+    correlation_id: str,
+    final_state: str,
+    decision: str | None = None,
+    include_evaluation: bool = False,
+) -> None:
+    now = utc_now()
+    workflow = await session.get(WorkflowRecord, workflow_id)
+    assert workflow is not None
+    workflow.state = final_state
+    workflow.temporal_workflow_id = f"mortgage-exception-review-{workflow_id}"
+    workflow.temporal_run_id = "temporal-run-1"
+    if final_state == "COMPLETED":
+        workflow.completed_at = now + timedelta(minutes=7)
+
+    session.add_all(
+        [
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000000601",
+                workflow_id=workflow_id,
+                prior_state="NEW",
+                new_state="INTAKE_IN_PROGRESS",
+                transition_reason="test_intake_started",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                created_at=now + timedelta(minutes=1),
+            ),
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000000602",
+                workflow_id=workflow_id,
+                prior_state="INTAKE_IN_PROGRESS",
+                new_state="DOCUMENT_ANALYSIS_PENDING",
+                transition_reason="test_intake_completed",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                created_at=now + timedelta(minutes=2),
+            ),
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000000603",
+                workflow_id=workflow_id,
+                prior_state="DOCUMENT_ANALYSIS_PENDING",
+                new_state="HUMAN_REVIEW_REQUIRED",
+                transition_reason="test_review_required",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                created_at=now + timedelta(minutes=3),
+            ),
+            WorkflowTimelineEntry(
+                timeline_entry_id="00000000-0000-0000-0000-000000000604",
+                workflow_id=workflow_id,
+                entry_type="AGENT_EXECUTION_COMPLETED",
+                message="Intake agent completed.",
+                state="INTAKE_IN_PROGRESS",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                entry_metadata={"agent_id": "intake_agent"},
+                created_at=now + timedelta(minutes=2),
+            ),
+            AgentExecutionRecord(
+                agent_execution_id="00000000-0000-0000-0000-000000000605",
+                workflow_id=workflow_id,
+                agent_id="intake_agent",
+                prompt_id="intake-agent",
+                prompt_version="1",
+                model_name="deterministic-langgraph-local-v1",
+                status="COMPLETED",
+                validation_status="VALIDATED",
+                confidence_score=0.91,
+                requires_human_review=False,
+                input_metadata={"workflow_id": workflow_id},
+                output_payload={"recommended_next_state": "DOCUMENT_ANALYSIS_PENDING"},
+                execution_metadata={"workflow_state": "INTAKE_IN_PROGRESS"},
+                error_message=None,
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                started_at=now + timedelta(minutes=1),
+                completed_at=now + timedelta(minutes=2),
+                created_at=now + timedelta(minutes=2),
+            ),
+            AgentExecutionRecord(
+                agent_execution_id="00000000-0000-0000-0000-000000000606",
+                workflow_id=workflow_id,
+                agent_id="document_analysis_agent",
+                prompt_id="document-analysis-agent",
+                prompt_version="1",
+                model_name="deterministic-langgraph-local-v1",
+                status="COMPLETED",
+                validation_status="VALIDATED",
+                confidence_score=0.87,
+                requires_human_review=True,
+                input_metadata={"workflow_id": workflow_id},
+                output_payload={"recommended_next_state": "RISK_REVIEW_PENDING"},
+                execution_metadata={"workflow_state": "DOCUMENT_ANALYSIS_PENDING"},
+                error_message=None,
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                started_at=now + timedelta(minutes=2),
+                completed_at=now + timedelta(minutes=3),
+                created_at=now + timedelta(minutes=3),
+            ),
+            ToolInvocationRecord(
+                tool_invocation_id="00000000-0000-0000-0000-000000000607",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                agent_execution_id="00000000-0000-0000-0000-000000000605",
+                agent_id="intake_agent",
+                tool_id="borrower_profile_lookup",
+                status="COMPLETED",
+                permission_status="AUTHORIZED",
+                input_validation_status="VALIDATED",
+                output_validation_status="VALIDATED",
+                input_metadata={"case_reference_present": True},
+                output_payload={"profile_status": "FOUND"},
+                execution_metadata={"replay_safe": True},
+                error_message=None,
+                created_by="workflow-engine",
+                started_at=now + timedelta(minutes=1),
+                completed_at=now + timedelta(minutes=2),
+                created_at=now + timedelta(minutes=2),
+            ),
+            ToolInvocationRecord(
+                tool_invocation_id="00000000-0000-0000-0000-000000000608",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                agent_execution_id="00000000-0000-0000-0000-000000000606",
+                agent_id="document_analysis_agent",
+                tool_id="document_fetch",
+                status="COMPLETED",
+                permission_status="AUTHORIZED",
+                input_validation_status="VALIDATED",
+                output_validation_status="VALIDATED",
+                input_metadata={"requested_document_types": ["income"]},
+                output_payload={"missing_document_types": ["income"]},
+                execution_metadata={"replay_safe": True},
+                error_message=None,
+                created_by="workflow-engine",
+                started_at=now + timedelta(minutes=2),
+                completed_at=now + timedelta(minutes=3),
+                created_at=now + timedelta(minutes=3),
+            ),
+        ]
+    )
+
+    if decision is not None:
+        session.add(
+            ApprovalRecord(
+                approval_id="00000000-0000-0000-0000-000000000609",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                decision=decision,
+                decision_reason="exception_review_completed",
+                comment=f"Operator {decision.lower()} the prepared exception review.",
+                reviewed_by="operator-1",
+                reviewed_at=now + timedelta(minutes=6),
+                approval_metadata={"review_channel": "operator_console"},
+                created_at=now + timedelta(minutes=6),
+            )
+        )
+
+    if include_evaluation:
+        session.add(
+            EvaluationRun(
+                evaluation_run_id="00000000-0000-0000-0000-000000000610",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                evaluation_scope="workflow",
+                evaluation_mode="dataset_replay",
+                dataset_id="mortgage-exception-local-v1",
+                status="COMPLETED",
+                started_at=now + timedelta(minutes=8),
+                completed_at=now + timedelta(minutes=8),
+                created_by="evaluation-service",
+                run_metadata={"dataset_case_id": f"mortgage-exception-local-v1:{decision.lower()}"},
+                created_at=now + timedelta(minutes=8),
+            )
+        )
+        session.add(
+            EvaluationResult(
+                evaluation_result_id="00000000-0000-0000-0000-000000000611",
+                evaluation_run_id="00000000-0000-0000-0000-000000000610",
+                workflow_id=workflow_id,
+                agent_execution_id=None,
+                prompt_id=None,
+                prompt_version=None,
+                model_name=None,
+                evaluator_id="dataset-replay-contract",
+                evaluator_version="v1",
+                score_name="dataset_case_alignment",
+                score_value=1.0,
+                score_status="PASS",
+                severity="informational",
+                rationale="Workflow evidence satisfied the selected local dataset case.",
+                result_metadata={"expected_decision": decision},
+                created_at=now + timedelta(minutes=8),
+            )
+        )
+
+    await session.commit()
+
+
+async def test_reconstruct_workflow_evidence_for_completed_approval_workflow(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "approval-evidence-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="approval-evidence-test",
+            final_state="COMPLETED",
+            decision="APPROVED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        snapshot = await WorkflowService(session).reconstruct_workflow_evidence(UUID(workflow_id))
+
+    assert snapshot.workflow_id == workflow_id
+    assert snapshot.workflow_state == "COMPLETED"
+    assert snapshot.artifact_counts["workflow_record"] == 1
+    assert snapshot.artifact_counts["agent_execution_record"] == 2
+    assert snapshot.artifact_counts["tool_invocation_record"] == 2
+    assert snapshot.artifact_counts["approval_record"] == 1
+    assert snapshot.artifact_counts["evaluation_run"] == 1
+    assert snapshot.artifact_counts["evaluation_result"] == 1
+    assert [diagnostic.code for diagnostic in snapshot.diagnostics] == ["evidence_snapshot_complete"]
+    assert {artifact.correlation_id for artifact in snapshot.artifacts} == {"approval-evidence-test"}
+
+    sort_keys = [(artifact.occurred_at, artifact.artifact_type, artifact.artifact_id) for artifact in snapshot.artifacts]
+    assert sort_keys == sorted(sort_keys)
+    approval_artifact = snapshot.artifacts_by_type("approval_record")[0]
+    assert approval_artifact.status == "APPROVED"
+    assert approval_artifact.metadata["comment_present"] is True
+    assert "Operator approved the prepared exception review." not in str(snapshot)
+
+
+async def test_reconstruct_workflow_evidence_for_completed_rejection_workflow(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "rejection-evidence-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="rejection-evidence-test",
+            final_state="COMPLETED",
+            decision="REJECTED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        snapshot = await WorkflowService(session).reconstruct_workflow_evidence(UUID(workflow_id))
+
+    assert snapshot.workflow_state == "COMPLETED"
+    assert snapshot.artifact_counts["approval_record"] == 1
+    assert snapshot.artifacts_by_type("approval_record")[0].status == "REJECTED"
+    assert snapshot.artifacts_by_type("evaluation_result")[0].metadata["score_name"] == "dataset_case_alignment"
+    assert [diagnostic.status for diagnostic in snapshot.diagnostics] == ["PASS"]
+
+
+async def test_reconstruct_workflow_evidence_flags_human_review_in_progress(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "review-pending-evidence-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="review-pending-evidence-test",
+            final_state="HUMAN_REVIEW_REQUIRED",
+            decision=None,
+            include_evaluation=False,
+        )
+
+    async with session_factory() as session:
+        before_counts = {
+            "workflows": len((await session.execute(select(WorkflowRecord))).scalars().all()),
+            "approvals": len((await session.execute(select(ApprovalRecord))).scalars().all()),
+            "replay_runs": len((await session.execute(select(WorkflowReplayRun))).scalars().all()),
+        }
+        snapshot = await WorkflowService(session).reconstruct_workflow_evidence(UUID(workflow_id))
+        after_counts = {
+            "workflows": len((await session.execute(select(WorkflowRecord))).scalars().all()),
+            "approvals": len((await session.execute(select(ApprovalRecord))).scalars().all()),
+            "replay_runs": len((await session.execute(select(WorkflowReplayRun))).scalars().all()),
+        }
+
+    assert before_counts == after_counts
+    assert snapshot.workflow_state == "HUMAN_REVIEW_REQUIRED"
+    assert snapshot.artifact_counts.get("approval_record") is None
+    diagnostics = {diagnostic.code: diagnostic for diagnostic in snapshot.diagnostics}
+    assert diagnostics["human_review_pending"].status == "WARN"
+    assert diagnostics["human_review_pending"].artifact_type == "approval_record"
 
 
 async def test_get_workflow_review_context_aggregates_review_records(

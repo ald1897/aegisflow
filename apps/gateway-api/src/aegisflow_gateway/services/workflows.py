@@ -30,6 +30,7 @@ from aegisflow_gateway.persistence.models import (
     WorkflowStateTransition,
     WorkflowTimelineEntry,
 )
+from aegisflow_gateway.services.evidence import WorkflowEvidenceReconstructor, WorkflowEvidenceSnapshot
 
 
 class WorkflowNotFoundError(Exception):
@@ -350,3 +351,7 @@ class WorkflowService:
             .order_by(WorkflowRecoveryAction.started_at.asc(), WorkflowRecoveryAction.recovery_action_id.asc())
         )
         return list(result.scalars().all())
+
+    async def reconstruct_workflow_evidence(self, workflow_id: UUID) -> WorkflowEvidenceSnapshot:
+        workflow = await self.get_workflow(workflow_id)
+        return await WorkflowEvidenceReconstructor(self.session).reconstruct(workflow)

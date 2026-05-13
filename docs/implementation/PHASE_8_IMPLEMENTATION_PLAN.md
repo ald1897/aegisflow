@@ -500,21 +500,21 @@ Completion criteria:
 
 ## Workstream 2 - Workflow Evidence Reconstruction
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- implement workflow evidence loader for workflow record, transitions, timeline, outbox events, agent executions, tool invocations, approval records, and evaluation records
-- normalize evidence into bounded internal dataclasses or DTOs
-- sort evidence deterministically by timestamp and stable identifiers
-- classify evidence artifacts by type and ownership
-- add missing evidence diagnostics for incomplete workflows
-- add tests for completed approval, completed rejection, and human-review-in-progress workflows
+- implement workflow evidence loader for workflow record, transitions, timeline, outbox events, agent executions, tool invocations, approval records, and evaluation records - Complete
+- normalize evidence into bounded internal dataclasses or DTOs - Complete
+- sort evidence deterministically by timestamp and stable identifiers - Complete
+- classify evidence artifacts by type and ownership - Complete
+- add missing evidence diagnostics for incomplete workflows - Complete
+- add tests for completed approval, completed rejection, and human-review-in-progress workflows - Complete
 
 Completion criteria:
-- workflow evidence can be reconstructed from persisted records
-- reconstruction does not mutate workflow state
-- completed approval and rejection workflows produce stable evidence snapshots
-- tests pass
+- workflow evidence can be reconstructed from persisted records - Met
+- reconstruction does not mutate workflow state - Met
+- completed approval and rejection workflows produce stable evidence snapshots - Met
+- tests pass - Met
 
 ---
 
@@ -870,6 +870,35 @@ Boundary:
 
 Next step:
 - implement Workstream 2: Workflow Evidence Reconstruction
+
+## 2026-05-12 - Workstream 2
+
+Status:
+- added gateway-api workflow evidence reconstruction dataclasses for normalized artifacts, diagnostics, and snapshots
+- added read-only workflow evidence reconstruction for workflow records, state transitions, timeline entries, event outbox records, agent executions, tool invocations, approval records, evaluation runs, and evaluation results
+- added deterministic artifact sorting by occurrence timestamp, artifact type, and artifact identifier
+- classified artifacts by type and owning runtime boundary
+- bounded artifact metadata to references, statuses, keys, flags, and diagnostic summaries
+- added diagnostics for missing state transitions, missing timeline entries, missing agent evidence, missing tool evidence, pending human review, missing terminal approval evidence, and missing completed-workflow evaluation runs
+- added gateway service method `reconstruct_workflow_evidence`
+- added tests for completed approval workflow evidence, completed rejection workflow evidence, and human-review-in-progress diagnostics
+- verified reconstruction does not create approval or replay records and does not mutate workflow counts
+
+Validation:
+- gateway-api pytest suite passed with 22 tests
+- Docker Compose configuration validated
+- gateway-api source compilation succeeded
+
+Completed workstream:
+- Workstream 2 - Workflow Evidence Reconstruction
+
+Boundary:
+- Workstream 2 is read-only evidence reconstruction only
+- no replay runs, replay steps, recovery actions, workflow state transitions, outbox retries, Temporal replay, agent execution, tool execution, or approval dispatch are created
+- approval comments, raw documents, borrower PII, prompt content, full model outputs, and unrestricted payloads are not copied into evidence artifacts
+
+Next step:
+- implement Workstream 3: Deterministic Replay Validator
 
 ---
 

@@ -130,6 +130,31 @@
       "key": "evaluationDatasetCaseId",
       "value": "mortgage-exception-local-v1:approval",
       "type": "string"
+    },
+    {
+      "key": "approvalReplayRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rejectionReplayRunId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "retryableOutboxEventId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "recoveryActionId",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "type": "string"
+    },
+    {
+      "key": "enableRecoveryScenario",
+      "value": "false",
+      "type": "string"
     }
   ],
   "item": [
@@ -1434,6 +1459,204 @@
       ]
     },
     {
+      "name": "Gateway Approval Replay Diagnostics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/replay-diagnostics",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "replay-diagnostics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Gateway Approval Replay Diagnostics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"replay diagnostics are bounded and deterministic\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect([\"PASS\", \"WARN\"]).to.include(json.status);",
+              "  pm.expect(json.diagnostics.length).to.be.above(0);",
+              "  pm.expect(json.diagnostics.map((step) => step.artifact_type)).to.include(\"workflow_state_sequence\");",
+              "  pm.expect(json.diagnostics.some((step) => JSON.stringify(step.metadata).includes(\"APPROVED\"))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Approval Replay Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"replay_mode\": \"deterministic_validation\",\n  \"metadata\": {\n    \"validation_scope\": \"phase_8_workstream_8\",\n    \"workflow_path\": \"approval\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/replay-runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "replay-runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Create Approval Replay Run accepted\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"replay run is persisted with deterministic steps\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set(\"approvalReplayRunId\", json.replay_run_id);",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.replay_mode).to.eql(\"deterministic_validation\");",
+              "  pm.expect(json.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.requested_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "  pm.expect(json.steps.length).to.be.above(0);",
+              "  pm.expect(json.steps.every((step) => [\"PASS\", \"WARN\", \"SKIPPED\"].includes(step.status))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Approval Replay Run",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/replay-runs/{{approvalReplayRunId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "replay-runs",
+            "{{approvalReplayRunId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Get Approval Replay Run returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"retrieved replay run matches captured identifier\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.replay_run_id).to.eql(pm.collectionVariables.get(\"approvalReplayRunId\"));",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.steps.length).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Approval Workflow Replay Runs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/replay-runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "replay-runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"List Approval Workflow Replay Runs returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow replay listing includes captured run\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.count).to.be.above(0);",
+              "  const matchingRun = json.runs.find((run) => run.replay_run_id === pm.collectionVariables.get(\"approvalReplayRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Create Mortgage Exception Review Workflow For Rejection",
       "request": {
         "method": "POST",
@@ -1845,6 +2068,447 @@
               "  pm.expect(matchingRun).to.exist;",
               "  pm.expect(matchingRun.results.length).to.be.above(0);",
               "  pm.expect(matchingRun.results.map((result) => result.evaluator_id)).to.include(\"dataset-replay-contract\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Gateway Rejection Replay Diagnostics",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{rejectionWorkflowId}}/replay-diagnostics",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "replay-diagnostics"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Gateway Rejection Replay Diagnostics returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"replay diagnostics are bounded and deterministic\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect([\"PASS\", \"WARN\"]).to.include(json.status);",
+              "  pm.expect(json.diagnostics.length).to.be.above(0);",
+              "  pm.expect(json.diagnostics.map((step) => step.artifact_type)).to.include(\"workflow_state_sequence\");",
+              "  pm.expect(json.diagnostics.some((step) => JSON.stringify(step.metadata).includes(\"REJECTED\"))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Rejection Replay Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"replay_mode\": \"deterministic_validation\",\n  \"metadata\": {\n    \"validation_scope\": \"phase_8_workstream_8\",\n    \"workflow_path\": \"rejection\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{rejectionWorkflowId}}/replay-runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "replay-runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Create Rejection Replay Run accepted\", function () {",
+              "  pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test(\"replay run is persisted with deterministic steps\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set(\"rejectionReplayRunId\", json.replay_run_id);",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect(json.replay_mode).to.eql(\"deterministic_validation\");",
+              "  pm.expect(json.status).to.eql(\"COMPLETED\");",
+              "  pm.expect(json.requested_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "  pm.expect(json.steps.length).to.be.above(0);",
+              "  pm.expect(json.steps.every((step) => [\"PASS\", \"WARN\", \"SKIPPED\"].includes(step.status))).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Rejection Replay Run",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/replay-runs/{{rejectionReplayRunId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "replay-runs",
+            "{{rejectionReplayRunId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Get Rejection Replay Run returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"retrieved replay run matches captured identifier\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.replay_run_id).to.eql(pm.collectionVariables.get(\"rejectionReplayRunId\"));",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect(json.steps.length).to.be.above(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Rejection Workflow Replay Runs",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{rejectionWorkflowId}}/replay-runs",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{rejectionWorkflowId}}",
+            "replay-runs"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"List Rejection Workflow Replay Runs returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow replay listing includes captured run\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"rejectionWorkflowId\"));",
+              "  pm.expect(json.count).to.be.above(0);",
+              "  const matchingRun = json.runs.find((run) => run.replay_run_id === pm.collectionVariables.get(\"rejectionReplayRunId\"));",
+              "  pm.expect(matchingRun).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Retry Seeded Approval Outbox Event Recovery Action",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action_type\": \"retry_outbox_event\",\n  \"target_resource_type\": \"workflow_event_outbox\",\n  \"target_resource_id\": \"{{retryableOutboxEventId}}\",\n  \"reason\": \"Postman validation retry for a seeded transient local outbox failure.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/recovery-actions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "recovery-actions"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const approvalWorkflowId = pm.collectionVariables.get(\"approvalWorkflowId\");",
+              "if (approvalWorkflowId) {",
+              "  pm.collectionVariables.set(\"retryableOutboxEventId\", `${approvalWorkflowId}:workflow.created`);",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const recoveryEnabled = pm.collectionVariables.get(\"enableRecoveryScenario\") === \"true\";",
+              "",
+              "pm.test(\"recovery action response is expected for the configured scenario\", function () {",
+              "  if (recoveryEnabled) {",
+              "    pm.response.to.have.status(201);",
+              "  } else {",
+              "    pm.expect([201, 409]).to.include(pm.response.code);",
+              "  }",
+              "});",
+              "",
+              "if (pm.response.code === 201) {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set(\"recoveryActionId\", json.recovery_action_id);",
+              "  pm.test(\"safe outbox retry action is recorded\", function () {",
+              "    pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "    pm.expect(json.action_type).to.eql(\"retry_outbox_event\");",
+              "    pm.expect(json.target_resource_type).to.eql(\"workflow_event_outbox\");",
+              "    pm.expect(json.target_resource_id).to.eql(pm.collectionVariables.get(\"retryableOutboxEventId\"));",
+              "    pm.expect(json.status).to.eql(\"COMPLETED\");",
+              "    pm.expect(json.requested_by).to.eql(pm.collectionVariables.get(\"actorId\"));",
+              "    pm.expect(json.metadata.classification).to.eql(\"retryable\");",
+              "    pm.expect(json.metadata.sensitive_payloads_persisted).to.eql(false);",
+              "  });",
+              "} else {",
+              "  const json = pm.response.json();",
+              "  pm.test(\"unseeded recovery attempt is rejected as already handled\", function () {",
+              "    pm.expect(json.error).to.eql(\"outbox_event_not_retryable\");",
+              "    pm.expect(recoveryEnabled).to.eql(false);",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Recovery Action",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/recovery-actions/{{recoveryActionId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "recovery-actions",
+            "{{recoveryActionId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const recoveryEnabled = pm.collectionVariables.get(\"enableRecoveryScenario\") === \"true\";",
+              "",
+              "pm.test(\"recovery action retrieval status matches scenario\", function () {",
+              "  if (recoveryEnabled) {",
+              "    pm.response.to.have.status(200);",
+              "  } else {",
+              "    pm.expect([200, 404]).to.include(pm.response.code);",
+              "  }",
+              "});",
+              "",
+              "if (pm.response.code === 200) {",
+              "  pm.test(\"retrieved recovery action matches captured identifier\", function () {",
+              "    const json = pm.response.json();",
+              "    pm.expect(json.recovery_action_id).to.eql(pm.collectionVariables.get(\"recoveryActionId\"));",
+              "    pm.expect(json.action_type).to.eql(\"retry_outbox_event\");",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Approval Workflow Recovery Actions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-Correlation-ID",
+            "value": "{{correlationId}}"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/recovery-actions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "recovery-actions"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"List Approval Workflow Recovery Actions returns 200\", function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test(\"workflow recovery action listing is bounded\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.workflow_id).to.eql(pm.collectionVariables.get(\"approvalWorkflowId\"));",
+              "  pm.expect(json.count).to.eql(json.actions.length);",
+              "  json.actions.forEach((action) => {",
+              "    pm.expect(action.metadata.sensitive_payloads_persisted).to.eql(false);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Unsupported Recovery Action Rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "X-Correlation-ID",
+            "value": "postman-unsupported-recovery"
+          },
+          {
+            "key": "X-Actor-ID",
+            "value": "{{actorId}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action_type\": \"clear_retryable_outbox_error\",\n  \"reason\": \"Postman validation confirms unsupported recovery actions are rejected.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/workflows/{{approvalWorkflowId}}/recovery-actions",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "workflows",
+            "{{approvalWorkflowId}}",
+            "recovery-actions"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"unsupported recovery action is rejected\", function () {",
+              "  pm.response.to.have.status(409);",
+              "});",
+              "",
+              "pm.test(\"unsupported recovery action has structured error\", function () {",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.error).to.eql(\"workflow_recovery_not_allowed\");",
+              "  pm.expect(json.correlation_id).to.eql(\"postman-unsupported-recovery\");",
               "});"
             ]
           }

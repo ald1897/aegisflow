@@ -36,6 +36,9 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - gateway-api replay run creation, retrieval, workflow replay listing, and read-only replay diagnostics
 - gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
 - Postman validation for approval and rejection workflow evaluation runs
+- Postman validation for approval and rejection workflow replay diagnostics and replay run retrieval
+- Postman validation for explicit local recovery action retrieval and unsupported recovery rejection
+- local helper script for seeding a retryable outbox failure scenario for safe Postman recovery validation
 - evaluation-service traces, metrics, structured logs, and Grafana dashboard panels
 
 Phase 6 is complete for the local simulation boundary.
@@ -488,6 +491,11 @@ The collection includes:
 - workflow rejection submission
 - evaluation-service health, readiness, dataset, run creation, run retrieval, workflow run listing, and metrics validation
 - gateway workflow evaluation retrieval validation
+- gateway replay diagnostics validation for approval and rejection workflows
+- deterministic replay run creation, retrieval, and workflow replay listing for approval and rejection workflows
+- safe local outbox recovery action validation with an explicit seeded retryable failure
+- recovery action retrieval and workflow recovery action listing validation
+- unsupported recovery action rejection validation
 - separate approval and rejection workflow validation
 - missing workflow error validation
 - gateway-api metrics validation
@@ -521,6 +529,7 @@ Recommended collection variables:
 - `grafanaPassword`: `aegisflow`
 - `correlationId`: `postman-manual-test`
 - `actorId`: `postman-operator`
+- `enableRecoveryScenario`: `false` by default; set to `true` only after seeding the local retryable outbox failure
 
 The collection automatically captures:
 - `workflowId`
@@ -535,6 +544,10 @@ The collection automatically captures:
 - `rejectionEvaluationRunId`
 - `evaluationRunId`
 - `evaluationDatasetCaseId`
+- `approvalReplayRunId`
+- `rejectionReplayRunId`
+- `retryableOutboxEventId`
+- `recoveryActionId`
 
 ---
 
@@ -998,6 +1011,64 @@ Expected result:
 
 ---
 
+## Replay Validation
+
+Run the following Postman requests after the approval and rejection evaluation requests have completed:
+
+```text
+Gateway Approval Replay Diagnostics
+Create Approval Replay Run
+Get Approval Replay Run
+List Approval Workflow Replay Runs
+Gateway Rejection Replay Diagnostics
+Create Rejection Replay Run
+Get Rejection Replay Run
+List Rejection Workflow Replay Runs
+```
+
+Expected result:
+- replay diagnostics return bounded deterministic checks for approval and rejection workflows
+- replay run creation returns `COMPLETED` deterministic validation runs
+- replay retrieval and workflow listing include the captured replay run identifiers
+- replay validation does not re-run agents, tools, approvals, workflows, or event publication
+
+---
+
+## Local Recovery Validation
+
+The safe recovery Postman path requires an explicitly seeded local outbox failure.
+
+After `Create Approval Replay Run` succeeds, run this from the repository root using the captured `approvalWorkflowId`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\seed_retryable_outbox_failure.ps1 -WorkflowId "<approvalWorkflowId>"
+```
+
+In Postman, set:
+
+```text
+enableRecoveryScenario=true
+```
+
+Then run:
+
+```text
+Retry Seeded Approval Outbox Event Recovery Action
+Get Recovery Action
+List Approval Workflow Recovery Actions
+Unsupported Recovery Action Rejected
+```
+
+Expected result:
+- the seeded approval workflow `workflow.created` outbox event is retried through the explicit recovery action endpoint
+- the recovery action is persisted and retrievable by ID
+- workflow recovery action listing includes bounded metadata only
+- `clear_retryable_outbox_error` is rejected with a structured `workflow_recovery_not_allowed` error
+
+The seed script is local-only validation support. It intentionally writes one selected outbox event in the Docker Postgres container to `FAILED` with a retryable transient error so the recovery endpoint can exercise the safe retry path.
+
+---
+
 ## 24. Validate Missing Workflow Behavior
 
 Run the Postman request:
@@ -1052,6 +1123,18 @@ Recommended request order:
 - `Get Rejection Evaluation Run`
 - `List Rejection Workflow Evaluation Runs`
 - `Gateway Rejection Workflow Evaluations`
+- `Gateway Approval Replay Diagnostics`
+- `Create Approval Replay Run`
+- `Get Approval Replay Run`
+- `List Approval Workflow Replay Runs`
+- `Gateway Rejection Replay Diagnostics`
+- `Create Rejection Replay Run`
+- `Get Rejection Replay Run`
+- `List Rejection Workflow Replay Runs`
+- `Retry Seeded Approval Outbox Event Recovery Action`
+- `Get Recovery Action`
+- `List Approval Workflow Recovery Actions`
+- `Unsupported Recovery Action Rejected`
 - `Gateway Metrics`
 - `Workflow Engine Metrics`
 - `Agent Runtime Metrics`
@@ -1193,6 +1276,10 @@ The Postman collection validates:
 - approval evaluation run creation and retrieval
 - rejection evaluation run creation and retrieval
 - gateway workflow evaluation retrieval
+- approval and rejection replay diagnostics
+- approval and rejection deterministic replay run creation, retrieval, and listing
+- safe seeded outbox recovery action creation and retrieval
+- unsupported recovery action structured rejection
 - deterministic dataset replay `PASS` validation for approval and rejection paths
 - persisted approval record retrieval
 - missing workflow error behavior

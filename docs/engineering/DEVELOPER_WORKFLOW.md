@@ -758,6 +758,48 @@ Evaluation validation is quality telemetry only. It must not approve workflows, 
 
 ---
 
+# Local Replay And Recovery Validation
+
+Phase 8 adds local Postman validation for replay diagnostics, replay run creation/retrieval, recovery action retrieval, and unsupported recovery rejection.
+
+The Postman collection includes approval and rejection replay requests after the evaluation requests:
+
+```text
+Gateway Approval Replay Diagnostics
+Create Approval Replay Run
+Get Approval Replay Run
+List Approval Workflow Replay Runs
+Gateway Rejection Replay Diagnostics
+Create Rejection Replay Run
+Get Rejection Replay Run
+List Rejection Workflow Replay Runs
+```
+
+To validate the safe outbox recovery scenario, first complete the approval workflow and run the approval replay requests. Then seed one local retryable outbox failure:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\seed_retryable_outbox_failure.ps1 -WorkflowId "<approvalWorkflowId>"
+```
+
+Set the Postman collection variable:
+
+```text
+enableRecoveryScenario=true
+```
+
+Then run:
+
+```text
+Retry Seeded Approval Outbox Event Recovery Action
+Get Recovery Action
+List Approval Workflow Recovery Actions
+Unsupported Recovery Action Rejected
+```
+
+Replay validation must remain side-effect free. The local seed script is only for development validation of an explicit recovery action against a selected `workflow_event_outbox` record.
+
+---
+
 # CI/CD Workflow
 
 # Pipeline Philosophy

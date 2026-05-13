@@ -83,12 +83,17 @@ The platform can currently:
 - compare approval and rejection workflows against local replay-aware dataset cases
 - retrieve persisted evaluation summaries through evaluation-service and read-only gateway-api endpoints
 - expose evaluation-service traces, metrics, structured logs, and Grafana evaluation panels
+- create and retrieve side-effect-free replay runs for approval and rejection workflows
+- inspect read-only replay diagnostics for approval and rejection workflows
+- exercise explicit local recovery actions for seeded retryable outbox failures
+- validate unsupported recovery actions through structured gateway errors
 
 Current business capability:
 - AegisFlow can demonstrate a controlled and observable mortgage exception review case from intake through AI-assisted preparation, human review, decision capture, and local workflow completion.
 - The platform can show how a case moves from creation through governed agent and tool activity to an accountable operator decision with durable state history.
 - The platform can trace and measure the local workflow path across service boundaries for operational debugging and stakeholder visibility.
 - The platform can measure whether local AI-assisted workflow preparation satisfies deterministic quality, escalation, tool-usage, evidence-consistency, and dataset replay expectations.
+- The platform can locally reconstruct workflow evidence, create replay run records, and validate bounded recovery controls without giving replay or recovery authority over mortgage decisions.
 - The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action, and decision history preserved.
 
 Current business boundary:
@@ -1180,7 +1185,7 @@ Implement:
 - dead-letter handling
 - recovery tooling
 
-Completed local deliverables through Workstream 7:
+Completed local deliverables through Workstream 8:
 - replay and recovery persistence model
 - workflow evidence reconstruction
 - deterministic replay validation
@@ -1191,6 +1196,8 @@ Completed local deliverables through Workstream 7:
 - gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
 - operator-console read-only replay and recovery summaries in workflow review context
 - gateway-api tests validating replay and recovery API boundaries
+- Postman validation for approval and rejection replay diagnostics, replay run creation/retrieval/listing, safe seeded outbox recovery, recovery retrieval, and unsupported recovery rejection
+- local PowerShell helper for seeding a retryable outbox failure scenario against Docker Postgres
 
 ---
 

@@ -634,24 +634,24 @@ Completion criteria:
 
 ## Workstream 8 - Postman Validation And Local Failure Scenarios
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add Postman requests for replay run creation and retrieval
-- add Postman requests for replay diagnostics
-- add Postman requests for recovery action creation and retrieval
-- add local validation for approval workflow replay
-- add local validation for rejection workflow replay
-- add local validation for a retryable outbox failure scenario
-- add local validation for rejection of unsupported recovery actions
-- validate Postman collection JSON and script syntax
+- add Postman requests for replay run creation and retrieval - Complete
+- add Postman requests for replay diagnostics - Complete
+- add Postman requests for recovery action creation and retrieval - Complete
+- add local validation for approval workflow replay - Complete
+- add local validation for rejection workflow replay - Complete
+- add local validation for a retryable outbox failure scenario - Complete
+- add local validation for rejection of unsupported recovery actions - Complete
+- validate Postman collection JSON and script syntax - Complete
 
 Completion criteria:
-- Postman can create and retrieve replay runs
-- Postman can validate replay diagnostics for approval and rejection workflows
-- Postman can exercise at least one safe recovery action
-- unsupported recovery actions are rejected with structured errors
-- collection JSON and scripts validate
+- Postman can create and retrieve replay runs - Met
+- Postman can validate replay diagnostics for approval and rejection workflows - Met
+- Postman can exercise at least one safe recovery action - Met
+- unsupported recovery actions are rejected with structured errors - Met
+- collection JSON and scripts validate - Met
 
 ---
 
@@ -1061,6 +1061,38 @@ Boundary:
 
 Next step:
 - implement Workstream 8: Postman Validation And Local Failure Scenarios
+
+## 2026-05-13 - Workstream 8
+
+Status:
+- added Postman replay diagnostics requests for approval and rejection workflows
+- added Postman deterministic replay run creation, retrieval, and workflow replay listing requests for approval and rejection workflows
+- added Postman recovery action creation, retrieval, and workflow recovery action listing requests
+- added Postman validation for structured rejection of unsupported recovery actions
+- added local helper script `scripts/seed_retryable_outbox_failure.ps1` to seed a retryable workflow outbox failure for safe local recovery validation
+- added collection variables for replay run ids, retryable outbox event id, recovery action id, and explicit recovery-scenario enablement
+- kept the default collection runnable without requiring database seeding while allowing strict recovery validation when `enableRecoveryScenario` is set to `true`
+- validated Postman collection JSON parsing and script syntax
+
+Validation:
+- Postman collection JSON parsed successfully
+- Postman test and pre-request scripts parsed successfully
+- PowerShell seed helper syntax parsed successfully
+- Docker Compose configuration validated
+- local live approval workflow replay smoke validation completed through gateway-api
+- local live seeded outbox retry recovery action completed through gateway-api
+- unsupported recovery action returned structured `workflow_recovery_not_allowed` error
+
+Completed workstream:
+- Workstream 8 - Postman Validation And Local Failure Scenarios
+
+Boundary:
+- Workstream 8 adds manual validation coverage and a local failure seed helper only
+- no gateway-api, workflow-engine, workflow state, Temporal replay, agent execution, tool execution, approval dispatch, event publication, or recovery business behavior is changed
+- local outbox seeding is explicit, operator-run, and limited to a selected outbox event in the local Docker Postgres container
+
+Next step:
+- implement Workstream 9: Replay Observability And Dashboards
 
 ---
 

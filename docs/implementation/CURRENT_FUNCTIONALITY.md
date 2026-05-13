@@ -35,11 +35,13 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - gateway-api retrieval of persisted workflow evaluation runs and results
 - gateway-api replay run creation, retrieval, workflow replay listing, and read-only replay diagnostics
 - gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
+- gateway-api replay and recovery traces, metrics, and bounded structured logs
 - Postman validation for approval and rejection workflow evaluation runs
 - Postman validation for approval and rejection workflow replay diagnostics and replay run retrieval
 - Postman validation for explicit local recovery action retrieval and unsupported recovery rejection
 - local helper script for seeding a retryable outbox failure scenario for safe Postman recovery validation
 - evaluation-service traces, metrics, structured logs, and Grafana dashboard panels
+- provisioned replay and recovery Grafana dashboard panels
 
 Phase 6 is complete for the local simulation boundary.
 Phase 7 is complete for the local evaluation boundary.
@@ -94,7 +96,7 @@ The gateway API currently supports:
 - Temporal human review decision workflow dispatch
 - workflow event publication for workflow creation
 - distributed request and operation tracing
-- Prometheus request and workflow operation metrics
+- Prometheus request, workflow operation, replay, recovery, outbox retry, and stuck-workflow diagnostic metrics
 - `/metrics` endpoint for local scraping
 
 Implemented endpoints:
@@ -128,6 +130,13 @@ The workflow evaluations endpoint is read-only. It returns persisted evaluation-
 The replay endpoints expose bounded local replay records and diagnostics. Replay run creation requires `X-Actor-ID` and only persists replay run and replay step records. Replay retrieval, workflow replay listing, and replay diagnostics are read-only and do not create replay or recovery records, mutate workflow state, publish events, execute agents, execute tools, dispatch approvals, or call external systems.
 
 The recovery endpoints expose bounded operator-facing recovery controls. Recovery checks are dry-run reads. Recovery action creation requires `X-Actor-ID` and a reason, and supports explicit outbox retry, explicit outbox dead-letter marking, and workflow projection reconciliation requests. Gateway workflow recovery requests are auditable records; workflow-engine remains responsible for any actual workflow state mutation.
+
+Current replay and recovery observability:
+- replay run creation emits spans for request handling, evidence loading, step validation, and replay record persistence
+- replay diagnostics emits read-only validation spans and bounded logs
+- recovery checks and recovery actions emit spans, low-cardinality metrics, and bounded logs
+- gateway metrics include replay run count and duration, replay step results, recovery action count and duration, outbox status, outbox retry outcomes, and stuck workflow diagnostics
+- metric labels remain aggregate-only and do not include workflow IDs, replay run IDs, recovery action IDs, event IDs, trace IDs, borrower values, prompt content, document content, or approval comments
 
 ---
 
@@ -1175,7 +1184,7 @@ Expected result:
 - Jaeger lists `gateway-api`, `workflow-engine`, `agent-runtime`, `tool-runtime`, and `evaluation-service` after workflow execution and evaluation requests
 - Jaeger trace search returns gateway traces
 - Grafana health returns `database` as `ok`
-- Grafana search returns the five provisioned AegisFlow dashboards
+- Grafana search returns the six provisioned AegisFlow dashboards, including `AegisFlow - Replay And Recovery`
 
 ---
 
@@ -1199,6 +1208,7 @@ Password: aegisflow
 Expected:
 - Grafana loads the `AegisFlow` dashboard folder
 - Prometheus query UI can evaluate AegisFlow metrics such as `aegisflow_workflow_engine_activity_executions_total`
+- Prometheus query UI can evaluate replay and recovery metrics such as `aegisflow_gateway_replay_runs_total` and `aegisflow_gateway_recovery_actions_total`
 - Jaeger can search traces for `gateway-api`, `workflow-engine`, `agent-runtime`, and `tool-runtime`
 
 ---

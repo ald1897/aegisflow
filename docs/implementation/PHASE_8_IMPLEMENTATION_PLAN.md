@@ -657,24 +657,24 @@ Completion criteria:
 
 ## Workstream 9 - Replay Observability And Dashboards
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- emit replay and recovery traces
-- emit replay and recovery metrics
-- add structured logs for replay and recovery operations
-- add Grafana panels or a dedicated dashboard for replay and recovery activity
-- validate Jaeger contains replay and recovery traces
-- validate Prometheus scrapes replay and recovery metrics
-- validate Grafana displays replay and recovery activity
-- keep metric labels low-cardinality
+- emit replay and recovery traces - Complete
+- emit replay and recovery metrics - Complete
+- add structured logs for replay and recovery operations - Complete
+- add Grafana panels or a dedicated dashboard for replay and recovery activity - Complete
+- validate Jaeger contains replay and recovery traces - Complete
+- validate Prometheus scrapes replay and recovery metrics - Complete
+- validate Grafana displays replay and recovery activity - Complete
+- keep metric labels low-cardinality - Complete
 
 Completion criteria:
-- replay and recovery activity appears in Jaeger
-- Prometheus exposes replay and recovery metrics
-- Grafana displays replay and recovery panels
-- logs include bounded correlation and trace context
-- telemetry avoids sensitive payload exposure
+- replay and recovery activity appears in Jaeger - Met
+- Prometheus exposes replay and recovery metrics - Met
+- Grafana displays replay and recovery panels - Met
+- logs include bounded correlation and trace context - Met
+- telemetry avoids sensitive payload exposure - Met
 
 ---
 
@@ -1093,6 +1093,43 @@ Boundary:
 
 Next step:
 - implement Workstream 9: Replay Observability And Dashboards
+
+## 2026-05-13 - Workstream 9
+
+Status:
+- added gateway-api replay run metrics for run count, run duration, and replay step results by replay mode, artifact type, and status
+- added gateway-api recovery metrics for recovery action count and duration by action type and status
+- added gateway-api outbox status gauge and outbox retry counter by publish status, event type, and outcome status
+- added gateway-api stuck workflow diagnostic counter by workflow type and diagnostic status
+- added OpenTelemetry spans for replay run creation, workflow evidence loading, replay step validation, replay run persistence, replay diagnostics, workflow recovery checks, workflow recovery requests, outbox retry, and outbox dead-letter updates
+- added bounded structured logs for replay run start/completion/failure, replay mismatches, replay diagnostics, recovery requests, recovery completion/failure, outbox retries, and outbox dead-letter updates
+- added Grafana dashboard `AegisFlow - Replay And Recovery`
+- preserved low-cardinality metric labels and kept workflow identifiers, replay run identifiers, recovery action identifiers, event identifiers, trace identifiers, borrower values, prompt content, document content, and approval comments out of metric labels
+
+Validation:
+- gateway-api Python source compilation succeeded
+- Postman collection JSON parsed successfully
+- Grafana replay/recovery dashboard JSON parsed successfully
+- Docker Compose configuration validated
+- gateway-api pytest suite passed
+- Prometheus exposed replay and recovery metric families through gateway-api `/metrics`
+- local live replay and recovery smoke path produced replay/recovery metrics
+- Prometheus returned replay, recovery, outbox retry, and stuck-workflow diagnostic samples
+- Jaeger returned gateway replay and recovery traces
+- Grafana listed `AegisFlow - Replay And Recovery`
+- Docker logs contained bounded replay and recovery entries with correlation ID and trace ID
+
+Completed workstream:
+- Workstream 9 - Replay Observability And Dashboards
+
+Boundary:
+- Workstream 9 adds telemetry and dashboard visibility only
+- replay remains side-effect free and persists replay records only
+- recovery actions remain explicit and bounded; workflow state mutation ownership remains with workflow-engine recovery logic
+- metric labels remain aggregate-first and avoid sensitive or high-cardinality identifiers
+
+Next step:
+- implement Workstream 10: Documentation And Phase Closeout
 
 ---
 

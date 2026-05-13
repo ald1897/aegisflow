@@ -798,6 +798,13 @@ Unsupported Recovery Action Rejected
 
 Replay validation must remain side-effect free. The local seed script is only for development validation of an explicit recovery action against a selected `workflow_event_outbox` record.
 
+Useful local replay and recovery observability checks:
+- Prometheus query: `aegisflow_gateway_replay_runs_total`
+- Prometheus query: `aegisflow_gateway_recovery_actions_total`
+- Prometheus query: `aegisflow_gateway_outbox_retries_total`
+- Jaeger service: `gateway-api` with spans such as `gateway.replay.run.create` and `gateway.recovery.outbox.retry`
+- Grafana dashboard: `AegisFlow - Replay And Recovery`
+
 ---
 
 # CI/CD Workflow

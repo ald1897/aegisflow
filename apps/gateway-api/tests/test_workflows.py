@@ -96,6 +96,12 @@ async def test_metrics_endpoint_exposes_gateway_metrics(client: AsyncClient) -> 
     assert response.status_code == 200
     assert "text/plain" in response.headers["content-type"]
     assert "aegisflow_gateway_http_requests_total" in response.text
+    assert "aegisflow_gateway_replay_runs_total" in response.text
+    assert "aegisflow_gateway_replay_steps_total" in response.text
+    assert "aegisflow_gateway_recovery_actions_total" in response.text
+    assert "aegisflow_gateway_outbox_events_by_publish_status" in response.text
+    assert "aegisflow_gateway_outbox_retries_total" in response.text
+    assert "aegisflow_gateway_stuck_workflow_diagnostics_total" in response.text
 
 
 async def test_create_workflow_persists_new_workflow_and_transition(

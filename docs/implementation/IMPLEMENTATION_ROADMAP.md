@@ -1185,7 +1185,7 @@ Implement:
 - dead-letter handling
 - recovery tooling
 
-Completed local deliverables through Workstream 8:
+Completed local deliverables through Workstream 9:
 - replay and recovery persistence model
 - workflow evidence reconstruction
 - deterministic replay validation
@@ -1198,6 +1198,9 @@ Completed local deliverables through Workstream 8:
 - gateway-api tests validating replay and recovery API boundaries
 - Postman validation for approval and rejection replay diagnostics, replay run creation/retrieval/listing, safe seeded outbox recovery, recovery retrieval, and unsupported recovery rejection
 - local PowerShell helper for seeding a retryable outbox failure scenario against Docker Postgres
+- gateway-api replay and recovery traces, metrics, and bounded structured logs
+- gateway-api low-cardinality metrics for replay runs, replay steps, recovery actions, outbox status, outbox retries, and stuck-workflow diagnostics
+- `AegisFlow - Replay And Recovery` Grafana dashboard
 
 ---
 

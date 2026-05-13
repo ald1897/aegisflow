@@ -152,6 +152,8 @@ The current local implementation emits spans for:
 - gateway Temporal workflow start dispatch
 - gateway human review decision dispatch
 - gateway workflow event publication
+- gateway replay run creation, workflow evidence loading, replay step validation, replay diagnostics, and replay run persistence
+- gateway recovery checks, workflow recovery requests, outbox retry updates, and outbox dead-letter updates
 - workflow-engine Temporal activities
 - workflow-engine state transitions
 - workflow-engine agent-runtime client calls
@@ -180,7 +182,7 @@ Temporal workflow definitions must not call tracing APIs directly. Instrumentati
 Metrics provide aggregate operational visibility and must use low-cardinality labels.
 
 The current local implementation exposes Prometheus metrics for:
-- gateway HTTP requests, errors, latency, workflow creation, Temporal dispatch, approval dispatch, and event publication
+- gateway HTTP requests, errors, latency, workflow creation, Temporal dispatch, approval dispatch, event publication, replay runs, replay steps, recovery actions, outbox status, outbox retries, and stuck-workflow diagnostics
 - workflow-engine worker startup, activity execution, state transitions, agent execution, tool invocation, approval decisions, and event publication
 - agent-runtime HTTP requests, agent execution, graph steps, and tool-runtime client calls
 - tool-runtime HTTP requests, governed tool invocations, and handler latency
@@ -190,6 +192,9 @@ Metric labels must not include:
 - borrower values
 - workflow IDs
 - approval IDs
+- replay run IDs
+- recovery action IDs
+- event IDs
 - trace IDs
 - prompt content
 - document content
@@ -208,6 +213,7 @@ The current local Grafana stack provisions:
 - `AegisFlow - Agent And Tool Execution`
 - `AegisFlow - Approval Decisions`
 - `AegisFlow - Evaluation Quality`
+- `AegisFlow - Replay And Recovery`
 
 Dashboards are operational views only. They do not replace PostgreSQL records, Temporal history, workflow timeline entries, approval records, or outbox events.
 
@@ -226,6 +232,8 @@ Current local service logs include bounded operational fields such as:
 - `agent_id`
 - `tool_id`
 - `approval_id`
+- `replay_run_id`
+- `recovery_action_id`
 - `operation`
 - `status`
 

@@ -223,6 +223,12 @@ class WorkflowEvaluationsResponse(BaseModel):
     count: int
 
 
+class ReplayRunCreateRequest(BaseModel):
+    replay_mode: ReplayMode = ReplayMode.deterministic_validation
+    replay_run_id: UUID | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 class ReplayStepResponse(BaseModel):
     replay_step_id: UUID
     replay_run_id: UUID
@@ -254,11 +260,35 @@ class ReplayRunResponse(BaseModel):
     steps: list[ReplayStepResponse] = Field(default_factory=list)
 
 
+class WorkflowReplayRunsResponse(BaseModel):
+    workflow_id: UUID
+    runs: list[ReplayRunResponse]
+    count: int
+
+
+class ReplayDiagnosticStepResponse(BaseModel):
+    sequence_number: int
+    artifact_type: str
+    artifact_id: str | None
+    expected_state: str | None
+    observed_state: str | None
+    status: ReplayStepStatus
+    message: str
+    metadata: dict[str, Any]
+
+
 class ReplayDiagnosticResponse(BaseModel):
     workflow_id: UUID
     status: ReplayStepStatus
     summary: str
-    diagnostics: list[ReplayStepResponse]
+    diagnostics: list[ReplayDiagnosticStepResponse]
+
+
+class RecoveryActionCreateRequest(BaseModel):
+    action_type: RecoveryActionType
+    target_resource_type: str | None = Field(default=None, max_length=80)
+    target_resource_id: str | None = Field(default=None, max_length=128)
+    reason: str = Field(min_length=1, max_length=1000)
 
 
 class RecoveryActionResponse(BaseModel):
@@ -275,3 +305,22 @@ class RecoveryActionResponse(BaseModel):
     completed_at: datetime | None
     metadata: dict[str, Any]
     created_at: datetime
+
+
+class WorkflowRecoveryActionsResponse(BaseModel):
+    workflow_id: UUID
+    actions: list[RecoveryActionResponse]
+    count: int
+
+
+class WorkflowRecoveryCheckResponse(BaseModel):
+    workflow_id: UUID
+    action_type: RecoveryActionType
+    target_resource_type: str
+    target_resource_id: str
+    allowed: bool
+    current_state: str
+    proposed_state: str | None
+    reason: str
+    requires_engine_execution: bool
+    metadata: dict[str, Any]

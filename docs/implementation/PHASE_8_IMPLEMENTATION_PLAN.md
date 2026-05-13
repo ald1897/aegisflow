@@ -612,7 +612,7 @@ Completion criteria:
 
 ## Workstream 7 - Gateway API And Operator Visibility
 
-Status: Not Started
+Status: Completed
 
 Tasks:
 - add gateway replay run creation endpoint
@@ -1025,8 +1025,42 @@ Boundary:
 - unsafe workflow recovery actions are rejected with structured errors
 - recovery metadata remains bounded to statuses, states, transition identifiers, reason presence, and safety flags only
 
+## 2026-05-13 - Workstream 7
+
+Status:
+- added gateway-api replay run creation endpoint
+- added gateway-api replay run retrieval endpoint
+- added gateway-api workflow replay run listing endpoint
+- added gateway-api read-only replay diagnostics endpoint
+- added gateway-api workflow recovery dry-run check endpoint
+- added gateway-api explicit recovery action creation endpoint
+- added gateway-api recovery action retrieval and workflow recovery action listing endpoints
+- required `X-Actor-ID` for replay run creation and recovery action creation
+- required explicit outbox target resource fields for outbox retry and dead-letter recovery
+- kept replay diagnostics, replay retrieval, recovery checks, and recovery retrieval endpoints read-only
+- added gateway-api tests for replay API creation/retrieval/listing, read-only diagnostics, actor enforcement, workflow recovery checks/actions, and explicit outbox recovery targets
+- added operator-console read-only replay and recovery summaries to the workflow review workspace
+
+Validation:
+- gateway-api pytest suite passed with 41 tests
+- workflow-engine pytest suite passed with 15 tests
+- operator-console production build passed
+- Docker Compose configuration validated
+- gateway-api and workflow-engine source compilation succeeded
+
+Completed workstream:
+- Workstream 7 - Gateway API And Operator Visibility
+
+Boundary:
+- replay run creation persists replay run and replay step records only
+- replay diagnostics and all retrieval endpoints do not create replay or recovery records
+- gateway recovery action creation requires explicit operator action, actor identity, and reason
+- gateway workflow recovery requests remain auditable records; workflow-engine remains responsible for actual workflow state mutation
+- no Temporal replay, agent execution, tool execution, approval dispatch, passive recovery mutation, or external integration calls are introduced
+- operator-console replay/recovery visibility is read-only and does not expose recovery mutation controls
+
 Next step:
-- implement Workstream 7: Gateway API And Operator Visibility
+- implement Workstream 8: Postman Validation And Local Failure Scenarios
 
 ---
 

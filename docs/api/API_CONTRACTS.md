@@ -131,6 +131,14 @@ GET /api/v1/workflows/{workflow_id}/review-context
 GET /api/v1/workflows/{workflow_id}/approvals
 POST /api/v1/workflows/{workflow_id}/approvals
 GET /api/v1/workflows/{workflow_id}/evaluations
+POST /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/replay-runs/{replay_run_id}
+GET /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/workflows/{workflow_id}/replay-diagnostics
+GET /api/v1/workflows/{workflow_id}/recovery-checks/{action_type}
+POST /api/v1/workflows/{workflow_id}/recovery-actions
+GET /api/v1/recovery-actions/{recovery_action_id}
+GET /api/v1/workflows/{workflow_id}/recovery-actions
 ```
 
 The gateway-api remains the primary API surface for workflow initiation and operational query access.
@@ -160,6 +168,14 @@ Current approval decision behavior:
 - approval and rejection requests are available to the operator-console and Postman validation collection through gateway-api only
 
 The workflow evaluations endpoint returns persisted evaluation runs and bounded evaluation results associated with a workflow. It is read-only gateway access for operator and Postman ergonomics. It must not create evaluation runs, mutate workflow state, approve or reject workflows, or expose raw prompt content, document contents, borrower PII, secrets, approval comments, or full model outputs.
+
+The replay run endpoints expose local Phase 8 replay records through DTOs. `POST /api/v1/workflows/{workflow_id}/replay-runs` requires `X-Actor-ID`, creates side-effect-free replay run records, and supports `history_reconstruction` and `deterministic_validation` modes. Replay creation persists replay run and replay step diagnostics only; it does not rerun agents, tools, approvals, workflow activities, event publication, or external integrations. Replay retrieval and listing endpoints are read-only.
+
+The replay diagnostics endpoint performs read-only deterministic validation of persisted workflow evidence. It returns bounded diagnostic steps without creating replay run records or mutating workflow state.
+
+The recovery check endpoint returns dry-run workflow recovery eligibility for supported local recovery commands. It does not create recovery action records or mutate workflow state.
+
+The recovery action endpoints expose explicit operator-triggered recovery actions. `POST /api/v1/workflows/{workflow_id}/recovery-actions` requires `X-Actor-ID` and a reason. Supported local actions are bounded to retrying retryable outbox events, marking dead-letterable outbox events, and requesting workflow projection reconciliation. Outbox recovery requires an explicit `workflow_event_outbox` target. Workflow projection reconciliation requests are auditable gateway records only; any workflow state mutation remains owned by workflow-engine recovery logic. Recovery retrieval and listing endpoints are read-only.
 
 ---
 

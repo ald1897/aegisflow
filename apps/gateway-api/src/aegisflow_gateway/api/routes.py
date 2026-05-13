@@ -16,11 +16,21 @@ from aegisflow_gateway.api.schemas import (
     HumanReviewQueueItemResponse,
     HumanReviewQueueResponse,
     ReadyResponse,
+    RecoveryActionCreateRequest,
+    RecoveryActionResponse,
+    ReplayDiagnosticResponse,
+    ReplayDiagnosticStepResponse,
+    ReplayRunCreateRequest,
+    ReplayRunResponse,
+    ReplayStepResponse,
     ToolInvocationRecordResponse,
     WorkflowApprovalsResponse,
     WorkflowAgentExecutionsResponse,
     WorkflowEvaluationsResponse,
+    WorkflowRecoveryActionsResponse,
+    WorkflowRecoveryCheckResponse,
     WorkflowCreateRequest,
+    WorkflowReplayRunsResponse,
     WorkflowReviewContextResponse,
     WorkflowResponse,
     WorkflowToolInvocationsResponse,
@@ -28,6 +38,7 @@ from aegisflow_gateway.api.schemas import (
     WorkflowTimelineResponse,
 )
 from aegisflow_gateway.config import Settings, get_settings
+from aegisflow_gateway.domain.workflows import RecoveryActionType
 from aegisflow_gateway.persistence.database import check_database, get_session
 from aegisflow_gateway.persistence.models import (
     AgentExecutionRecord,
@@ -35,12 +46,17 @@ from aegisflow_gateway.persistence.models import (
     EvaluationResult,
     EvaluationRun,
     ToolInvocationRecord,
+    WorkflowRecoveryAction,
     WorkflowRecord,
+    WorkflowReplayRun,
+    WorkflowReplayStep,
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.services.events import WorkflowEventPublisher
+from aegisflow_gateway.services.replay import ReplayValidationStep
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
 from aegisflow_gateway.services.workflows import WorkflowReviewActionError, WorkflowService
+from aegisflow_gateway.services.workflow_recovery import WorkflowRecoveryCheck
 from aegisflow_gateway.telemetry.metrics import record_workflow_creation, render_prometheus_metrics
 
 router = APIRouter()
@@ -178,6 +194,88 @@ def evaluation_run_to_response(run: EvaluationRun, results: list[EvaluationResul
     )
 
 
+def replay_step_to_response(step: WorkflowReplayStep) -> ReplayStepResponse:
+    return ReplayStepResponse(
+        replay_step_id=UUID(step.replay_step_id),
+        replay_run_id=UUID(step.replay_run_id),
+        workflow_id=UUID(step.workflow_id),
+        sequence_number=step.sequence_number,
+        artifact_type=step.artifact_type,
+        artifact_id=step.artifact_id,
+        expected_state=step.expected_state,
+        observed_state=step.observed_state,
+        status=step.status,
+        message=step.message,
+        metadata=step.step_metadata,
+        created_at=step.created_at,
+    )
+
+
+async def replay_run_to_response(service: WorkflowService, run: WorkflowReplayRun) -> ReplayRunResponse:
+    steps = await service.list_replay_steps(UUID(run.replay_run_id))
+    return ReplayRunResponse(
+        replay_run_id=UUID(run.replay_run_id),
+        workflow_id=UUID(run.workflow_id),
+        correlation_id=run.correlation_id,
+        replay_mode=run.replay_mode,
+        status=run.status,
+        source_temporal_workflow_id=run.source_temporal_workflow_id,
+        source_temporal_run_id=run.source_temporal_run_id,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        requested_by=run.requested_by,
+        metadata=run.replay_metadata,
+        created_at=run.created_at,
+        steps=[replay_step_to_response(step) for step in steps],
+    )
+
+
+def replay_validation_step_to_response(step: ReplayValidationStep) -> ReplayDiagnosticStepResponse:
+    return ReplayDiagnosticStepResponse(
+        sequence_number=step.sequence_number,
+        artifact_type=step.artifact_type,
+        artifact_id=step.artifact_id,
+        expected_state=step.expected_state,
+        observed_state=step.observed_state,
+        status=step.status,
+        message=step.message,
+        metadata=step.metadata,
+    )
+
+
+def recovery_action_to_response(action: WorkflowRecoveryAction) -> RecoveryActionResponse:
+    return RecoveryActionResponse(
+        recovery_action_id=UUID(action.recovery_action_id),
+        workflow_id=UUID(action.workflow_id),
+        correlation_id=action.correlation_id,
+        action_type=action.action_type,
+        target_resource_type=action.target_resource_type,
+        target_resource_id=action.target_resource_id,
+        status=action.status,
+        requested_by=action.requested_by,
+        reason=action.reason,
+        started_at=action.started_at,
+        completed_at=action.completed_at,
+        metadata=action.result_metadata,
+        created_at=action.created_at,
+    )
+
+
+def recovery_check_to_response(check: WorkflowRecoveryCheck) -> WorkflowRecoveryCheckResponse:
+    return WorkflowRecoveryCheckResponse(
+        workflow_id=UUID(check.workflow_id),
+        action_type=check.action_type,
+        target_resource_type=check.target_resource_type,
+        target_resource_id=check.target_resource_id,
+        allowed=check.allowed,
+        current_state=check.current_state,
+        proposed_state=check.proposed_state,
+        reason=check.reason,
+        requires_engine_execution=check.requires_engine_execution,
+        metadata=check.metadata,
+    )
+
+
 def workflow_to_review_queue_item(workflow: WorkflowRecord) -> HumanReviewQueueItemResponse:
     return HumanReviewQueueItemResponse(
         workflow_id=UUID(workflow.workflow_id),
@@ -189,6 +287,16 @@ def workflow_to_review_queue_item(workflow: WorkflowRecord) -> HumanReviewQueueI
         updated_at=workflow.updated_at,
         metadata=workflow.workflow_metadata,
     )
+
+
+def require_actor_id(actor_id: str | None, *, action_name: str) -> str:
+    if actor_id is None or not actor_id.strip():
+        raise WorkflowReviewActionError(
+            error="actor_required",
+            message=f"{action_name} requires X-Actor-ID",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+    return actor_id.strip()
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -392,6 +500,195 @@ async def get_workflow_evaluations(
 
 
 @router.post(
+    "/api/v1/workflows/{workflow_id}/replay-runs",
+    response_model=ReplayRunResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_workflow_replay_run(
+    workflow_id: UUID,
+    payload: ReplayRunCreateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+) -> ReplayRunResponse:
+    requested_by = require_actor_id(actor_id, action_name="Replay run creation")
+    service = WorkflowService(session)
+    replay_run = await service.create_orchestrated_replay_run(
+        workflow_id,
+        replay_mode=payload.replay_mode,
+        requested_by=requested_by,
+        correlation_id=request.state.correlation_id,
+        replay_run_id=payload.replay_run_id,
+        metadata=payload.metadata,
+    )
+    logger.info(
+        "replay run created",
+        extra={
+            "workflow_id": str(workflow_id),
+            "correlation_id": replay_run.correlation_id,
+            "replay_run_id": replay_run.replay_run_id,
+            "replay_mode": replay_run.replay_mode,
+            "operation": "replay_run_create",
+            "status": replay_run.status,
+        },
+    )
+    return await replay_run_to_response(service, replay_run)
+
+
+@router.get(
+    "/api/v1/replay-runs/{replay_run_id}",
+    response_model=ReplayRunResponse,
+)
+async def get_replay_run(
+    replay_run_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> ReplayRunResponse:
+    service = WorkflowService(session)
+    replay_run = await service.get_replay_run(replay_run_id)
+    return await replay_run_to_response(service, replay_run)
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/replay-runs",
+    response_model=WorkflowReplayRunsResponse,
+)
+async def get_workflow_replay_runs(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowReplayRunsResponse:
+    service = WorkflowService(session)
+    runs = await service.list_replay_runs(workflow_id)
+    run_responses = [await replay_run_to_response(service, run) for run in runs]
+    return WorkflowReplayRunsResponse(workflow_id=workflow_id, runs=run_responses, count=len(run_responses))
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/replay-diagnostics",
+    response_model=ReplayDiagnosticResponse,
+)
+async def get_workflow_replay_diagnostics(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> ReplayDiagnosticResponse:
+    service = WorkflowService(session)
+    validation = await service.validate_deterministic_replay(workflow_id)
+    return ReplayDiagnosticResponse(
+        workflow_id=workflow_id,
+        status=validation.status,
+        summary=validation.summary,
+        diagnostics=[replay_validation_step_to_response(step) for step in validation.steps],
+    )
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/recovery-checks/{action_type}",
+    response_model=WorkflowRecoveryCheckResponse,
+)
+async def get_workflow_recovery_check(
+    workflow_id: UUID,
+    action_type: RecoveryActionType,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowRecoveryCheckResponse:
+    service = WorkflowService(session)
+    check = await service.check_workflow_recovery(workflow_id, action_type=action_type)
+    return recovery_check_to_response(check)
+
+
+@router.post(
+    "/api/v1/workflows/{workflow_id}/recovery-actions",
+    response_model=RecoveryActionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_workflow_recovery_action(
+    workflow_id: UUID,
+    payload: RecoveryActionCreateRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+    actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+) -> RecoveryActionResponse:
+    requested_by = require_actor_id(actor_id, action_name="Recovery action creation")
+    service = WorkflowService(session)
+    if payload.action_type == RecoveryActionType.retry_outbox_event:
+        if payload.target_resource_type != "workflow_event_outbox" or not payload.target_resource_id:
+            raise WorkflowReviewActionError(
+                error="recovery_target_required",
+                message="Outbox retry recovery requires target_resource_type workflow_event_outbox and target_resource_id",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        publisher = WorkflowEventPublisher(settings) if settings.enable_event_publishing else None
+        action = await service.retry_outbox_event(
+            payload.target_resource_id,
+            requested_by=requested_by,
+            reason=payload.reason,
+            publisher=publisher,
+        )
+    elif payload.action_type == RecoveryActionType.mark_outbox_event_dead_lettered:
+        if payload.target_resource_type != "workflow_event_outbox" or not payload.target_resource_id:
+            raise WorkflowReviewActionError(
+                error="recovery_target_required",
+                message="Outbox dead-letter recovery requires target_resource_type workflow_event_outbox and target_resource_id",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        action = await service.mark_outbox_event_dead_lettered(
+            payload.target_resource_id,
+            requested_by=requested_by,
+            reason=payload.reason,
+        )
+    else:
+        action = await service.request_workflow_recovery(
+            workflow_id,
+            action_type=payload.action_type,
+            requested_by=requested_by,
+            reason=payload.reason,
+            correlation_id=request.state.correlation_id,
+        )
+
+    logger.info(
+        "recovery action accepted",
+        extra={
+            "workflow_id": action.workflow_id,
+            "correlation_id": action.correlation_id,
+            "recovery_action_id": action.recovery_action_id,
+            "action_type": action.action_type,
+            "operation": "recovery_action_create",
+            "status": action.status,
+        },
+    )
+    return recovery_action_to_response(action)
+
+
+@router.get(
+    "/api/v1/recovery-actions/{recovery_action_id}",
+    response_model=RecoveryActionResponse,
+)
+async def get_recovery_action(
+    recovery_action_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> RecoveryActionResponse:
+    service = WorkflowService(session)
+    action = await service.get_recovery_action(recovery_action_id)
+    return recovery_action_to_response(action)
+
+
+@router.get(
+    "/api/v1/workflows/{workflow_id}/recovery-actions",
+    response_model=WorkflowRecoveryActionsResponse,
+)
+async def get_workflow_recovery_actions(
+    workflow_id: UUID,
+    session: AsyncSession = Depends(get_session),
+) -> WorkflowRecoveryActionsResponse:
+    service = WorkflowService(session)
+    actions = await service.list_recovery_actions(workflow_id)
+    return WorkflowRecoveryActionsResponse(
+        workflow_id=workflow_id,
+        actions=[recovery_action_to_response(action) for action in actions],
+        count=len(actions),
+    )
+
+
+@router.post(
     "/api/v1/workflows/{workflow_id}/approvals",
     response_model=ApprovalDecisionResponse,
     status_code=status.HTTP_201_CREATED,
@@ -404,12 +701,7 @@ async def create_workflow_approval(
     settings: Settings = Depends(get_settings),
     actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
 ) -> ApprovalDecisionResponse:
-    if actor_id is None or not actor_id.strip():
-        raise WorkflowReviewActionError(
-            error="actor_required",
-            message="Approval decisions require X-Actor-ID",
-            status_code=status.HTTP_400_BAD_REQUEST,
-        )
+    actor_id = require_actor_id(actor_id, action_name="Approval decision submission")
 
     service = WorkflowService(session)
     workflow = await service.require_human_reviewable_workflow(workflow_id)
@@ -422,7 +714,7 @@ async def create_workflow_approval(
         "decision": payload.decision.value,
         "decision_reason": payload.decision_reason,
         "comment": payload.comment,
-        "reviewed_by": actor_id.strip(),
+        "reviewed_by": actor_id,
         "reviewed_at": reviewed_at.isoformat(),
         "approval_metadata": {
             **payload.metadata,
@@ -451,7 +743,7 @@ async def create_workflow_approval(
             "correlation_id": decision_payload["correlation_id"],
             "approval_id": str(approval_id),
             "decision": payload.decision.value,
-            "actor_id": actor_id.strip(),
+            "actor_id": actor_id,
             "operation": "approval_decision",
             "status": "accepted",
         },

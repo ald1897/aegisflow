@@ -23,6 +23,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - workflow review context retrieval
 - approval and rejection submission through gateway-api
 - operator-console review and decision workflow
+- operator-console read-only replay and recovery summaries
 - local OpenTelemetry Collector, Jaeger, Prometheus, and Grafana observability stack
 - distributed tracing across gateway-api, workflow-engine, agent-runtime, and tool-runtime
 - Prometheus metrics for service requests, workflow activities, agents, tools, approvals, evaluation runs, evaluation results, and event publication
@@ -32,6 +33,8 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - local evaluation dataset listing and replay-aware dataset case scoring
 - persisted evaluation runs and evaluation results for bounded workflow evidence
 - gateway-api retrieval of persisted workflow evaluation runs and results
+- gateway-api replay run creation, retrieval, workflow replay listing, and read-only replay diagnostics
+- gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
 - Postman validation for approval and rejection workflow evaluation runs
 - evaluation-service traces, metrics, structured logs, and Grafana dashboard panels
 
@@ -78,6 +81,10 @@ The gateway API currently supports:
 - workflow approval record retrieval
 - workflow approval and rejection decision submission
 - workflow evaluation run and result retrieval
+- workflow replay run creation, retrieval, and listing
+- read-only deterministic replay diagnostics
+- workflow recovery dry-run check retrieval
+- explicit recovery action creation and retrieval
 - correlation ID propagation
 - structured JSON logs
 - Temporal workflow startup
@@ -103,9 +110,21 @@ GET /api/v1/workflows/{workflow_id}/review-context
 GET /api/v1/workflows/{workflow_id}/approvals
 POST /api/v1/workflows/{workflow_id}/approvals
 GET /api/v1/workflows/{workflow_id}/evaluations
+POST /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/replay-runs/{replay_run_id}
+GET /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/workflows/{workflow_id}/replay-diagnostics
+GET /api/v1/workflows/{workflow_id}/recovery-checks/{action_type}
+POST /api/v1/workflows/{workflow_id}/recovery-actions
+GET /api/v1/recovery-actions/{recovery_action_id}
+GET /api/v1/workflows/{workflow_id}/recovery-actions
 ```
 
 The workflow evaluations endpoint is read-only. It returns persisted evaluation-service records for operator and Postman validation ergonomics, but it does not create evaluation runs, change workflow state, or participate in mortgage decisions.
+
+The replay endpoints expose bounded local replay records and diagnostics. Replay run creation requires `X-Actor-ID` and only persists replay run and replay step records. Replay retrieval, workflow replay listing, and replay diagnostics are read-only and do not create replay or recovery records, mutate workflow state, publish events, execute agents, execute tools, dispatch approvals, or call external systems.
+
+The recovery endpoints expose bounded operator-facing recovery controls. Recovery checks are dry-run reads. Recovery action creation requires `X-Actor-ID` and a reason, and supports explicit outbox retry, explicit outbox dead-letter marking, and workflow projection reconciliation requests. Gateway workflow recovery requests are auditable records; workflow-engine remains responsible for any actual workflow state mutation.
 
 ---
 
@@ -254,6 +273,8 @@ It provides:
 - approval history display
 - approval and rejection form submission through gateway-api
 - required operator identity and decision comment capture
+- read-only replay run count and latest replay run summary for the selected workflow
+- read-only recovery action count and latest recovery action summary for the selected workflow
 
 Implemented local endpoint:
 
@@ -274,6 +295,7 @@ Current Phase 5 operator-console boundary:
 - queue visibility is implemented
 - workflow detail review is implemented
 - approval and rejection form submission is implemented through gateway-api
+- replay and recovery summaries are read-only and do not create replay runs, recovery actions, or workflow mutations
 - production authentication and RBAC are not yet implemented
 
 ---
@@ -1200,7 +1222,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-17 passed
+41 passed
 ```
 
 ---
@@ -1284,7 +1306,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-12 passed
+15 passed
 ```
 
 ---

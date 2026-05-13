@@ -1158,7 +1158,7 @@ All AI outputs should:
 
 # Phase 8 - Replay and Failure Recovery
 
-Status: Planned.
+Status: In Progress.
 
 Detailed continuous implementation planning is tracked in:
 
@@ -1179,6 +1179,18 @@ Implement:
 - retry orchestration
 - dead-letter handling
 - recovery tooling
+
+Completed local deliverables through Workstream 7:
+- replay and recovery persistence model
+- workflow evidence reconstruction
+- deterministic replay validation
+- side-effect-free replay run orchestration
+- outbox failure classification, retry, and dead-letter recovery
+- workflow recovery checks and auditable workflow recovery requests
+- gateway-api replay run creation, retrieval, workflow replay listing, and replay diagnostics
+- gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
+- operator-console read-only replay and recovery summaries in workflow review context
+- gateway-api tests validating replay and recovery API boundaries
 
 ---
 

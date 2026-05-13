@@ -1733,6 +1733,212 @@ async def test_create_replay_run_preserves_incomplete_evidence_as_warning_steps(
     assert steps_by_type["evaluation_run"].status == ReplayStepStatus.skipped.value
 
 
+async def test_gateway_replay_endpoints_create_retrieve_list_and_diagnose_without_read_side_effects(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "gateway-replay-endpoints-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    replay_run_id = str(uuid4())
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="gateway-replay-endpoints-test",
+            final_state="COMPLETED",
+            decision="APPROVED",
+            include_evaluation=True,
+        )
+
+    diagnostics_response = await client.get(f"/api/v1/workflows/{workflow_id}/replay-diagnostics")
+
+    assert diagnostics_response.status_code == 200
+    diagnostics_body = diagnostics_response.json()
+    assert diagnostics_body["status"] == "PASS"
+    assert len(diagnostics_body["diagnostics"]) == 7
+    assert "replay_step_id" not in diagnostics_body["diagnostics"][0]
+
+    async with session_factory() as session:
+        replay_count_after_read = len((await session.execute(select(WorkflowReplayRun))).scalars().all())
+
+    assert replay_count_after_read == 0
+
+    create_replay_response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/replay-runs",
+        headers={"X-Actor-ID": "operator-replay", "X-Correlation-ID": "gateway-replay-create-test"},
+        json={
+            "replay_mode": "deterministic_validation",
+            "replay_run_id": replay_run_id,
+            "metadata": {"operator_note_present": True},
+        },
+    )
+
+    assert create_replay_response.status_code == 201
+    created_body = create_replay_response.json()
+    assert created_body["replay_run_id"] == replay_run_id
+    assert created_body["workflow_id"] == workflow_id
+    assert created_body["requested_by"] == "operator-replay"
+    assert created_body["status"] == "COMPLETED"
+    assert created_body["metadata"]["boundary"] == "side_effect_free"
+    assert created_body["metadata"]["sensitive_payloads_persisted"] is False
+    assert len(created_body["steps"]) == 7
+
+    get_response = await client.get(f"/api/v1/replay-runs/{replay_run_id}")
+    list_response = await client.get(f"/api/v1/workflows/{workflow_id}/replay-runs")
+
+    assert get_response.status_code == 200
+    assert get_response.json()["replay_run_id"] == replay_run_id
+    assert list_response.status_code == 200
+    assert list_response.json()["count"] == 1
+    assert list_response.json()["runs"][0]["replay_run_id"] == replay_run_id
+
+
+async def test_gateway_replay_creation_requires_actor_identity(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/replay-runs",
+        json={"replay_mode": "deterministic_validation"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "actor_required"
+
+
+async def test_gateway_workflow_recovery_check_and_action_endpoints(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "gateway-recovery-endpoints-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        session.add(
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000001701",
+                workflow_id=workflow_id,
+                prior_state="NEW",
+                new_state="INTAKE_IN_PROGRESS",
+                transition_reason="engine_transition_completed_projection_stale",
+                correlation_id="gateway-recovery-endpoints-test",
+                created_by="workflow-engine",
+                created_at=utc_now() + timedelta(minutes=1),
+            )
+        )
+        await session.commit()
+
+    check_response = await client.get(
+        f"/api/v1/workflows/{workflow_id}/recovery-checks/reconcile_workflow_projection"
+    )
+
+    assert check_response.status_code == 200
+    check_body = check_response.json()
+    assert check_body["allowed"] is True
+    assert check_body["current_state"] == "NEW"
+    assert check_body["proposed_state"] == "INTAKE_IN_PROGRESS"
+    assert check_body["requires_engine_execution"] is True
+
+    action_response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/recovery-actions",
+        headers={"X-Actor-ID": "operator-recovery", "X-Correlation-ID": "gateway-recovery-action-test"},
+        json={
+            "action_type": "reconcile_workflow_projection",
+            "reason": "Projection is stale after local worker interruption.",
+        },
+    )
+
+    assert action_response.status_code == 201
+    action_body = action_response.json()
+    assert action_body["workflow_id"] == workflow_id
+    assert action_body["action_type"] == "reconcile_workflow_projection"
+    assert action_body["status"] == "REQUESTED"
+    assert action_body["requested_by"] == "operator-recovery"
+    assert action_body["metadata"]["engine_owned_mutation_required"] is True
+    assert action_body["metadata"]["sensitive_payloads_persisted"] is False
+
+    get_response = await client.get(f"/api/v1/recovery-actions/{action_body['recovery_action_id']}")
+    list_response = await client.get(f"/api/v1/workflows/{workflow_id}/recovery-actions")
+
+    assert get_response.status_code == 200
+    assert get_response.json()["recovery_action_id"] == action_body["recovery_action_id"]
+    assert list_response.status_code == 200
+    assert list_response.json()["count"] == 1
+    assert list_response.json()["actions"][0]["recovery_action_id"] == action_body["recovery_action_id"]
+
+    async with session_factory() as session:
+        workflow = await session.get(WorkflowRecord, workflow_id)
+        assert workflow is not None
+        assert workflow.state == "NEW"
+
+
+async def test_gateway_outbox_recovery_action_endpoint_requires_explicit_target(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "gateway-outbox-recovery-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    event_id = f"{workflow_id}:workflow.created"
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        event.publish_status = OutboxPublishStatus.failed.value
+        event.retry_count = 1
+        event.last_error = "temporary broker outage"
+        await session.commit()
+
+    missing_target_response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/recovery-actions",
+        headers={"X-Actor-ID": "operator-recovery"},
+        json={"action_type": "retry_outbox_event", "reason": "Retry transient outbox failure."},
+    )
+
+    assert missing_target_response.status_code == 400
+    assert missing_target_response.json()["error"] == "recovery_target_required"
+
+    retry_response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/recovery-actions",
+        headers={"X-Actor-ID": "operator-recovery"},
+        json={
+            "action_type": "retry_outbox_event",
+            "target_resource_type": "workflow_event_outbox",
+            "target_resource_id": event_id,
+            "reason": "Retry transient outbox failure.",
+        },
+    )
+
+    assert retry_response.status_code == 201
+    retry_body = retry_response.json()
+    assert retry_body["action_type"] == "retry_outbox_event"
+    assert retry_body["target_resource_type"] == "workflow_event_outbox"
+    assert retry_body["target_resource_id"] == event_id
+    assert retry_body["status"] == "COMPLETED"
+    assert retry_body["metadata"]["queued_publish_status"] == "PENDING"
+    assert retry_body["metadata"]["publisher_invoked"] is False
+
+    async with session_factory() as session:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        assert event.publish_status == OutboxPublishStatus.pending.value
+
+
 async def test_get_workflow_review_context_aggregates_review_records(
     client: AsyncClient,
     app_context: tuple[object, async_sessionmaker[AsyncSession]],

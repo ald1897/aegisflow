@@ -117,6 +117,69 @@ export interface WorkflowReviewContext {
   approvals: ApprovalRecord[];
 }
 
+export type ReplayRunStatus = "REQUESTED" | "RUNNING" | "COMPLETED" | "FAILED";
+export type ReplayStepStatus = "PASS" | "WARN" | "FAIL" | "SKIPPED";
+export type RecoveryActionStatus = "REQUESTED" | "RUNNING" | "COMPLETED" | "FAILED" | "REJECTED";
+
+export interface ReplayStep {
+  replay_step_id: string;
+  replay_run_id: string;
+  workflow_id: string;
+  sequence_number: number;
+  artifact_type: string;
+  artifact_id?: string | null;
+  expected_state?: string | null;
+  observed_state?: string | null;
+  status: ReplayStepStatus;
+  message: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface ReplayRun {
+  replay_run_id: string;
+  workflow_id: string;
+  correlation_id: string;
+  replay_mode: string;
+  status: ReplayRunStatus;
+  source_temporal_workflow_id?: string | null;
+  source_temporal_run_id?: string | null;
+  started_at: string;
+  completed_at?: string | null;
+  requested_by: string;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  steps: ReplayStep[];
+}
+
+export interface WorkflowReplayRunsResponse {
+  workflow_id: string;
+  runs: ReplayRun[];
+  count: number;
+}
+
+export interface RecoveryAction {
+  recovery_action_id: string;
+  workflow_id: string;
+  correlation_id: string;
+  action_type: string;
+  target_resource_type: string;
+  target_resource_id: string;
+  status: RecoveryActionStatus;
+  requested_by: string;
+  reason: string;
+  started_at: string;
+  completed_at?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface WorkflowRecoveryActionsResponse {
+  workflow_id: string;
+  actions: RecoveryAction[];
+  count: number;
+}
+
 export type ApprovalDecision = "APPROVED" | "REJECTED";
 
 export interface ApprovalDecisionRequest {

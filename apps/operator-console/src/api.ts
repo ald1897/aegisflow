@@ -3,6 +3,8 @@ import type {
   ApprovalDecisionRequest,
   ApprovalDecisionResponse,
   HumanReviewQueueResponse,
+  WorkflowRecoveryActionsResponse,
+  WorkflowReplayRunsResponse,
   WorkflowReviewContext,
 } from "./types";
 
@@ -56,6 +58,14 @@ export async function getHumanReviewQueue(): Promise<HumanReviewQueueResponse> {
 
 export async function getWorkflowReviewContext(workflowId: string): Promise<WorkflowReviewContext> {
   return requestJson<WorkflowReviewContext>(`/api/v1/workflows/${workflowId}/review-context`);
+}
+
+export async function getWorkflowReplayRuns(workflowId: string): Promise<WorkflowReplayRunsResponse> {
+  return requestJson<WorkflowReplayRunsResponse>(`/api/v1/workflows/${workflowId}/replay-runs`);
+}
+
+export async function getWorkflowRecoveryActions(workflowId: string): Promise<WorkflowRecoveryActionsResponse> {
+  return requestJson<WorkflowRecoveryActionsResponse>(`/api/v1/workflows/${workflowId}/recovery-actions`);
 }
 
 export async function submitApprovalDecision(

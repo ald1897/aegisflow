@@ -3,21 +3,32 @@ import {
   CheckCircle2,
   Clock3,
   FileText,
+  History,
   RefreshCw,
   Send,
   ShieldCheck,
   UserCheck,
+  Wrench,
   XCircle,
 } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-import { gatewayBaseUrl, getHumanReviewQueue, getWorkflowReviewContext, submitApprovalDecision } from "./api";
+import {
+  gatewayBaseUrl,
+  getHumanReviewQueue,
+  getWorkflowRecoveryActions,
+  getWorkflowReplayRuns,
+  getWorkflowReviewContext,
+  submitApprovalDecision,
+} from "./api";
 import type {
   AgentExecutionRecord,
   ApprovalDecision,
   ApprovalDecisionResponse,
   HumanReviewQueueItem,
+  RecoveryAction,
+  ReplayRun,
   TimelineEntry,
   ToolInvocationRecord,
   WorkflowReviewContext,
@@ -70,6 +81,8 @@ export default function App() {
   const [items, setItems] = useState<HumanReviewQueueItem[]>([]);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   const [reviewContext, setReviewContext] = useState<WorkflowReviewContext | null>(null);
+  const [replayRuns, setReplayRuns] = useState<ReplayRun[]>([]);
+  const [recoveryActions, setRecoveryActions] = useState<RecoveryAction[]>([]);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [contextState, setContextState] = useState<LoadState>("idle");
   const [decisionState, setDecisionState] = useState<DecisionState>("idle");
@@ -102,11 +115,19 @@ export default function App() {
     setDecisionError(null);
     setDecisionResult(null);
     try {
-      const context = await getWorkflowReviewContext(workflowId);
+      const [context, replayResponse, recoveryResponse] = await Promise.all([
+        getWorkflowReviewContext(workflowId),
+        getWorkflowReplayRuns(workflowId),
+        getWorkflowRecoveryActions(workflowId),
+      ]);
       setReviewContext(context);
+      setReplayRuns(replayResponse.runs);
+      setRecoveryActions(recoveryResponse.actions);
       setContextState("ready");
     } catch (err) {
       setReviewContext(null);
+      setReplayRuns([]);
+      setRecoveryActions([]);
       setContextError(err instanceof Error ? err.message : "Unable to load workflow review context");
       setContextState("error");
     }
@@ -242,6 +263,8 @@ export default function App() {
               decisionState={decisionState}
               decisionError={decisionError}
               decisionResult={decisionResult}
+              replayRuns={replayRuns}
+              recoveryActions={recoveryActions}
               onDecisionStateChange={setDecisionState}
               onDecisionError={setDecisionError}
               onDecisionSubmitted={(result) => void handleDecisionSubmitted(result)}
@@ -354,6 +377,8 @@ function ReviewWorkspace({
   decisionState,
   decisionError,
   decisionResult,
+  replayRuns,
+  recoveryActions,
   onDecisionStateChange,
   onDecisionError,
   onDecisionSubmitted,
@@ -362,6 +387,8 @@ function ReviewWorkspace({
   decisionState: DecisionState;
   decisionError: string | null;
   decisionResult: ApprovalDecisionResponse | null;
+  replayRuns: ReplayRun[];
+  recoveryActions: RecoveryAction[];
   onDecisionStateChange: (state: DecisionState) => void;
   onDecisionError: (message: string | null) => void;
   onDecisionSubmitted: (result: ApprovalDecisionResponse) => void;
@@ -417,6 +444,7 @@ function ReviewWorkspace({
 
       <div className="grid gap-4 2xl:grid-cols-2">
         <TimelinePanel entries={context.timeline} />
+        <ReplayRecoveryPanel replayRuns={replayRuns} recoveryActions={recoveryActions} />
         <MetadataPanel title="Workflow Metadata" metadata={workflow.metadata} />
         <AgentPanel records={context.agent_executions} />
         <ToolPanel records={context.tool_invocations} />
@@ -575,6 +603,70 @@ function MetadataPanel({ title, metadata }: { title: string; metadata: Record<st
       <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-md bg-slate-950 p-3 text-xs text-slate-100">
         {compactJson(metadata)}
       </pre>
+    </Panel>
+  );
+}
+
+function ReplayRecoveryPanel({
+  replayRuns,
+  recoveryActions,
+}: {
+  replayRuns: ReplayRun[];
+  recoveryActions: RecoveryAction[];
+}) {
+  const latestReplay = replayRuns.length > 0 ? replayRuns[replayRuns.length - 1] : undefined;
+  const latestRecovery = recoveryActions.length > 0 ? recoveryActions[recoveryActions.length - 1] : undefined;
+
+  return (
+    <Panel title="Replay And Recovery">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-slate-200 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <History size={16} aria-hidden="true" className="text-slate-600" />
+            <p className="text-sm font-semibold text-slate-900">Replay Runs</p>
+          </div>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{replayRuns.length}</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {latestReplay
+              ? `${latestReplay.replay_mode} / ${latestReplay.status} / ${latestReplay.steps.length} steps`
+              : "No replay runs recorded"}
+          </p>
+        </div>
+        <div className="rounded-md border border-slate-200 px-3 py-2">
+          <div className="flex items-center gap-2">
+            <Wrench size={16} aria-hidden="true" className="text-slate-600" />
+            <p className="text-sm font-semibold text-slate-900">Recovery Actions</p>
+          </div>
+          <p className="mt-2 text-2xl font-semibold text-slate-950">{recoveryActions.length}</p>
+          <p className="mt-1 text-xs text-slate-600">
+            {latestRecovery
+              ? `${latestRecovery.action_type} / ${latestRecovery.status}`
+              : "No recovery actions recorded"}
+          </p>
+        </div>
+      </div>
+
+      {latestReplay ? (
+        <div className="mt-3 rounded-md border border-slate-200 px-3 py-2">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium text-slate-900">{latestReplay.replay_mode}</p>
+            <span className="shrink-0 text-xs font-semibold text-emerald-700">{latestReplay.status}</span>
+          </div>
+          <p className="mt-1 break-all font-mono text-xs text-slate-600">{latestReplay.replay_run_id}</p>
+          <p className="mt-2 text-xs text-slate-600">{formatDate(latestReplay.created_at)}</p>
+        </div>
+      ) : null}
+
+      {latestRecovery ? (
+        <div className="mt-3 rounded-md border border-slate-200 px-3 py-2">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium text-slate-900">{latestRecovery.action_type}</p>
+            <span className="shrink-0 text-xs font-semibold text-amber-700">{latestRecovery.status}</span>
+          </div>
+          <p className="mt-1 break-all font-mono text-xs text-slate-600">{latestRecovery.recovery_action_id}</p>
+          <p className="mt-2 text-xs text-slate-600">{latestRecovery.target_resource_type}</p>
+        </div>
+      ) : null}
     </Panel>
   );
 }

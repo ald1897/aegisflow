@@ -1158,6 +1158,14 @@ All AI outputs should:
 
 # Phase 8 - Replay and Failure Recovery
 
+Status: Planned.
+
+Detailed continuous implementation planning is tracked in:
+
+```text
+docs/implementation/PHASE_8_IMPLEMENTATION_PLAN.md
+```
+
 # Objective
 
 Implement enterprise-grade replay and recovery capabilities.

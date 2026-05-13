@@ -1,0 +1,892 @@
+# Phase 8 Implementation Plan
+
+## Purpose
+
+This document defines the continuous implementation plan for Phase 8 of AegisFlow.
+
+Phase 8 introduces local replay and failure recovery capabilities for the completed Mortgage Exception Review workflow foundation.
+
+The plan exists to:
+- guide implementation work across multiple development sessions
+- preserve workflow-engine ownership of workflow state
+- make workflow history reconstructable from durable records
+- validate replay safety before recovery actions are allowed
+- provide bounded failure recovery tooling for local workflow, event, and operator diagnostics
+- keep replay and recovery observable, auditable, and side-effect controlled
+
+This document must be updated as implementation progresses.
+
+---
+
+# Phase 8 Objective
+
+Phase 8 will implement replay and failure recovery tooling for the local AegisFlow runtime.
+
+The platform must support:
+- reconstruction of completed or in-progress workflow history from persisted records
+- deterministic validation of expected workflow state transitions
+- replay-run records that preserve what was checked and what differed
+- side-effect-safe replay modes that do not re-run agents, tools, approvals, or external integrations by default
+- failure classification for workflow, event outbox, agent, tool, approval, and evaluation evidence
+- local recovery actions for retryable operational failures
+- administrator-facing API and Postman validation paths
+- replay and recovery observability through traces, metrics, logs, and dashboards
+
+Replay and recovery may support debugging, incident analysis, regression review, and controlled local remediation.
+
+Replay and recovery must not:
+- bypass workflow-engine ownership of workflow state
+- silently mutate workflow records
+- duplicate irreversible side effects
+- re-dispatch human approvals without explicit recovery action
+- re-run governed tools or agents during dry-run replay
+- call production mortgage systems
+- treat replay output as a mortgage approval, rejection, or completion decision
+- store raw document contents, borrower PII, secrets, prompt content, approval comments as diagnostic metadata, or full model outputs
+
+---
+
+# Business Context
+
+## Current Business Capability
+
+AegisFlow can currently demonstrate a governed and observable local Mortgage Exception Review workflow from creation through AI-assisted preparation, human review, local approval or rejection, completion, and deterministic evaluation.
+
+Current capability proves:
+- workflow state is durable and queryable
+- AI and tool participation is governed and recorded
+- human approval or rejection remains authoritative
+- local workflow operations are observable through traces, metrics, logs, dashboards, and Postman checks
+- local evaluation can score persisted workflow evidence without mutating workflow state
+
+## Phase 8 Business Goal
+
+Phase 8 will demonstrate that AegisFlow can explain and recover from operational failures without losing governance.
+
+For mortgage stakeholders, this means the platform begins to answer:
+- what happened to a case
+- where a case became stuck
+- whether the recorded history is internally consistent
+- whether a failed event or activity can be safely retried
+- what recovery action was requested, who requested it, and what happened next
+
+Business value:
+- strengthen operational trust in workflow automation
+- make failed or stuck workflow cases easier to diagnose
+- reduce ambiguity during incident review
+- preserve audit readiness during recovery
+- establish the foundation for future production recovery controls
+
+## Business Boundary
+
+Phase 8 will not implement autonomous recovery for production mortgage operations.
+
+Phase 8 will not replace human approval, compliance review, underwriting judgment, servicing policy, or downstream mortgage system controls.
+
+Phase 8 will not enable production identity provider or RBAC enforcement. Local recovery actions may use development actor headers until the later security hardening phase.
+
+Phase 8 will not connect to production mortgage systems.
+
+Phase 8 will not perform unrestricted Temporal history manipulation. Temporal history remains the durable execution record; Phase 8 tooling reads and validates workflow evidence before any controlled recovery action is allowed.
+
+---
+
+# Current Implementation Baseline
+
+Phase 8 starts from the completed Phase 7 baseline.
+
+Implemented runtime services:
+- `gateway-api`
+- `workflow-engine`
+- `agent-runtime`
+- `tool-runtime`
+- `evaluation-service`
+- `operator-console`
+- Postgres
+- Redpanda
+- Redis
+- Temporal
+- Temporal UI
+- OpenTelemetry Collector
+- Jaeger
+- Prometheus
+- Grafana
+
+Implemented workflow behavior:
+- `NEW`
+- `INTAKE_IN_PROGRESS`
+- `DOCUMENT_ANALYSIS_PENDING`
+- `RISK_REVIEW_PENDING`
+- `HUMAN_REVIEW_REQUIRED`
+- `APPROVED`
+- `REJECTED`
+- `COMPLETED`
+
+Implemented persisted records:
+- `workflow_records`
+- `workflow_state_transitions`
+- `workflow_timeline_entries`
+- `workflow_event_outbox`
+- `agent_execution_records`
+- `tool_invocation_records`
+- `approval_records`
+- `evaluation_dataset_cases`
+- `evaluation_runs`
+- `evaluation_results`
+
+Existing recovery-related foundation:
+- workflow records include Temporal workflow ID and run ID metadata
+- workflow state transitions preserve prior state, new state, reason, actor, correlation ID, and timestamp
+- timeline records preserve ordered operational history
+- event outbox records include publish status, retry count, last error, and published timestamp
+- agent execution records preserve validation status and error metadata
+- tool invocation records preserve permission, validation, status, and error metadata
+- approval records preserve operator decision context
+- evaluation records preserve quality signals for persisted workflow evidence
+- observability provides trace, metric, and log context across services
+
+Phase 8 must extend this baseline without weakening workflow-engine ownership of workflow state or treating replay output as an operational decision.
+
+---
+
+# Target Phase 8 Scope
+
+## In Scope
+
+Phase 8 should implement:
+- replay and recovery persistence tables
+- replay domain contracts and status enums
+- workflow evidence reconstruction from persisted records
+- deterministic replay validation for current Mortgage Exception Review state paths
+- replay run creation and retrieval
+- dry-run replay mode as the default
+- side-effect policy for replay and recovery actions
+- failed/stuck workflow diagnosis from persisted state, timelines, outbox events, agent records, tool records, approval records, and evaluation records
+- outbox retry and dead-letter handling for local event publication failures
+- controlled workflow recovery commands for local retryable conditions
+- gateway-api administrative replay and recovery endpoints
+- optional operator-console visibility for replay runs and recovery actions
+- Postman validation requests for replay, diagnosis, and recovery paths
+- Prometheus metrics and OpenTelemetry tracing for replay and recovery operations
+- Grafana panels or dashboard updates for replay and recovery activity
+- documentation updates for current functionality, roadmap, data model, API contracts, workflow engine, security, and developer workflow
+
+## Out Of Scope
+
+Phase 8 must not implement:
+- production autonomous recovery
+- production identity provider integration
+- production RBAC enforcement
+- production incident paging
+- production log aggregation
+- production mortgage system integration
+- mutation of Temporal history
+- unrestricted re-execution of workflow activities
+- automatic approval, rejection, completion, cancellation, or override based on replay output
+- replay modes that call external systems by default
+- storage of raw document content, borrower PII, secrets, prompt content, approval comments as replay metadata, or full model outputs
+
+---
+
+# Proposed Runtime Architecture
+
+## Initial Local Architecture
+
+Phase 8 should avoid introducing a new physical service unless implementation pressure proves it necessary.
+
+Initial ownership:
+- gateway-api exposes administrative replay and recovery request/retrieval endpoints
+- workflow-engine owns any workflow state mutation or recovery activity
+- Postgres stores replay and recovery records
+- existing services continue to own their current records
+- operator-console may display replay/recovery summaries after gateway endpoints exist
+
+Preferred local flow for replay:
+
+```text
+Postman or operator-console
+    ->
+gateway-api replay endpoint
+    ->
+Postgres workflow, timeline, transition, event, agent, tool, approval, and evaluation records
+    ->
+replay run and replay step records
+```
+
+Preferred local flow for recovery:
+
+```text
+Postman or operator-console
+    ->
+gateway-api recovery endpoint
+    ->
+workflow-engine-owned recovery workflow or activity
+    ->
+Postgres recovery action, workflow, timeline, and outbox records
+```
+
+Gateway may orchestrate read-only replay analysis directly.
+
+Gateway must not directly mutate workflow state for recovery outcomes. Mutating recovery actions must route through workflow-engine-owned logic.
+
+## Replay Modes
+
+Initial replay modes:
+- `history_reconstruction`
+- `deterministic_validation`
+- `dry_run_recovery_check`
+
+Future replay modes may include:
+- `temporal_history_replay`
+- `activity_replay`
+- `integration_replay`
+- `production_incident_replay`
+
+Default mode must be side-effect free.
+
+## Recovery Action Types
+
+Initial recovery action types:
+- `retry_outbox_event`
+- `mark_outbox_event_dead_lettered`
+- `clear_retryable_outbox_error`
+- `reconcile_workflow_projection`
+- `resume_stuck_workflow_check`
+
+Future recovery actions may include:
+- controlled workflow cancellation
+- controlled workflow restart
+- activity retry orchestration
+- operator reassignment
+- external integration compensation
+
+Initial actions must be local, explicit, audited, and bounded.
+
+---
+
+# Persistence Model
+
+Recommended initial tables:
+- `workflow_replay_runs`
+- `workflow_replay_steps`
+- `workflow_recovery_actions`
+
+Recommended `workflow_replay_runs` fields:
+- `replay_run_id`
+- `workflow_id`
+- `correlation_id`
+- `replay_mode`
+- `status`
+- `source_temporal_workflow_id`
+- `source_temporal_run_id`
+- `started_at`
+- `completed_at`
+- `requested_by`
+- `replay_metadata`
+- `created_at`
+
+Recommended `workflow_replay_steps` fields:
+- `replay_step_id`
+- `replay_run_id`
+- `workflow_id`
+- `sequence_number`
+- `artifact_type`
+- `artifact_id`
+- `expected_state`
+- `observed_state`
+- `status`
+- `message`
+- `step_metadata`
+- `created_at`
+
+Recommended `workflow_recovery_actions` fields:
+- `recovery_action_id`
+- `workflow_id`
+- `correlation_id`
+- `action_type`
+- `target_resource_type`
+- `target_resource_id`
+- `status`
+- `requested_by`
+- `reason`
+- `started_at`
+- `completed_at`
+- `result_metadata`
+- `created_at`
+
+Replay and recovery records must store bounded references and diagnostic summaries.
+
+Replay and recovery records must not store:
+- raw document contents
+- unrestricted borrower PII
+- secrets
+- prompt content
+- approval comments as diagnostic metadata
+- full model outputs
+- unrestricted integration payloads
+
+---
+
+# Replay Validation Dimensions
+
+## Workflow State Reconstruction
+
+Initial checks:
+- workflow record exists
+- state transition sequence is ordered and valid
+- first transition is compatible with workflow creation
+- final persisted workflow state matches the last state transition
+- terminal timestamp fields are compatible with terminal state
+- timeline entries align with expected major workflow milestones
+
+## Agent Evidence Reconstruction
+
+Initial checks:
+- required agent execution records exist for current local workflow path
+- agent execution records are associated with the workflow and correlation ID
+- validation status is present
+- prompt ID, prompt version, and model name are present
+- agent execution timing is compatible with workflow timeline ordering
+
+## Tool Evidence Reconstruction
+
+Initial checks:
+- tool invocation records are associated with expected agents
+- permission status is present
+- input and output validation statuses are present
+- tool invocation timing is compatible with agent execution evidence
+- tool failure metadata is bounded when present
+
+## Human Review Reconstruction
+
+Initial checks:
+- approval records exist only for workflows that reached human review
+- approval decision is compatible with terminal approval or rejection path
+- approval record actor and reviewed timestamp are present
+- duplicate final decisions are not represented as multiple authoritative outcomes
+
+## Event Outbox Reconstruction
+
+Initial checks:
+- workflow event outbox records exist for expected major workflow facts
+- publish status is one of the accepted local statuses
+- retry count and last error are internally consistent
+- failed or pending events can be classified for retry or dead-letter handling
+
+## Evaluation Evidence Reconstruction
+
+Initial checks:
+- evaluation runs remain quality telemetry only
+- evaluation results reference existing workflow records
+- evaluation records do not conflict with authoritative workflow outcome records
+- evaluation replay dataset results are not mistaken for workflow replay execution
+
+---
+
+# API Scope
+
+## gateway-api Replay Endpoints
+
+Recommended endpoints:
+
+```text
+POST /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/workflows/{workflow_id}/replay-runs
+GET /api/v1/replay-runs/{replay_run_id}
+GET /api/v1/workflows/{workflow_id}/replay-diagnostics
+```
+
+Replay run creation must:
+- require a local actor identity such as `X-Actor-ID`
+- default to side-effect-free replay
+- create a replay run record
+- create replay step records
+- return bounded diagnostics
+- never mutate workflow state
+
+## gateway-api Recovery Endpoints
+
+Recommended endpoints:
+
+```text
+POST /api/v1/workflows/{workflow_id}/recovery-actions
+GET /api/v1/workflows/{workflow_id}/recovery-actions
+GET /api/v1/recovery-actions/{recovery_action_id}
+```
+
+Recovery action creation must:
+- require a local actor identity such as `X-Actor-ID`
+- require an action type
+- require a reason
+- validate that the action is allowed for the target resource
+- route workflow state mutations through workflow-engine-owned recovery logic
+- persist the requested action and final result
+
+---
+
+# Observability Requirements
+
+Phase 8 must extend the existing Phase 6 and Phase 7 observability foundation.
+
+Required traces:
+- replay run request
+- workflow evidence loading
+- replay step validation
+- replay run persistence
+- recovery action request
+- recovery action execution
+- outbox retry or dead-letter update
+
+Required metrics:
+- replay runs total by mode and status
+- replay steps total by artifact type and status
+- replay run duration
+- recovery actions total by action type and status
+- recovery action duration
+- outbox events by publish status
+- outbox retries total by event type and status
+- stuck workflow diagnostics total by workflow type and diagnostic status
+
+Metric labels must remain low-cardinality.
+
+Metrics must not label by:
+- workflow ID
+- replay run ID
+- recovery action ID
+- event ID
+- trace ID
+- borrower values
+- prompt content
+- document content
+- approval comments
+
+Required logs:
+- replay run started
+- replay run completed
+- replay run failed
+- replay mismatch detected
+- recovery action requested
+- recovery action completed
+- recovery action failed
+- outbox event retried
+- outbox event dead-lettered
+
+Logs must include correlation ID and trace ID where available and avoid sensitive payloads.
+
+---
+
+# Workstreams
+
+## Workstream 1 - Replay And Recovery Domain Model
+
+Status: Not Started
+
+Tasks:
+- define replay run, replay step, and recovery action statuses
+- add Alembic migration for `workflow_replay_runs`, `workflow_replay_steps`, and `workflow_recovery_actions`
+- add SQLAlchemy models to gateway-api and workflow-engine as needed
+- add DTOs for replay run, replay step, diagnostic, and recovery action responses
+- add repository methods for create, retrieve, and list behavior
+- document bounded metadata and sensitive data restrictions
+- add persistence tests
+
+Completion criteria:
+- replay and recovery tables are created locally
+- records can be persisted and retrieved
+- records preserve workflow and correlation identity
+- persistence tests pass
+
+---
+
+## Workstream 2 - Workflow Evidence Reconstruction
+
+Status: Not Started
+
+Tasks:
+- implement workflow evidence loader for workflow record, transitions, timeline, outbox events, agent executions, tool invocations, approval records, and evaluation records
+- normalize evidence into bounded internal dataclasses or DTOs
+- sort evidence deterministically by timestamp and stable identifiers
+- classify evidence artifacts by type and ownership
+- add missing evidence diagnostics for incomplete workflows
+- add tests for completed approval, completed rejection, and human-review-in-progress workflows
+
+Completion criteria:
+- workflow evidence can be reconstructed from persisted records
+- reconstruction does not mutate workflow state
+- completed approval and rejection workflows produce stable evidence snapshots
+- tests pass
+
+---
+
+## Workstream 3 - Deterministic Replay Validator
+
+Status: Not Started
+
+Tasks:
+- implement state transition sequence validator for the local Mortgage Exception Review path
+- implement timeline milestone validator
+- implement agent evidence validator
+- implement tool evidence validator
+- implement human review evidence validator
+- implement event outbox evidence validator
+- implement evaluation evidence boundary validator
+- map validation results into replay step records
+- add unit tests for pass, warn, and fail scenarios
+
+Completion criteria:
+- replay validation creates deterministic step results
+- replay mismatches are bounded and explainable
+- validator does not re-run agents, tools, approvals, events, or workflows
+- tests pass
+
+---
+
+## Workstream 4 - Replay Run Orchestration
+
+Status: Not Started
+
+Tasks:
+- add replay run creation service
+- support `history_reconstruction` mode
+- support `deterministic_validation` mode
+- support explicit `replay_run_id` idempotency where practical
+- persist replay run and replay step records
+- handle missing workflows with structured errors
+- handle workflows with incomplete evidence using warning diagnostics instead of unsafe mutation
+- add retrieval and workflow listing services
+- add integration tests against seeded workflow evidence
+
+Completion criteria:
+- a local workflow can receive a replay run
+- replay runs and steps are persisted and retrievable
+- missing workflow and incomplete evidence cases are handled clearly
+- replay run creation is side-effect free
+- tests pass
+
+---
+
+## Workstream 5 - Failure Classification And Outbox Recovery
+
+Status: Not Started
+
+Tasks:
+- define retryable, terminal, dead-letterable, and informational failure categories
+- classify workflow event outbox records by publish status, retry count, and last error
+- add safe outbox retry command for retryable local events
+- add dead-letter marking behavior for explicitly selected local outbox events
+- add recovery action records for outbox retry and dead-letter outcomes
+- ensure event retry uses existing event publication boundaries
+- add tests for pending, published, failed, retryable, and dead-lettered event cases
+
+Completion criteria:
+- failed outbox events can be diagnosed
+- retryable outbox events can be retried explicitly
+- dead-letter action is explicit and auditable
+- event retry does not duplicate successful published events
+- tests pass
+
+---
+
+## Workstream 6 - Workflow Recovery Commands
+
+Status: Not Started
+
+Tasks:
+- define allowed local recovery commands for stuck or inconsistent workflows
+- require actor identity and recovery reason for every recovery command
+- route any workflow state mutation through workflow-engine-owned recovery activities or workflows
+- add dry-run recovery check before mutating commands
+- add timeline entries for accepted recovery actions
+- add outbox events for completed recovery actions where appropriate
+- reject unsafe recovery actions with structured errors
+- add workflow-engine and gateway-api tests
+
+Completion criteria:
+- recovery commands are explicit and auditable
+- gateway-api does not directly mutate workflow state for recovery outcomes
+- unsafe or unsupported recovery actions are rejected
+- recovery actions preserve workflow history
+- tests pass
+
+---
+
+## Workstream 7 - Gateway API And Operator Visibility
+
+Status: Not Started
+
+Tasks:
+- add gateway replay run creation endpoint
+- add gateway replay run retrieval endpoint
+- add gateway workflow replay run listing endpoint
+- add gateway workflow replay diagnostics endpoint
+- add gateway recovery action creation and retrieval endpoints
+- add operator-console read-only replay/recovery summaries if time allows
+- keep recovery mutation controls behind explicit operator action, not passive page load
+- add API and UI tests where surfaces are changed
+
+Completion criteria:
+- replay and recovery records are accessible through gateway-api
+- operator-facing data is bounded and understandable
+- no read endpoint creates replay or recovery side effects
+- tests pass
+
+---
+
+## Workstream 8 - Postman Validation And Local Failure Scenarios
+
+Status: Not Started
+
+Tasks:
+- add Postman requests for replay run creation and retrieval
+- add Postman requests for replay diagnostics
+- add Postman requests for recovery action creation and retrieval
+- add local validation for approval workflow replay
+- add local validation for rejection workflow replay
+- add local validation for a retryable outbox failure scenario
+- add local validation for rejection of unsupported recovery actions
+- validate Postman collection JSON and script syntax
+
+Completion criteria:
+- Postman can create and retrieve replay runs
+- Postman can validate replay diagnostics for approval and rejection workflows
+- Postman can exercise at least one safe recovery action
+- unsupported recovery actions are rejected with structured errors
+- collection JSON and scripts validate
+
+---
+
+## Workstream 9 - Replay Observability And Dashboards
+
+Status: Not Started
+
+Tasks:
+- emit replay and recovery traces
+- emit replay and recovery metrics
+- add structured logs for replay and recovery operations
+- add Grafana panels or a dedicated dashboard for replay and recovery activity
+- validate Jaeger contains replay and recovery traces
+- validate Prometheus scrapes replay and recovery metrics
+- validate Grafana displays replay and recovery activity
+- keep metric labels low-cardinality
+
+Completion criteria:
+- replay and recovery activity appears in Jaeger
+- Prometheus exposes replay and recovery metrics
+- Grafana displays replay and recovery panels
+- logs include bounded correlation and trace context
+- telemetry avoids sensitive payload exposure
+
+---
+
+## Workstream 10 - Documentation And Phase Closeout
+
+Status: Not Started
+
+Tasks:
+- update `CURRENT_FUNCTIONALITY.md`
+- update `IMPLEMENTATION_ROADMAP.md`
+- update `WORKFLOW_ENGINE.md` with implemented replay and recovery behavior
+- update `WORKFLOW_STATE_MACHINE.md` if recovery states or transitions are added
+- update `DATA_MODEL.md` for implemented replay and recovery records
+- update `API_CONTRACTS.md` for replay and recovery endpoints
+- update `SECURITY_MODEL.md` for local recovery authorization boundaries
+- update `OBSERVABILITY_STRATEGY.md` for replay and recovery telemetry
+- update `DEVELOPER_WORKFLOW.md` with replay and recovery validation commands
+- add Phase 8 completion log after validation
+
+Completion criteria:
+- documentation describes implemented behavior, not aspirational behavior
+- business-facing recovery boundary remains clear
+- manual tester can run local replay and safe recovery validation
+- automated tests and manual validation are recorded
+
+---
+
+# Validation Plan
+
+## Automated Tests
+
+Expected test suites:
+- gateway-api tests for replay and recovery endpoints
+- workflow-engine tests for recovery command execution where workflow state mutation is involved
+- service/domain tests for replay evidence reconstruction and validation
+- Postman collection JSON validation
+- Postman script syntax validation
+- Docker Compose configuration validation
+
+Minimum validation:
+- replay persistence works against local Postgres
+- replay evidence reconstruction works for approval and rejection workflows
+- deterministic replay validation produces stable results
+- replay run creation does not mutate workflow state
+- recovery commands require actor identity and reason
+- unsupported recovery commands are rejected
+- outbox retry does not duplicate already-published events
+- metrics endpoints do not expose sensitive payloads
+- telemetry configuration does not break tests when disabled
+
+## Manual Validation
+
+Expected manual flow:
+- start local Docker Compose stack
+- create and approve a Mortgage Exception Review workflow
+- create and reject a separate Mortgage Exception Review workflow
+- create replay runs for both workflows
+- inspect replay diagnostics and replay step records
+- create or seed a retryable local outbox failure scenario
+- execute an explicit safe recovery action
+- inspect recovery action records
+- inspect workflow timeline and outbox records after recovery
+- inspect Prometheus metrics for replay and recovery activity
+- inspect Jaeger traces for replay and recovery activity
+- inspect Grafana replay and recovery panels
+- inspect structured logs by correlation ID
+
+Expected manual result:
+- approval and rejection workflows remain reconstructable
+- replay runs complete without mutating workflow state
+- replay diagnostics are bounded and understandable
+- safe recovery action is explicit, recorded, and observable
+- unsupported or unsafe recovery action is rejected
+- traces, metrics, dashboards, and logs reflect replay and recovery activity
+
+---
+
+# Risk Register
+
+## Risk 1 - Replay Accidentally Creates Side Effects
+
+Mitigation:
+- make dry-run replay the default
+- prohibit agent, tool, approval, event publication, and workflow mutation during replay validation
+- require explicit recovery action endpoints for any mutation
+- add tests proving replay run creation does not mutate workflow state
+
+---
+
+## Risk 2 - Recovery Bypasses Workflow Engine Ownership
+
+Mitigation:
+- route workflow state mutation through workflow-engine-owned recovery logic
+- keep gateway-api responsible for validation and request intake, not direct workflow state updates
+- add tests for ownership boundaries
+
+---
+
+## Risk 3 - Duplicate Event Publication
+
+Mitigation:
+- retry only events classified as retryable
+- reject retries for already-published events
+- preserve retry count, status, and recovery action history
+- add idempotency checks around event publication
+
+---
+
+## Risk 4 - Recovery Is Mistaken For Business Approval
+
+Mitigation:
+- document recovery as operational remediation only
+- keep approval/rejection decisions tied to approval records and human review paths
+- prevent recovery actions from creating mortgage approval or rejection decisions
+
+---
+
+## Risk 5 - Replay Records Leak Sensitive Data
+
+Mitigation:
+- persist references, statuses, counts, and bounded diagnostics only
+- exclude raw documents, borrower PII, secrets, prompt content, approval comments as metadata, and full model outputs
+- test representative response payloads for bounded shape
+
+---
+
+## Risk 6 - Replay Metrics Become High Cardinality
+
+Mitigation:
+- do not label metrics with workflow IDs, replay run IDs, recovery action IDs, event IDs, trace IDs, borrower values, prompt content, document content, or approval comments
+- use IDs in persisted records and traces, not metric labels
+- keep dashboards aggregate-first
+
+---
+
+# Phase 8 Completion Criteria
+
+Phase 8 is complete when:
+- replay and recovery persistence tables exist and are tested
+- workflow evidence reconstruction works for local approval and rejection workflows
+- deterministic replay validation produces persisted replay runs and steps
+- replay run creation is side-effect free
+- replay and recovery retrieval endpoints are available through gateway-api
+- safe outbox recovery behavior is implemented and tested
+- unsupported recovery actions are rejected with structured errors
+- recovery actions require local actor identity and reason
+- any workflow state mutation routes through workflow-engine-owned logic
+- Postman validates replay and safe recovery workflows
+- replay and recovery emit traces, metrics, and structured logs
+- Grafana or dashboard panels expose replay and recovery activity
+- replay and recovery avoid sensitive payload exposure
+- documentation and roadmap are updated
+
+---
+
+# Running Status Log
+
+## 2026-05-12 - Planning
+
+Status:
+- Phase 8 planning started after Phase 7 completion
+- continuous implementation plan created
+
+Next step:
+- implement Workstream 1: Replay And Recovery Domain Model
+
+---
+
+# Decision Log
+
+## Decision 1 - Replay Is Side-Effect Free By Default
+
+Decision:
+- Phase 8 replay runs will reconstruct and validate persisted workflow evidence by default. They will not re-run agents, tools, approvals, events, workflow activities, or external integrations.
+
+Reason:
+- replay must be safe for local debugging and future production incident analysis
+- duplicate tool calls, event publication, or human decisions would corrupt operational history
+- recovery actions need a separate explicit control boundary
+
+---
+
+## Decision 2 - Workflow Engine Owns Mutating Recovery
+
+Decision:
+- Gateway may expose recovery request APIs, but any workflow state mutation must route through workflow-engine-owned recovery logic.
+
+Reason:
+- workflow-engine ownership of state is an AegisFlow architectural constraint
+- recovery must preserve the same governance model as normal workflow progression
+- direct gateway state mutation would create hidden operational paths
+
+---
+
+## Decision 3 - Outbox Recovery Before Broad Workflow Recovery
+
+Decision:
+- Phase 8 will implement bounded event outbox recovery before broader workflow restart or activity replay commands.
+
+Reason:
+- outbox records already contain retry and error metadata
+- event retry/dead-letter handling is valuable and contained
+- broader workflow restart and activity replay require stricter authorization and production controls
+
+---
+
+## Decision 4 - No New Replay Service Initially
+
+Decision:
+- Phase 8 will start with gateway-api and workflow-engine changes rather than a new replay-service.
+
+Reason:
+- current replay scope is local and workflow-specific
+- existing services already own the relevant API, persistence, and workflow mutation boundaries
+- a separate replay-service can be introduced later if operational complexity justifies it

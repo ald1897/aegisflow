@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from aegisflow_gateway.domain.workflows import (
     PHASE_2_STATE_SEQUENCE,
+    ReplayRunStatus,
     ReplayStepStatus,
     WorkflowEventType,
     WorkflowState,
@@ -47,6 +48,56 @@ class DeterministicReplayValidationResult:
         for step in self.steps:
             counts[step.status.value] = counts.get(step.status.value, 0) + 1
         return counts
+
+
+def build_history_reconstruction_steps(snapshot: WorkflowEvidenceSnapshot) -> tuple[ReplayValidationStep, ...]:
+    steps: list[ReplayValidationStep] = []
+    for artifact in snapshot.artifacts:
+        steps.append(
+            ReplayValidationStep(
+                sequence_number=len(steps) + 1,
+                artifact_type=artifact.artifact_type,
+                artifact_id=artifact.artifact_id,
+                expected_state=artifact.state,
+                observed_state=artifact.state,
+                status=ReplayStepStatus.pass_,
+                message=f"Reconstructed {artifact.artifact_type} evidence artifact.",
+                metadata={
+                    "owner": artifact.owner,
+                    "artifact_status": artifact.status,
+                    "correlation_id": artifact.correlation_id,
+                    "metadata_keys": sorted(artifact.metadata.keys()),
+                    "sensitive_payloads_persisted": False,
+                },
+            )
+        )
+
+    for diagnostic in snapshot.diagnostics:
+        steps.append(
+            ReplayValidationStep(
+                sequence_number=len(steps) + 1,
+                artifact_type=diagnostic.artifact_type or "workflow_evidence_snapshot",
+                artifact_id=None,
+                expected_state=snapshot.workflow_state,
+                observed_state=snapshot.workflow_state,
+                status=_diagnostic_status_to_step_status(diagnostic.status),
+                message=diagnostic.message,
+                metadata={
+                    "diagnostic_code": diagnostic.code,
+                    "diagnostic_status": diagnostic.status,
+                    "metadata_keys": sorted(diagnostic.metadata.keys()),
+                    "sensitive_payloads_persisted": False,
+                },
+            )
+        )
+
+    return tuple(steps)
+
+
+def replay_run_status_for_steps(steps: tuple[ReplayValidationStep, ...]) -> ReplayRunStatus:
+    if any(step.status == ReplayStepStatus.fail for step in steps):
+        return ReplayRunStatus.failed
+    return ReplayRunStatus.completed
 
 
 class DeterministicReplayValidator:
@@ -360,6 +411,14 @@ def _aggregate_status(steps: tuple[ReplayValidationStep, ...]) -> ReplayStepStat
     if ReplayStepStatus.warn in statuses:
         return ReplayStepStatus.warn
     return ReplayStepStatus.pass_
+
+
+def _diagnostic_status_to_step_status(status: str) -> ReplayStepStatus:
+    if status == "PASS":
+        return ReplayStepStatus.pass_
+    if status in {"WARN", "INFO"}:
+        return ReplayStepStatus.warn
+    return ReplayStepStatus.fail
 
 
 def _summary_for(status: ReplayStepStatus, steps: tuple[ReplayValidationStep, ...]) -> str:

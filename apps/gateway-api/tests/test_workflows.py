@@ -1,6 +1,6 @@
 from collections.abc import AsyncIterator
 from datetime import timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -1155,6 +1155,194 @@ async def test_validate_deterministic_replay_fails_invalid_state_sequence(
         "REJECTED",
         "COMPLETED",
     ]
+
+
+async def test_create_history_reconstruction_replay_run_persists_bounded_steps(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "history-replay-orchestration-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            str(workflow_id),
+            correlation_id="history-replay-orchestration-test",
+            final_state="COMPLETED",
+            decision="APPROVED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        before_counts = {
+            "transitions": len((await session.execute(select(WorkflowStateTransition))).scalars().all()),
+            "approvals": len((await session.execute(select(ApprovalRecord))).scalars().all()),
+            "outbox_events": len((await session.execute(select(WorkflowEventOutbox))).scalars().all()),
+        }
+        service = WorkflowService(session)
+        replay_run = await service.create_orchestrated_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.history_reconstruction,
+            requested_by="operator-1",
+            metadata={"operator_note_present": True},
+        )
+        steps = await service.list_replay_steps(UUID(replay_run.replay_run_id))
+        runs = await service.list_replay_runs(workflow_id)
+        after_counts = {
+            "transitions": len((await session.execute(select(WorkflowStateTransition))).scalars().all()),
+            "approvals": len((await session.execute(select(ApprovalRecord))).scalars().all()),
+            "outbox_events": len((await session.execute(select(WorkflowEventOutbox))).scalars().all()),
+        }
+
+    assert before_counts == after_counts
+    assert len(runs) == 1
+    assert replay_run.status == ReplayRunStatus.completed.value
+    assert replay_run.completed_at is not None
+    assert replay_run.replay_metadata["boundary"] == "side_effect_free"
+    assert replay_run.replay_metadata["operator_note_present"] is True
+    assert replay_run.replay_metadata["step_counts"]["PASS"] == len(steps)
+    assert replay_run.replay_metadata["sensitive_payloads_persisted"] is False
+    assert len(steps) == sum(replay_run.replay_metadata["artifact_counts"].values()) + 1
+    assert steps[-1].artifact_type == "workflow_evidence_snapshot"
+    assert steps[-1].step_metadata["diagnostic_code"] == "evidence_snapshot_complete"
+    assert all(step.step_metadata["sensitive_payloads_persisted"] is False for step in steps)
+
+
+async def test_create_deterministic_validation_replay_run_persists_validator_steps(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "deterministic-replay-orchestration-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            str(workflow_id),
+            correlation_id="deterministic-replay-orchestration-test",
+            final_state="COMPLETED",
+            decision="REJECTED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        replay_run = await service.create_orchestrated_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.deterministic_validation,
+            requested_by="operator-2",
+        )
+        retrieved_run = await service.get_replay_run(UUID(replay_run.replay_run_id))
+        workflow_runs = await service.list_replay_runs(workflow_id)
+        steps = await service.list_replay_steps(UUID(replay_run.replay_run_id))
+
+    assert retrieved_run.replay_run_id == replay_run.replay_run_id
+    assert workflow_runs[0].replay_run_id == replay_run.replay_run_id
+    assert replay_run.status == ReplayRunStatus.completed.value
+    assert replay_run.replay_mode == ReplayMode.deterministic_validation.value
+    assert replay_run.replay_metadata["step_counts"] == {"PASS": 7}
+    assert len(steps) == 7
+    assert [step.sequence_number for step in steps] == [1, 2, 3, 4, 5, 6, 7]
+    assert {step.status for step in steps} == {ReplayStepStatus.pass_.value}
+    assert steps[0].artifact_type == "workflow_state_transition"
+
+
+async def test_create_orchestrated_replay_run_is_idempotent_for_explicit_replay_run_id(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-idempotency-orchestration-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+    replay_run_id = uuid4()
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            str(workflow_id),
+            correlation_id="replay-idempotency-orchestration-test",
+            final_state="COMPLETED",
+            decision="APPROVED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        first_run = await service.create_orchestrated_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.deterministic_validation,
+            requested_by="operator-3",
+            replay_run_id=replay_run_id,
+        )
+        first_steps = await service.list_replay_steps(UUID(first_run.replay_run_id))
+        second_run = await service.create_orchestrated_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.deterministic_validation,
+            requested_by="operator-3",
+            replay_run_id=replay_run_id,
+        )
+        second_steps = await service.list_replay_steps(UUID(second_run.replay_run_id))
+        replay_run_count = len((await session.execute(select(WorkflowReplayRun))).scalars().all())
+
+    assert first_run.replay_run_id == second_run.replay_run_id == str(replay_run_id)
+    assert len(first_steps) == len(second_steps) == 7
+    assert replay_run_count == 1
+
+
+async def test_create_replay_run_preserves_incomplete_evidence_as_warning_steps(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-incomplete-evidence-orchestration-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            str(workflow_id),
+            correlation_id="replay-incomplete-evidence-orchestration-test",
+            final_state="HUMAN_REVIEW_REQUIRED",
+            decision=None,
+            include_evaluation=False,
+        )
+
+    async with session_factory() as session:
+        before_approval_count = len((await session.execute(select(ApprovalRecord))).scalars().all())
+        service = WorkflowService(session)
+        replay_run = await service.create_orchestrated_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.deterministic_validation,
+            requested_by="operator-4",
+        )
+        steps = await service.list_replay_steps(UUID(replay_run.replay_run_id))
+        after_approval_count = len((await session.execute(select(ApprovalRecord))).scalars().all())
+
+    assert before_approval_count == after_approval_count == 0
+    assert replay_run.status == ReplayRunStatus.completed.value
+    assert replay_run.replay_metadata["step_counts"] == {"PASS": 5, "WARN": 1, "SKIPPED": 1}
+    steps_by_type = {step.artifact_type: step for step in steps}
+    assert steps_by_type["approval_record"].status == ReplayStepStatus.warn.value
+    assert steps_by_type["evaluation_run"].status == ReplayStepStatus.skipped.value
 
 
 async def test_get_workflow_review_context_aggregates_review_records(

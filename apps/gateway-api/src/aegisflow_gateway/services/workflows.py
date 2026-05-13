@@ -31,7 +31,12 @@ from aegisflow_gateway.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.services.evidence import WorkflowEvidenceReconstructor, WorkflowEvidenceSnapshot
-from aegisflow_gateway.services.replay import DeterministicReplayValidationResult, DeterministicReplayValidator
+from aegisflow_gateway.services.replay import (
+    DeterministicReplayValidationResult,
+    DeterministicReplayValidator,
+    build_history_reconstruction_steps,
+    replay_run_status_for_steps,
+)
 
 
 class WorkflowNotFoundError(Exception):
@@ -297,6 +302,118 @@ class WorkflowService:
             .order_by(WorkflowReplayStep.sequence_number.asc(), WorkflowReplayStep.replay_step_id.asc())
         )
         return list(result.scalars().all())
+
+    async def create_orchestrated_replay_run(
+        self,
+        workflow_id: UUID,
+        *,
+        replay_mode: ReplayMode,
+        requested_by: str,
+        correlation_id: str | None = None,
+        replay_run_id: UUID | None = None,
+        metadata: dict | None = None,
+    ) -> WorkflowReplayRun:
+        workflow = await self.get_workflow(workflow_id)
+        if replay_mode not in {ReplayMode.history_reconstruction, ReplayMode.deterministic_validation}:
+            raise WorkflowReviewActionError(
+                error="unsupported_replay_mode",
+                message=f"Replay mode {replay_mode.value} is not supported by local replay orchestration",
+                status_code=400,
+            )
+
+        if replay_run_id is not None:
+            existing = await self._get_existing_replay_run_for_idempotency(
+                replay_run_id=replay_run_id,
+                workflow_id=workflow_id,
+                replay_mode=replay_mode,
+            )
+            if existing is not None:
+                return existing
+
+        snapshot = await WorkflowEvidenceReconstructor(self.session).reconstruct(workflow)
+        if replay_mode == ReplayMode.history_reconstruction:
+            steps = build_history_reconstruction_steps(snapshot)
+            summary = (
+                f"History reconstruction created {len(steps)} replay steps from "
+                f"{len(snapshot.artifacts)} evidence artifacts and {len(snapshot.diagnostics)} diagnostics."
+            )
+        else:
+            validation = DeterministicReplayValidator().validate(snapshot)
+            steps = validation.steps
+            summary = validation.summary
+
+        status = replay_run_status_for_steps(steps)
+        step_counts: dict[str, int] = {}
+        for step in steps:
+            step_counts[step.status.value] = step_counts.get(step.status.value, 0) + 1
+
+        now = datetime.now(timezone.utc)
+        replay_run = WorkflowReplayRun(
+            replay_run_id=str(replay_run_id or uuid4()),
+            workflow_id=str(workflow_id),
+            correlation_id=correlation_id or workflow.correlation_id,
+            replay_mode=replay_mode.value,
+            status=status.value,
+            source_temporal_workflow_id=workflow.temporal_workflow_id,
+            source_temporal_run_id=workflow.temporal_run_id,
+            started_at=now,
+            completed_at=now,
+            requested_by=requested_by,
+            replay_metadata={
+                **(metadata or {}),
+                "boundary": "side_effect_free",
+                "summary": summary,
+                "workflow_state": snapshot.workflow_state,
+                "artifact_counts": snapshot.artifact_counts,
+                "diagnostic_codes": [diagnostic.code for diagnostic in snapshot.diagnostics],
+                "step_counts": step_counts,
+                "sensitive_payloads_persisted": False,
+            },
+        )
+        self.session.add(replay_run)
+        await self.session.flush()
+
+        self.session.add_all(
+            [
+                WorkflowReplayStep(
+                    replay_run_id=replay_run.replay_run_id,
+                    workflow_id=replay_run.workflow_id,
+                    sequence_number=step.sequence_number,
+                    artifact_type=step.artifact_type,
+                    artifact_id=step.artifact_id,
+                    expected_state=step.expected_state,
+                    observed_state=step.observed_state,
+                    status=step.status.value,
+                    message=step.message,
+                    step_metadata=step.metadata,
+                )
+                for step in steps
+            ]
+        )
+        await self.session.commit()
+        await self.session.refresh(replay_run)
+        return replay_run
+
+    async def _get_existing_replay_run_for_idempotency(
+        self,
+        *,
+        replay_run_id: UUID,
+        workflow_id: UUID,
+        replay_mode: ReplayMode,
+    ) -> WorkflowReplayRun | None:
+        result = await self.session.execute(
+            select(WorkflowReplayRun).where(WorkflowReplayRun.replay_run_id == str(replay_run_id))
+        )
+        replay_run = result.scalar_one_or_none()
+        if replay_run is None:
+            return None
+        if replay_run.workflow_id != str(workflow_id) or replay_run.replay_mode != replay_mode.value:
+            raise WorkflowReviewActionError(
+                error="replay_run_id_conflict",
+                message=f"Replay run {replay_run_id} already exists for a different workflow or mode",
+                status_code=409,
+            )
+        return replay_run
 
     async def create_recovery_action(
         self,

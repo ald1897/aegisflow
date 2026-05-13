@@ -543,25 +543,25 @@ Completion criteria:
 
 ## Workstream 4 - Replay Run Orchestration
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- add replay run creation service
-- support `history_reconstruction` mode
-- support `deterministic_validation` mode
-- support explicit `replay_run_id` idempotency where practical
-- persist replay run and replay step records
-- handle missing workflows with structured errors
-- handle workflows with incomplete evidence using warning diagnostics instead of unsafe mutation
-- add retrieval and workflow listing services
-- add integration tests against seeded workflow evidence
+- add replay run creation service - Complete
+- support `history_reconstruction` mode - Complete
+- support `deterministic_validation` mode - Complete
+- support explicit `replay_run_id` idempotency where practical - Complete
+- persist replay run and replay step records - Complete
+- handle missing workflows with structured errors - Complete
+- handle workflows with incomplete evidence using warning diagnostics instead of unsafe mutation - Complete
+- add retrieval and workflow listing services - Complete
+- add integration tests against seeded workflow evidence - Complete
 
 Completion criteria:
-- a local workflow can receive a replay run
-- replay runs and steps are persisted and retrievable
-- missing workflow and incomplete evidence cases are handled clearly
-- replay run creation is side-effect free
-- tests pass
+- a local workflow can receive a replay run - Met
+- replay runs and steps are persisted and retrievable - Met
+- missing workflow and incomplete evidence cases are handled clearly - Met
+- replay run creation is side-effect free - Met
+- tests pass - Met
 
 ---
 
@@ -929,6 +929,36 @@ Boundary:
 
 Next step:
 - implement Workstream 4: Replay Run Orchestration
+
+## 2026-05-13 - Workstream 4
+
+Status:
+- added gateway-api replay run orchestration service method `create_orchestrated_replay_run`
+- supported `history_reconstruction` mode by converting reconstructed evidence artifacts and diagnostics into persisted replay steps
+- supported `deterministic_validation` mode by persisting deterministic replay validator steps
+- added explicit replay run id idempotency for same workflow and replay mode
+- added conflict handling for reused replay run ids with different workflow or mode
+- persisted completed or failed replay run status from generated step outcomes
+- persisted replay step records with bounded metadata only
+- preserved retrieval and workflow listing through existing replay run and replay step service methods
+- added tests for history reconstruction, deterministic validation, explicit idempotency, and incomplete evidence warning orchestration
+
+Validation:
+- gateway-api pytest suite passed with 29 tests
+- Docker Compose configuration validated
+- gateway-api source compilation succeeded
+
+Completed workstream:
+- Workstream 4 - Replay Run Orchestration
+
+Boundary:
+- Workstream 4 persists replay run and replay step records only
+- no recovery actions, workflow state transitions, outbox retries, Temporal replay, agent execution, tool execution, approval dispatch, or event publication are created
+- incomplete workflow evidence is preserved as warning or skipped replay steps rather than repaired or mutated
+- replay metadata remains bounded to summaries, counts, statuses, artifact families, diagnostic codes, and expected or observed identifiers
+
+Next step:
+- implement Workstream 5: Failure Classification And Outbox Recovery
 
 ---
 

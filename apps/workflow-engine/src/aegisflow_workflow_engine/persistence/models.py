@@ -163,3 +163,71 @@ class ApprovalRecord(Base):
     reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     approval_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WorkflowReplayRun(Base):
+    __tablename__ = "workflow_replay_runs"
+
+    replay_run_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    replay_mode: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_temporal_workflow_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_temporal_run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    replay_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WorkflowReplayStep(Base):
+    __tablename__ = "workflow_replay_steps"
+
+    replay_step_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    replay_run_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_replay_runs.replay_run_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    artifact_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    artifact_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    expected_state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    observed_state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    step_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class WorkflowRecoveryAction(Base):
+    __tablename__ = "workflow_recovery_actions"
+
+    recovery_action_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    action_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_resource_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    result_metadata: Mapped[dict] = mapped_column(json_type, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

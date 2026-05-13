@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +9,11 @@ from aegisflow_gateway.domain.workflows import (
     OutboxPublishStatus,
     TimelineEntryType,
     WorkflowEventType,
+    RecoveryActionStatus,
+    RecoveryActionType,
+    ReplayMode,
+    ReplayRunStatus,
+    ReplayStepStatus,
     WorkflowState,
 )
 from aegisflow_gateway.persistence.models import (
@@ -17,8 +22,11 @@ from aegisflow_gateway.persistence.models import (
     EvaluationResult,
     EvaluationRun,
     ToolInvocationRecord,
+    WorkflowRecoveryAction,
     WorkflowEventOutbox,
     WorkflowRecord,
+    WorkflowReplayRun,
+    WorkflowReplayStep,
     WorkflowStateTransition,
     WorkflowTimelineEntry,
 )
@@ -193,5 +201,152 @@ class WorkflowService:
             select(EvaluationResult)
             .where(EvaluationResult.evaluation_run_id == str(evaluation_run_id))
             .order_by(EvaluationResult.created_at.asc(), EvaluationResult.evaluation_result_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def create_replay_run(
+        self,
+        workflow_id: UUID,
+        *,
+        replay_mode: ReplayMode,
+        requested_by: str,
+        correlation_id: str | None = None,
+        replay_run_id: UUID | None = None,
+        status: ReplayRunStatus = ReplayRunStatus.requested,
+        metadata: dict | None = None,
+    ) -> WorkflowReplayRun:
+        workflow = await self.get_workflow(workflow_id)
+        replay_run = WorkflowReplayRun(
+            replay_run_id=str(replay_run_id or uuid4()),
+            workflow_id=str(workflow_id),
+            correlation_id=correlation_id or workflow.correlation_id,
+            replay_mode=replay_mode.value,
+            status=status.value,
+            source_temporal_workflow_id=workflow.temporal_workflow_id,
+            source_temporal_run_id=workflow.temporal_run_id,
+            requested_by=requested_by,
+            replay_metadata=metadata or {},
+        )
+        self.session.add(replay_run)
+        await self.session.commit()
+        await self.session.refresh(replay_run)
+        return replay_run
+
+    async def get_replay_run(self, replay_run_id: UUID) -> WorkflowReplayRun:
+        result = await self.session.execute(
+            select(WorkflowReplayRun).where(WorkflowReplayRun.replay_run_id == str(replay_run_id))
+        )
+        replay_run = result.scalar_one_or_none()
+        if replay_run is None:
+            raise WorkflowReviewActionError(
+                error="replay_run_not_found",
+                message=f"Replay run {replay_run_id} was not found",
+                status_code=404,
+            )
+        return replay_run
+
+    async def list_replay_runs(self, workflow_id: UUID) -> list[WorkflowReplayRun]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(WorkflowReplayRun)
+            .where(WorkflowReplayRun.workflow_id == str(workflow_id))
+            .order_by(WorkflowReplayRun.started_at.asc(), WorkflowReplayRun.replay_run_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def create_replay_step(
+        self,
+        replay_run_id: UUID,
+        *,
+        sequence_number: int,
+        artifact_type: str,
+        status: ReplayStepStatus,
+        message: str,
+        artifact_id: str | None = None,
+        expected_state: str | None = None,
+        observed_state: str | None = None,
+        metadata: dict | None = None,
+        replay_step_id: UUID | None = None,
+    ) -> WorkflowReplayStep:
+        replay_run = await self.get_replay_run(replay_run_id)
+        replay_step = WorkflowReplayStep(
+            replay_step_id=str(replay_step_id or uuid4()),
+            replay_run_id=str(replay_run_id),
+            workflow_id=replay_run.workflow_id,
+            sequence_number=sequence_number,
+            artifact_type=artifact_type,
+            artifact_id=artifact_id,
+            expected_state=expected_state,
+            observed_state=observed_state,
+            status=status.value,
+            message=message,
+            step_metadata=metadata or {},
+        )
+        self.session.add(replay_step)
+        await self.session.commit()
+        await self.session.refresh(replay_step)
+        return replay_step
+
+    async def list_replay_steps(self, replay_run_id: UUID) -> list[WorkflowReplayStep]:
+        await self.get_replay_run(replay_run_id)
+        result = await self.session.execute(
+            select(WorkflowReplayStep)
+            .where(WorkflowReplayStep.replay_run_id == str(replay_run_id))
+            .order_by(WorkflowReplayStep.sequence_number.asc(), WorkflowReplayStep.replay_step_id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def create_recovery_action(
+        self,
+        workflow_id: UUID,
+        *,
+        action_type: RecoveryActionType,
+        target_resource_type: str,
+        target_resource_id: str,
+        requested_by: str,
+        reason: str,
+        correlation_id: str | None = None,
+        recovery_action_id: UUID | None = None,
+        status: RecoveryActionStatus = RecoveryActionStatus.requested,
+        metadata: dict | None = None,
+    ) -> WorkflowRecoveryAction:
+        workflow = await self.get_workflow(workflow_id)
+        recovery_action = WorkflowRecoveryAction(
+            recovery_action_id=str(recovery_action_id or uuid4()),
+            workflow_id=str(workflow_id),
+            correlation_id=correlation_id or workflow.correlation_id,
+            action_type=action_type.value,
+            target_resource_type=target_resource_type,
+            target_resource_id=target_resource_id,
+            status=status.value,
+            requested_by=requested_by,
+            reason=reason,
+            result_metadata=metadata or {},
+        )
+        self.session.add(recovery_action)
+        await self.session.commit()
+        await self.session.refresh(recovery_action)
+        return recovery_action
+
+    async def get_recovery_action(self, recovery_action_id: UUID) -> WorkflowRecoveryAction:
+        result = await self.session.execute(
+            select(WorkflowRecoveryAction)
+            .where(WorkflowRecoveryAction.recovery_action_id == str(recovery_action_id))
+        )
+        recovery_action = result.scalar_one_or_none()
+        if recovery_action is None:
+            raise WorkflowReviewActionError(
+                error="recovery_action_not_found",
+                message=f"Recovery action {recovery_action_id} was not found",
+                status_code=404,
+            )
+        return recovery_action
+
+    async def list_recovery_actions(self, workflow_id: UUID) -> list[WorkflowRecoveryAction]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(WorkflowRecoveryAction)
+            .where(WorkflowRecoveryAction.workflow_id == str(workflow_id))
+            .order_by(WorkflowRecoveryAction.started_at.asc(), WorkflowRecoveryAction.recovery_action_id.asc())
         )
         return list(result.scalars().all())

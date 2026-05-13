@@ -61,6 +61,42 @@ class OutboxPublishStatus(StrEnum):
     failed = "FAILED"
 
 
+class ReplayMode(StrEnum):
+    history_reconstruction = "history_reconstruction"
+    deterministic_validation = "deterministic_validation"
+    dry_run_recovery_check = "dry_run_recovery_check"
+
+
+class ReplayRunStatus(StrEnum):
+    requested = "REQUESTED"
+    running = "RUNNING"
+    completed = "COMPLETED"
+    failed = "FAILED"
+
+
+class ReplayStepStatus(StrEnum):
+    pass_ = "PASS"
+    warn = "WARN"
+    fail = "FAIL"
+    skipped = "SKIPPED"
+
+
+class RecoveryActionType(StrEnum):
+    retry_outbox_event = "retry_outbox_event"
+    mark_outbox_event_dead_lettered = "mark_outbox_event_dead_lettered"
+    clear_retryable_outbox_error = "clear_retryable_outbox_error"
+    reconcile_workflow_projection = "reconcile_workflow_projection"
+    resume_stuck_workflow_check = "resume_stuck_workflow_check"
+
+
+class RecoveryActionStatus(StrEnum):
+    requested = "REQUESTED"
+    running = "RUNNING"
+    completed = "COMPLETED"
+    failed = "FAILED"
+    rejected = "REJECTED"
+
+
 PHASE_2_STATE_SEQUENCE: tuple[WorkflowState, ...] = (
     WorkflowState.intake_in_progress,
     WorkflowState.document_analysis_pending,

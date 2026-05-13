@@ -4,7 +4,17 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from aegisflow_gateway.domain.workflows import ApprovalDecision, WorkflowPriority, WorkflowState, WorkflowType
+from aegisflow_gateway.domain.workflows import (
+    ApprovalDecision,
+    RecoveryActionStatus,
+    RecoveryActionType,
+    ReplayMode,
+    ReplayRunStatus,
+    ReplayStepStatus,
+    WorkflowPriority,
+    WorkflowState,
+    WorkflowType,
+)
 
 
 class WorkflowCreateRequest(BaseModel):
@@ -211,3 +221,57 @@ class WorkflowEvaluationsResponse(BaseModel):
     workflow_id: UUID
     runs: list[EvaluationRunSummaryResponse]
     count: int
+
+
+class ReplayStepResponse(BaseModel):
+    replay_step_id: UUID
+    replay_run_id: UUID
+    workflow_id: UUID
+    sequence_number: int
+    artifact_type: str
+    artifact_id: str | None
+    expected_state: str | None
+    observed_state: str | None
+    status: ReplayStepStatus
+    message: str
+    metadata: dict[str, Any]
+    created_at: datetime
+
+
+class ReplayRunResponse(BaseModel):
+    replay_run_id: UUID
+    workflow_id: UUID
+    correlation_id: str
+    replay_mode: ReplayMode
+    status: ReplayRunStatus
+    source_temporal_workflow_id: str | None
+    source_temporal_run_id: str | None
+    started_at: datetime
+    completed_at: datetime | None
+    requested_by: str
+    metadata: dict[str, Any]
+    created_at: datetime
+    steps: list[ReplayStepResponse] = Field(default_factory=list)
+
+
+class ReplayDiagnosticResponse(BaseModel):
+    workflow_id: UUID
+    status: ReplayStepStatus
+    summary: str
+    diagnostics: list[ReplayStepResponse]
+
+
+class RecoveryActionResponse(BaseModel):
+    recovery_action_id: UUID
+    workflow_id: UUID
+    correlation_id: str
+    action_type: RecoveryActionType
+    target_resource_type: str
+    target_resource_id: str
+    status: RecoveryActionStatus
+    requested_by: str
+    reason: str
+    started_at: datetime
+    completed_at: datetime | None
+    metadata: dict[str, Any]
+    created_at: datetime

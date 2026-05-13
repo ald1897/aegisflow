@@ -7,6 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from aegisflow_gateway.config import Settings, get_settings
+from aegisflow_gateway.domain.workflows import (
+    RecoveryActionStatus,
+    RecoveryActionType,
+    ReplayMode,
+    ReplayRunStatus,
+    ReplayStepStatus,
+)
 from aegisflow_gateway.main import create_app
 from aegisflow_gateway.persistence.database import get_session
 from aegisflow_gateway.persistence.models import (
@@ -16,13 +24,17 @@ from aegisflow_gateway.persistence.models import (
     EvaluationResult,
     EvaluationRun,
     ToolInvocationRecord,
+    WorkflowRecoveryAction,
     WorkflowEventOutbox,
     WorkflowRecord,
+    WorkflowReplayRun,
+    WorkflowReplayStep,
     WorkflowStateTransition,
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.persistence.models import utc_now
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
+from aegisflow_gateway.services.workflows import WorkflowService
 
 
 @pytest.fixture
@@ -43,6 +55,14 @@ async def app_context() -> AsyncIterator[tuple[object, async_sessionmaker[AsyncS
 
     app = create_app()
     app.dependency_overrides[get_session] = override_get_session
+    def override_get_settings() -> Settings:
+        settings = Settings()
+        settings.enable_event_publishing = False
+        settings.enable_temporal_start = False
+        settings.enable_telemetry = False
+        return settings
+
+    app.dependency_overrides[get_settings] = override_get_settings
 
     yield app, session_factory
 
@@ -416,6 +436,114 @@ async def test_get_workflow_evaluations_returns_persisted_runs_and_results(
         "borrower_profile_lookup",
         "document_fetch",
     ]
+
+
+async def test_replay_run_and_steps_can_be_persisted_and_listed(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-persistence-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        workflow = await session.get(WorkflowRecord, str(workflow_id))
+        assert workflow is not None
+        workflow.temporal_workflow_id = f"mortgage-exception-review-{workflow_id}"
+        workflow.temporal_run_id = "temporal-run-1"
+        await session.commit()
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        replay_run = await service.create_replay_run(
+            workflow_id,
+            replay_mode=ReplayMode.history_reconstruction,
+            requested_by="operator-1",
+            metadata={"boundary": "side_effect_free"},
+        )
+        replay_step = await service.create_replay_step(
+            UUID(replay_run.replay_run_id),
+            sequence_number=1,
+            artifact_type="workflow_state_transition",
+            artifact_id="transition-1",
+            expected_state="NEW",
+            observed_state="NEW",
+            status=ReplayStepStatus.pass_,
+            message="Initial workflow state was reconstructed.",
+            metadata={"sensitive_payloads_persisted": False},
+        )
+        runs = await service.list_replay_runs(workflow_id)
+        steps = await service.list_replay_steps(UUID(replay_run.replay_run_id))
+
+    assert len(runs) == 1
+    assert runs[0].replay_run_id == replay_run.replay_run_id
+    assert runs[0].correlation_id == "replay-persistence-test"
+    assert runs[0].replay_mode == ReplayMode.history_reconstruction.value
+    assert runs[0].status == ReplayRunStatus.requested.value
+    assert runs[0].source_temporal_workflow_id == f"mortgage-exception-review-{workflow_id}"
+    assert runs[0].source_temporal_run_id == "temporal-run-1"
+    assert runs[0].requested_by == "operator-1"
+    assert runs[0].replay_metadata == {"boundary": "side_effect_free"}
+    assert len(steps) == 1
+    assert steps[0].replay_step_id == replay_step.replay_step_id
+    assert steps[0].sequence_number == 1
+    assert steps[0].artifact_type == "workflow_state_transition"
+    assert steps[0].status == ReplayStepStatus.pass_.value
+    assert steps[0].step_metadata == {"sensitive_payloads_persisted": False}
+
+    async with session_factory() as session:
+        replay_run_count = len((await session.execute(select(WorkflowReplayRun))).scalars().all())
+        replay_step_count = len((await session.execute(select(WorkflowReplayStep))).scalars().all())
+
+    assert replay_run_count == 1
+    assert replay_step_count == 1
+
+
+async def test_recovery_action_can_be_persisted_and_listed(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "recovery-persistence-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        recovery_action = await service.create_recovery_action(
+            workflow_id,
+            action_type=RecoveryActionType.retry_outbox_event,
+            target_resource_type="workflow_event_outbox",
+            target_resource_id=f"{workflow_id}:workflow.created",
+            requested_by="operator-1",
+            reason="Retry local event publication after transient publisher failure.",
+            metadata={"raw_payload_persisted": False},
+        )
+        actions = await service.list_recovery_actions(workflow_id)
+        retrieved_action = await service.get_recovery_action(UUID(recovery_action.recovery_action_id))
+
+    assert len(actions) == 1
+    assert actions[0].recovery_action_id == recovery_action.recovery_action_id
+    assert retrieved_action.recovery_action_id == recovery_action.recovery_action_id
+    assert retrieved_action.correlation_id == "recovery-persistence-test"
+    assert retrieved_action.action_type == RecoveryActionType.retry_outbox_event.value
+    assert retrieved_action.target_resource_type == "workflow_event_outbox"
+    assert retrieved_action.status == RecoveryActionStatus.requested.value
+    assert retrieved_action.requested_by == "operator-1"
+    assert retrieved_action.reason == "Retry local event publication after transient publisher failure."
+    assert retrieved_action.result_metadata == {"raw_payload_persisted": False}
+
+    async with session_factory() as session:
+        recovery_action_count = len((await session.execute(select(WorkflowRecoveryAction))).scalars().all())
+
+    assert recovery_action_count == 1
 
 
 async def test_get_workflow_review_context_aggregates_review_records(

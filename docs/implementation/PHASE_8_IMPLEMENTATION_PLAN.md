@@ -479,22 +479,22 @@ Logs must include correlation ID and trace ID where available and avoid sensitiv
 
 ## Workstream 1 - Replay And Recovery Domain Model
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define replay run, replay step, and recovery action statuses
-- add Alembic migration for `workflow_replay_runs`, `workflow_replay_steps`, and `workflow_recovery_actions`
-- add SQLAlchemy models to gateway-api and workflow-engine as needed
-- add DTOs for replay run, replay step, diagnostic, and recovery action responses
-- add repository methods for create, retrieve, and list behavior
-- document bounded metadata and sensitive data restrictions
-- add persistence tests
+- define replay run, replay step, and recovery action statuses - Complete
+- add Alembic migration for `workflow_replay_runs`, `workflow_replay_steps`, and `workflow_recovery_actions` - Complete
+- add SQLAlchemy models to gateway-api and workflow-engine as needed - Complete
+- add DTOs for replay run, replay step, diagnostic, and recovery action responses - Complete
+- add repository methods for create, retrieve, and list behavior - Complete
+- document bounded metadata and sensitive data restrictions - Complete
+- add persistence tests - Complete
 
 Completion criteria:
-- replay and recovery tables are created locally
-- records can be persisted and retrieved
-- records preserve workflow and correlation identity
-- persistence tests pass
+- replay and recovery tables are created locally - Met
+- records can be persisted and retrieved - Met
+- records preserve workflow and correlation identity - Met
+- persistence tests pass - Met
 
 ---
 
@@ -840,6 +840,36 @@ Status:
 
 Next step:
 - implement Workstream 1: Replay And Recovery Domain Model
+
+## 2026-05-12 - Workstream 1
+
+Status:
+- added Alembic migration `20260512_0007_add_replay_recovery_records`
+- added `workflow_replay_runs`, `workflow_replay_steps`, and `workflow_recovery_actions` tables
+- added replay mode, replay run status, replay step status, recovery action type, and recovery action status enums to gateway-api and workflow-engine domain models
+- added gateway-api and workflow-engine SQLAlchemy models for replay and recovery records
+- added gateway-api DTOs for replay runs, replay steps, replay diagnostics, and recovery actions
+- added gateway-api service methods for replay run create/retrieve/list, replay step create/list, and recovery action create/retrieve/list
+- added persistence tests for replay runs, replay steps, and recovery actions
+- made gateway-api tests override compose runtime flags so persistence tests remain isolated from local event publishing settings
+
+Validation:
+- gateway-api pytest suite passed with 19 tests
+- workflow-engine pytest suite passed with 12 tests
+- Docker Compose configuration validated
+- Python source compilation succeeded for gateway-api and workflow-engine
+
+Completed workstream:
+- Workstream 1 - Replay And Recovery Domain Model
+
+Boundary:
+- Workstream 1 only adds persistence, typed contracts, and service-layer create/retrieve/list behavior
+- no public replay or recovery endpoints are introduced yet
+- no workflow state mutation, event retry, Temporal replay, agent execution, tool execution, or approval dispatch is introduced
+- replay and recovery metadata remains bounded to references, statuses, and diagnostic context only
+
+Next step:
+- implement Workstream 2: Workflow Evidence Reconstruction
 
 ---
 

@@ -948,6 +948,54 @@ Replay-aware records should distinguish:
 - replay execution
 - evaluation-only replay
 
+## Implemented Local Replay And Recovery Persistence
+
+The Phase 8 local implementation persists replay and recovery foundation data in:
+- `workflow_replay_runs`
+- `workflow_replay_steps`
+- `workflow_recovery_actions`
+
+`workflow_replay_runs` stores replay request metadata:
+- `replay_run_id`
+- `workflow_id`
+- `correlation_id`
+- `replay_mode`
+- `status`
+- source Temporal workflow and run identifiers when present
+- start and completion timestamps
+- requesting actor or service
+- bounded replay metadata
+- creation timestamp
+
+`workflow_replay_steps` stores deterministic replay validation steps:
+- `replay_step_id`
+- `replay_run_id`
+- `workflow_id`
+- sequence number
+- artifact type and optional artifact identifier
+- expected and observed state values
+- status
+- bounded diagnostic message
+- bounded step metadata
+- creation timestamp
+
+`workflow_recovery_actions` stores explicit recovery requests and outcomes:
+- `recovery_action_id`
+- `workflow_id`
+- `correlation_id`
+- action type
+- target resource type and identifier
+- status
+- requesting actor or service
+- reason
+- start and completion timestamps
+- bounded result metadata
+- creation timestamp
+
+Replay and recovery records preserve references, statuses, timestamps, actor identity, and bounded diagnostic context. They must not store raw document contents, unrestricted borrower PII, secrets, prompt content, approval comments as diagnostic metadata, full model outputs, or unrestricted integration payloads.
+
+The current local replay and recovery persistence foundation does not itself mutate workflow state, retry events, perform Temporal replay, execute agents, execute tools, or dispatch approvals.
+
 ---
 
 ## Idempotent Writes

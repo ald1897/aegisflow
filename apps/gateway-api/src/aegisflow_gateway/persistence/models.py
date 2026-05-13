@@ -65,6 +65,14 @@ class WorkflowRecord(Base):
         back_populates="workflow",
         cascade="all, delete-orphan",
     )
+    replay_runs: Mapped[list["WorkflowReplayRun"]] = relationship(
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
+    recovery_actions: Mapped[list["WorkflowRecoveryAction"]] = relationship(
+        back_populates="workflow",
+        cascade="all, delete-orphan",
+    )
 
 
 class WorkflowStateTransition(Base):
@@ -269,6 +277,84 @@ class EvaluationResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
 
 
+class WorkflowReplayRun(Base):
+    __tablename__ = "workflow_replay_runs"
+
+    replay_run_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    replay_mode: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_temporal_workflow_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    source_temporal_run_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    replay_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    workflow: Mapped[WorkflowRecord] = relationship(back_populates="replay_runs")
+    steps: Mapped[list["WorkflowReplayStep"]] = relationship(
+        back_populates="replay_run",
+        cascade="all, delete-orphan",
+    )
+
+
+class WorkflowReplayStep(Base):
+    __tablename__ = "workflow_replay_steps"
+
+    replay_step_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    replay_run_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_replay_runs.replay_run_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    sequence_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    artifact_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    artifact_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    expected_state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    observed_state: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    message: Mapped[str] = mapped_column(String(1000), nullable=False)
+    step_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    replay_run: Mapped[WorkflowReplayRun] = relationship(back_populates="steps")
+
+
+class WorkflowRecoveryAction(Base):
+    __tablename__ = "workflow_recovery_actions"
+
+    recovery_action_id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    workflow_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workflow_records.workflow_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    correlation_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    action_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_resource_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_resource_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
+    requested_by: Mapped[str] = mapped_column(String(128), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    result_metadata: Mapped[dict] = mapped_column(json_type, nullable=False, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
+
+    workflow: Mapped[WorkflowRecord] = relationship(back_populates="recovery_actions")
+
+
 Index("ix_workflow_timeline_entries_workflow_id", WorkflowTimelineEntry.workflow_id)
 Index("ix_workflow_timeline_entries_created_at", WorkflowTimelineEntry.created_at)
 Index("ix_workflow_event_outbox_workflow_id", WorkflowEventOutbox.workflow_id)
@@ -289,3 +375,16 @@ Index("ix_evaluation_results_workflow_id", EvaluationResult.workflow_id)
 Index("ix_evaluation_results_evaluation_run_id", EvaluationResult.evaluation_run_id)
 Index("ix_evaluation_results_evaluator_id", EvaluationResult.evaluator_id)
 Index("ix_evaluation_results_score_status", EvaluationResult.score_status)
+Index("ix_workflow_replay_runs_workflow_id", WorkflowReplayRun.workflow_id)
+Index("ix_workflow_replay_runs_replay_mode", WorkflowReplayRun.replay_mode)
+Index("ix_workflow_replay_runs_status", WorkflowReplayRun.status)
+Index("ix_workflow_replay_runs_source_temporal_workflow_id", WorkflowReplayRun.source_temporal_workflow_id)
+Index("ix_workflow_replay_steps_replay_run_id", WorkflowReplayStep.replay_run_id)
+Index("ix_workflow_replay_steps_workflow_id", WorkflowReplayStep.workflow_id)
+Index("ix_workflow_replay_steps_artifact_type", WorkflowReplayStep.artifact_type)
+Index("ix_workflow_replay_steps_status", WorkflowReplayStep.status)
+Index("uq_workflow_replay_steps_run_sequence", WorkflowReplayStep.replay_run_id, WorkflowReplayStep.sequence_number, unique=True)
+Index("ix_workflow_recovery_actions_workflow_id", WorkflowRecoveryAction.workflow_id)
+Index("ix_workflow_recovery_actions_action_type", WorkflowRecoveryAction.action_type)
+Index("ix_workflow_recovery_actions_status", WorkflowRecoveryAction.status)
+Index("ix_workflow_recovery_actions_target", WorkflowRecoveryAction.target_resource_type, WorkflowRecoveryAction.target_resource_id)

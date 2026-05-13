@@ -658,6 +658,7 @@ Current local stack:
 - workflow-engine
 - agent-runtime
 - tool-runtime
+- evaluation-service
 - operator-console
 - OpenTelemetry Collector
 - Jaeger
@@ -678,6 +679,8 @@ Gateway API: http://localhost:8000
 Agent Runtime: http://localhost:8010
 Tool Runtime: http://localhost:8020
 Workflow Engine Metrics: http://localhost:8030/metrics
+Evaluation Service: http://localhost:8040
+Evaluation Service Metrics: http://localhost:8040/metrics
 Temporal UI: http://localhost:8088
 Grafana: http://localhost:3001
 Prometheus: http://localhost:9090
@@ -699,9 +702,59 @@ docker logs aegisflow-gateway-api --since 15m
 docker logs aegisflow-workflow-engine --since 15m
 docker logs aegisflow-agent-runtime --since 15m
 docker logs aegisflow-tool-runtime --since 15m
+docker logs aegisflow-evaluation-service --since 15m
 ```
 
 Filter structured JSON logs by `correlation_id` when investigating a workflow. Loki is deferred from the local Docker Compose stack to avoid host-specific log collection setup.
+
+---
+
+# Local Evaluation Validation
+
+Phase 7 adds a local evaluation-service for deterministic AI quality scoring, dataset comparison, and evaluation telemetry.
+
+Run the evaluation-service test suite from the repository root:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -v "${PWD}\apps\evaluation-service\tests:/app/tests" `
+  evaluation-service sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected current result:
+
+```text
+36 passed
+```
+
+Run the gateway-api test suite when changing workflow evaluation retrieval:
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -v "${PWD}\apps\gateway-api\tests:/app/tests" `
+  gateway-api sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected current result:
+
+```text
+17 passed
+```
+
+Local Postman validation lives in:
+
+```text
+postman/AegisFlow_Local_Runtime.postman_collection.json
+```
+
+The collection includes evaluation-service health/readiness, dataset listing, approval and rejection dataset replay runs, evaluation run retrieval, workflow evaluation retrieval through gateway-api, Prometheus metric checks, Jaeger trace checks, Grafana dashboard checks, and bounded structured log checks.
+
+Useful local observability checks:
+- Prometheus query: `aegisflow_evaluation_service_evaluation_runs_total`
+- Jaeger service: `evaluation-service`
+- Grafana dashboard: `AegisFlow - Evaluation Quality`
+
+Evaluation validation is quality telemetry only. It must not approve workflows, reject workflows, complete workflows, bypass human review, mutate workflow records, or replace approval records.
 
 ---
 

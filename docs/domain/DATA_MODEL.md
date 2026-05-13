@@ -524,6 +524,53 @@ Evaluation records must:
 
 Evaluation records must not mutate production workflow outcomes.
 
+## Implemented Local Evaluation Tables
+
+The Phase 7 local implementation persists evaluation data in:
+- `evaluation_dataset_cases`
+- `evaluation_runs`
+- `evaluation_results`
+
+`evaluation_dataset_cases` stores local replay-aware scenario definitions:
+- `dataset_case_id`
+- `dataset_id`
+- `case_name`
+- `workflow_type`
+- expected agents
+- expected tools
+- expected human review requirement
+- expected terminal decision
+- expected signals
+- bounded case metadata
+- creation timestamp
+
+`evaluation_runs` stores each requested evaluation run:
+- `evaluation_run_id`
+- `workflow_id`
+- `correlation_id`
+- `evaluation_scope`
+- `evaluation_mode`
+- `dataset_id`
+- `status`
+- start and completion timestamps
+- creating actor or service
+- bounded run metadata
+
+`evaluation_results` stores evaluator scores:
+- `evaluation_result_id`
+- `evaluation_run_id`
+- `workflow_id`
+- optional `agent_execution_id`
+- optional prompt ID, prompt version, and model name
+- evaluator ID and evaluator version
+- score name, value, status, severity, and rationale
+- bounded result metadata
+- creation timestamp
+
+Implemented evaluation records preserve references and bounded scoring context. They do not store raw document contents, borrower PII, secrets, prompt content, approval comments as scoring metadata, or full model outputs.
+
+Dataset replay records compare persisted workflow evidence against local dataset expectations only. They do not invoke workflow replay, Temporal activities, agents, tools, approval dispatch, external systems, or recovery actions.
+
 ---
 
 # Prompt Version Metadata
@@ -629,6 +676,9 @@ The local implementation currently persists:
 - agent execution records
 - tool invocation records
 - approval records
+- evaluation dataset cases
+- evaluation runs
+- evaluation results
 
 Approval records currently preserve:
 - approval identity

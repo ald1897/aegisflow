@@ -424,6 +424,7 @@ Implemented flow:
 - optionally compare workflow evidence against a selected local dataset case when `dataset_case_id` is supplied
 - persist evaluation run and evaluation result records
 - retrieve a run with its results or list runs for a workflow
+- retrieve persisted workflow evaluation summaries through gateway-api for operator and Postman ergonomics
 
 Current implemented endpoints:
 
@@ -433,8 +434,61 @@ GET /api/v1/evaluations/runs/{evaluation_run_id}
 GET /api/v1/evaluations/workflows/{workflow_id}/runs
 GET /api/v1/evaluations/datasets
 GET /api/v1/evaluations/datasets/{dataset_id}/cases
+GET /api/v1/workflows/{workflow_id}/evaluations
 ```
 
 Evaluation run orchestration is side-effect free with respect to workflow state. It reads authoritative records and writes evaluation records only.
 
 The initial local replay-aware dataset is `mortgage-exception-local-v1`. It includes approval, rejection, and human-review Mortgage Exception Review scenarios. Dataset replay means deterministic comparison against persisted records; it does not run a full workflow replay engine, invoke Temporal activities, call agents, execute tools, dispatch approvals, or perform recovery actions.
+
+## Implemented Local Evaluators
+
+Phase 7 implements deterministic local evaluators before any external judge-model behavior is enabled.
+
+Implemented evaluators:
+- `agent-output-contract` checks validated agent output shape, prompt/model references, confidence bounds, and human-review metadata consistency
+- `tool-usage-contract` checks expected tool coverage, permission status, input validation, output validation, and tool completion
+- `human-review-escalation` checks human-review state alignment and expected terminal approval or rejection evidence
+- `evidence-consistency-signals` checks unsupported tool claims and high-confidence validation failure signals
+- `dataset-replay-contract` compares persisted workflow evidence against a selected local dataset case
+- `judge-model-boundary` provides a deterministic fallback for judge-style scoring while external judge providers remain disabled by default
+
+Implemented score statuses:
+- `PASS`
+- `WARN`
+- `FAIL`
+
+Implemented severities:
+- `informational`
+- `moderate`
+- `critical`
+
+## Implemented Local Evaluation Observability
+
+Evaluation-service emits:
+- HTTP request traces and metrics
+- evaluation run creation spans
+- workflow evidence loading spans
+- evaluator execution spans
+- evaluation result persistence spans
+- structured JSON logs for run start, completion, failure, and result persistence
+- Prometheus metrics for run counts, run durations, result counts, evidence-consistency signals, and prompt-attributed result status
+
+The local Grafana stack includes:
+- `AegisFlow - Evaluation Quality`
+
+Metric labels intentionally avoid workflow IDs, evaluation run IDs, trace IDs, borrower values, prompt content, document content, approval comments, and full model outputs.
+
+## Current Phase 7 Boundary
+
+Evaluation results are quality telemetry and governance support only.
+
+Evaluation must not:
+- approve workflows
+- reject workflows
+- complete workflows
+- mutate workflow state
+- bypass human review
+- replace workflow timelines, approval records, audit records, or workflow-engine state
+- call production mortgage systems
+- store raw document contents, borrower PII, secrets, prompt content, approval comments as scoring metadata, or full model outputs

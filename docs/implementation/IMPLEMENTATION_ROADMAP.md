@@ -78,24 +78,31 @@ The platform can currently:
 - expose Prometheus metrics for service, workflow, agent, tool, approval, and event activity
 - provide provisioned Grafana dashboards for local operational inspection
 - support local correlation-based diagnostics through structured JSON logs
+- run deterministic local evaluation against persisted workflow evidence
+- persist evaluation runs, evaluation results, and local dataset cases
+- compare approval and rejection workflows against local replay-aware dataset cases
+- retrieve persisted evaluation summaries through evaluation-service and read-only gateway-api endpoints
+- expose evaluation-service traces, metrics, structured logs, and Grafana evaluation panels
 
 Current business capability:
 - AegisFlow can demonstrate a controlled and observable mortgage exception review case from intake through AI-assisted preparation, human review, decision capture, and local workflow completion.
 - The platform can show how a case moves from creation through governed agent and tool activity to an accountable operator decision with durable state history.
 - The platform can trace and measure the local workflow path across service boundaries for operational debugging and stakeholder visibility.
+- The platform can measure whether local AI-assisted workflow preparation satisfies deterministic quality, escalation, tool-usage, evidence-consistency, and dataset replay expectations.
 - The system now proves the core operating pattern: workflow first, audit trail always, human control before critical action, and decision history preserved.
 
 Current business boundary:
 - AegisFlow performs local deterministic document analysis simulation for workflow demonstration, not production document interpretation.
 - AegisFlow can execute synthetic mock tool calls through a governed service boundary and persist those calls during the workflow path.
 - AegisFlow can record local simulated approval or rejection decisions for the Mortgage Exception Review workflow, but it does not make underwriting, credit, compliance, servicing, or production exception decisions.
+- AegisFlow can score local workflow evidence for quality telemetry, but evaluation results do not approve, reject, complete, or mutate workflows.
 - AegisFlow is not yet connected to mortgage servicing, LOS, document management, fraud, credit, or borrower systems.
 - AegisFlow does not update downstream mortgage systems after local approval or rejection.
 
 Business meaning:
 - the platform has moved from design into a working local operational prototype
-- the current implementation proves the control framework and human review loop, not final production mortgage automation
-- the system is ready for AI evaluation, replay, and production-style hardening work
+- the current implementation proves the control framework, human review loop, and measurable local AI quality signals, not final production mortgage automation
+- the system is ready for full replay/recovery tooling and production-style hardening work
 
 ---
 
@@ -108,7 +115,7 @@ Planned future capability includes:
 - governed integration with approved mortgage data sources
 - richer operational dashboards for review queues and bottlenecks
 - production-grade observability for operational oversight
-- AI evaluation and replay-based quality measurement
+- expanded AI evaluation and replay-based quality measurement
 - failure recovery and replay tooling
 - service hardening for production-style deployment boundaries
 
@@ -144,6 +151,7 @@ The following phases have been completed in the local implementation:
 - Phase 4 - Tool Runtime MVP
 - Phase 5 - Human Review UI
 - Phase 6 - Observability Integration
+- Phase 7 - AI Evaluation Layer
 
 ---
 
@@ -200,6 +208,16 @@ The platform currently supports:
 - workflow-engine activity, state transition, agent, tool, approval, event publication, and worker telemetry
 - agent-runtime request, agent execution, graph step, and tool client telemetry
 - tool-runtime request, governed tool invocation, and handler latency telemetry
+- evaluation-service health, readiness, and metrics endpoints
+- evaluation persistence tables for dataset cases, evaluation runs, and evaluation results
+- deterministic evaluators for agent output contracts, tool usage, human review escalation, and evidence consistency signals
+- judge-model boundary with external judging disabled by default
+- seeded local Mortgage Exception Review dataset cases for approval, rejection, and human-review paths
+- replay-aware dataset comparison against persisted workflow evidence
+- evaluation run creation, retrieval, workflow run listing, dataset listing, and dataset case listing endpoints
+- read-only gateway workflow evaluation retrieval endpoint
+- Postman validation for approval and rejection evaluation runs
+- evaluation-service run/result traces, metrics, logs, and Grafana evaluation dashboard
 - trace context propagation from gateway-api through workflow-engine, agent-runtime, and tool-runtime
 - structured JSON logs with correlation and trace metadata
 - Postman observability validation for metrics, Prometheus, Jaeger, and Grafana
@@ -212,16 +230,16 @@ The platform currently supports:
 
 ## Current Implementation Boundary
 
-The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, the Phase 5 human review foundation, and the Phase 6 local observability foundation.
+The current implementation includes the Phase 3 governed agent runtime foundation, the completed Phase 4 tool-runtime service boundary, the Phase 5 human review foundation, the Phase 6 local observability foundation, and the completed Phase 7 local evaluation layer.
 
 Phase 5 currently supports backend approval record persistence, approval decision timeline entries, approval decision outbox events, workflow-engine decision transitions through approved or rejected completion paths, gateway review APIs for human review queues, review context retrieval, approval record retrieval, and approval or rejection submission, and the operator-console review queue and workflow review experience.
 
 The platform does not yet implement:
-- AI evaluation
-- replay and failure recovery tooling
+- full workflow replay and failure recovery tooling
 - production identity provider and RBAC integration
 - production alerting and paging
 - production log aggregation
+- external judge-model provider integration enabled by default
 - production mortgage system integrations
 
 These capabilities remain assigned to later roadmap phases.
@@ -518,7 +536,62 @@ Validation completed:
 - Postman collection JSON validated successfully with Phase 6 observability requests
 
 Next deliverable:
-- Phase 7 - AI Evaluation And Replay Support
+- Phase 8 - Replay and Failure Recovery
+
+---
+
+## Phase 7 - AI Evaluation Layer
+
+Status: Completed
+
+Implementation started: 2026-05-12
+
+Completion date: 2026-05-12
+
+Completed deliverables:
+- evaluation-service FastAPI application in local Docker Compose on port `8040`
+- evaluation-service health, readiness, and metrics endpoints
+- `evaluation_dataset_cases`, `evaluation_runs`, and `evaluation_results` persistence tables
+- evaluation repository and service layer for bounded run/result/dataset record creation and retrieval
+- deterministic local evaluators for agent output contract, governed tool usage, human review escalation, and evidence consistency signals
+- judge-model evaluator boundary with deterministic local fallback and external judge calls disabled by default
+- local Mortgage Exception Review dataset cases for approval, rejection, and human-review paths
+- dataset replay scoring through `dataset-replay-contract`
+- evaluation run creation for persisted workflow evidence
+- evaluation run retrieval and workflow run listing endpoints
+- evaluation dataset listing and dataset case listing endpoints
+- read-only gateway-api workflow evaluation retrieval endpoint
+- Postman validation requests for evaluation-service, approval evaluation, rejection evaluation, gateway retrieval, Prometheus, Jaeger, and Grafana
+- evaluation-service traces for run creation, evidence loading, evaluator execution, and result persistence
+- evaluation-service metrics for run counts, run duration, result counts, evidence-consistency signals, and prompt-attributed result status
+- `AegisFlow - Evaluation Quality` Grafana dashboard
+- current functionality, roadmap, API, data model, evaluation strategy, observability, and developer workflow documentation updates
+
+Explicit non-scope:
+- autonomous mortgage decisions
+- evaluation-based workflow approval, rejection, completion, blocking, or mutation
+- production LLM-as-judge provider integration enabled by default
+- full Temporal workflow replay, recovery, or failure reconstruction
+- production mortgage system integration
+- storage of raw document contents, borrower PII, secrets, prompt content, approval comments as scoring metadata, or full model outputs in evaluation records
+
+Validation completed:
+- evaluation-service pytest suite passed with 36 tests
+- gateway-api pytest suite passed with 17 tests after adding workflow evaluation retrieval
+- evaluation-service image built successfully
+- gateway-api image built successfully for the Workstream 7 retrieval surface
+- Postman collection JSON parsed successfully
+- Postman test scripts parsed successfully
+- local approval and rejection workflow evaluation runs completed with `dataset_replay` mode
+- local approval and rejection dataset replay results persisted with `dataset-replay-contract` scores
+- Prometheus reported `evaluation-service` target as `up`
+- Prometheus returned `aegisflow_evaluation_service_evaluation_runs_total` samples after evaluation activity
+- Jaeger listed `evaluation-service` and contained evaluation run, evidence loading, evaluator execution, and result persistence spans
+- Grafana listed `AegisFlow - Evaluation Quality` with evaluation activity panels
+- Docker logs contained bounded evaluation-service JSON entries with correlation ID and trace ID
+
+Next deliverable:
+- Phase 8 - Replay and Failure Recovery
 
 ---
 
@@ -1023,19 +1096,23 @@ The platform should:
 
 # Phase 7 - AI Evaluation Layer
 
+Status: Completed in the local implementation.
+
 # Objective
 
-Implement measurable AI quality validation.
+Implement measurable AI quality validation for the local Mortgage Exception Review workflow.
 
 ---
 
 # Goals
 
 Implement:
-- evaluation pipelines
-- hallucination detection
-- replay evaluation
-- regression testing
+- evaluation-service runtime
+- deterministic local evaluation pipelines
+- evidence-consistency hallucination signals
+- replay-aware dataset comparison
+- prompt/model traceability through evaluation records
+- evaluation observability
 
 ---
 
@@ -1043,30 +1120,39 @@ Implement:
 
 ## Evaluation Features
 
-Implement:
-- LLM-as-judge pipelines
-- structured output validation
-- evaluation persistence
-- replay scoring
+Implemented:
+- deterministic evaluator suite for agent outputs, tool usage, human review escalation, and evidence consistency
+- judge-model boundary with local deterministic fallback and external providers disabled by default
+- evaluation persistence for dataset cases, runs, and results
+- local dataset replay scoring against persisted records
+- evaluation-service and gateway retrieval APIs
+- Postman approval and rejection evaluation validation
+- evaluation-service traces, metrics, structured logs, and Grafana dashboard
 
 ---
 
 ## Evaluation Metrics
 
 Track:
-- hallucination rate
-- extraction accuracy
-- escalation correctness
-- operator override frequency
+- evaluation run count and duration
+- evaluator result count by evaluator, score, status, and severity
+- evidence-consistency signals by severity
+- prompt-attributed result status
+- escalation correctness through deterministic result records
+
+Current boundary:
+- Phase 7 does not compute production hallucination rates or operator override trends from real mortgage operations
+- Phase 7 does not enable external judge-model providers by default
+- Phase 7 dataset replay is deterministic comparison against persisted records, not full workflow replay or recovery
 
 ---
 
 # Success Criteria
 
 All AI outputs should:
-- receive evaluation scoring
-- support replay validation
-- remain measurable over time
+- receive deterministic local evaluation scoring where workflow evidence exists
+- support local replay-aware dataset validation
+- remain measurable through persisted evaluation records, Prometheus metrics, Jaeger traces, and Grafana dashboards
 
 ---
 

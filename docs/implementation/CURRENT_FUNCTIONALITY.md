@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the Phase 7 evaluation foundation through Workstream 7:
+The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, Phase 6 observability capabilities, and the completed Phase 7 local evaluation layer:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -36,7 +36,7 @@ The current implementation includes Phase 1, Phase 2, Phase 3, Phase 4, Phase 5,
 - evaluation-service traces, metrics, structured logs, and Grafana dashboard panels
 
 Phase 6 is complete for the local simulation boundary.
-Phase 7 is partially complete through evaluation observability and dashboards.
+Phase 7 is complete for the local evaluation boundary.
 
 ---
 
@@ -190,7 +190,7 @@ Implemented Phase 4 gateway capability:
 
 ## evaluation-service
 
-The evaluation-service currently supports the Phase 7 local evaluation foundation.
+The evaluation-service currently supports the completed Phase 7 local evaluation layer.
 
 It provides:
 - health and readiness endpoints
@@ -229,6 +229,7 @@ Current Phase 7 boundary:
 - dataset replay is side-effect-free scoring against persisted records, not full Temporal replay or failure recovery
 - gateway evaluation retrieval and Postman validation are implemented for approval and rejection workflows
 - evaluation-service observability uses aggregate metrics and bounded logs/traces only
+- evaluation is quality telemetry and governance support, not mortgage decision authority
 
 ---
 
@@ -428,6 +429,7 @@ The following capabilities are intentionally not implemented yet:
 - advanced replay tooling
 - production alerting and paging
 - production log aggregation
+- external judge-model provider integration
 - production mortgage system update actions
 
 ---
@@ -1199,6 +1201,22 @@ Expected result:
 
 ```text
 17 passed
+```
+
+---
+
+## evaluation-service Tests
+
+```powershell
+docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps `
+  -v "${PWD}\apps\evaluation-service\tests:/app/tests" `
+  evaluation-service sh -c "pip install --no-cache-dir -e '.[dev]' && pytest"
+```
+
+Expected result:
+
+```text
+36 passed
 ```
 
 ---

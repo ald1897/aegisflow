@@ -264,4 +264,12 @@ Current dataset behavior:
 - evaluation run requests may include `dataset_case_id` to persist `dataset-replay-contract` comparison results
 - dataset replay evaluates persisted evidence only and does not invoke workflow replay, agent execution, tool execution, approval dispatch, or recovery behavior
 
+Current implemented evaluation behavior:
+- deterministic local evaluation is the default execution mode
+- external judge-model scoring remains disabled by default
+- result statuses are `PASS`, `WARN`, and `FAIL`
+- result severities are informational, moderate, or critical
+- gateway-api exposes read-only workflow evaluation summaries for operator and Postman validation
+- evaluation-service emits traces, metrics, and structured logs with bounded workflow/evaluation identifiers
+
 Evaluation results are quality signals only. They must not mutate workflow state, approve or reject workflows, bypass human review, or replace workflow timelines, approval records, or audit records.

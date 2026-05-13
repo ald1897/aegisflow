@@ -31,6 +31,7 @@ from aegisflow_gateway.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.services.evidence import WorkflowEvidenceReconstructor, WorkflowEvidenceSnapshot
+from aegisflow_gateway.services.replay import DeterministicReplayValidationResult, DeterministicReplayValidator
 
 
 class WorkflowNotFoundError(Exception):
@@ -355,3 +356,7 @@ class WorkflowService:
     async def reconstruct_workflow_evidence(self, workflow_id: UUID) -> WorkflowEvidenceSnapshot:
         workflow = await self.get_workflow(workflow_id)
         return await WorkflowEvidenceReconstructor(self.session).reconstruct(workflow)
+
+    async def validate_deterministic_replay(self, workflow_id: UUID) -> DeterministicReplayValidationResult:
+        snapshot = await self.reconstruct_workflow_evidence(workflow_id)
+        return DeterministicReplayValidator().validate(snapshot)

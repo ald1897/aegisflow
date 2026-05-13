@@ -560,11 +560,18 @@ async def _seed_workflow_evidence(
     now = utc_now()
     workflow = await session.get(WorkflowRecord, workflow_id)
     assert workflow is not None
+    terminal_decision = decision if final_state == "COMPLETED" else None
     workflow.state = final_state
     workflow.temporal_workflow_id = f"mortgage-exception-review-{workflow_id}"
     workflow.temporal_run_id = "temporal-run-1"
     if final_state == "COMPLETED":
+        assert terminal_decision is not None
         workflow.completed_at = now + timedelta(minutes=7)
+
+    created_event = await session.get(WorkflowEventOutbox, f"{workflow_id}:workflow.created")
+    assert created_event is not None
+    created_event.publish_status = "PUBLISHED"
+    created_event.published_at = now
 
     session.add_all(
         [
@@ -592,14 +599,35 @@ async def _seed_workflow_evidence(
                 transition_id="00000000-0000-0000-0000-000000000603",
                 workflow_id=workflow_id,
                 prior_state="DOCUMENT_ANALYSIS_PENDING",
-                new_state="HUMAN_REVIEW_REQUIRED",
-                transition_reason="test_review_required",
+                new_state="RISK_REVIEW_PENDING",
+                transition_reason="test_risk_review_started",
                 correlation_id=correlation_id,
                 created_by="workflow-engine",
                 created_at=now + timedelta(minutes=3),
             ),
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000000604",
+                workflow_id=workflow_id,
+                prior_state="RISK_REVIEW_PENDING",
+                new_state="HUMAN_REVIEW_REQUIRED",
+                transition_reason="test_review_required",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                created_at=now + timedelta(minutes=4),
+            ),
             WorkflowTimelineEntry(
-                timeline_entry_id="00000000-0000-0000-0000-000000000604",
+                timeline_entry_id="00000000-0000-0000-0000-000000000621",
+                workflow_id=workflow_id,
+                entry_type="STATE_TRANSITION",
+                message="Workflow advanced through local mortgage review states.",
+                state="HUMAN_REVIEW_REQUIRED",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                entry_metadata={"new_state": "HUMAN_REVIEW_REQUIRED"},
+                created_at=now + timedelta(minutes=4),
+            ),
+            WorkflowTimelineEntry(
+                timeline_entry_id="00000000-0000-0000-0000-000000000622",
                 workflow_id=workflow_id,
                 entry_type="AGENT_EXECUTION_COMPLETED",
                 message="Intake agent completed.",
@@ -609,8 +637,19 @@ async def _seed_workflow_evidence(
                 entry_metadata={"agent_id": "intake_agent"},
                 created_at=now + timedelta(minutes=2),
             ),
+            WorkflowTimelineEntry(
+                timeline_entry_id="00000000-0000-0000-0000-000000000623",
+                workflow_id=workflow_id,
+                entry_type="TOOL_INVOCATION_COMPLETED",
+                message="Document fetch completed.",
+                state="DOCUMENT_ANALYSIS_PENDING",
+                correlation_id=correlation_id,
+                created_by="workflow-engine",
+                entry_metadata={"tool_id": "document_fetch", "replay_safe": True},
+                created_at=now + timedelta(minutes=3),
+            ),
             AgentExecutionRecord(
-                agent_execution_id="00000000-0000-0000-0000-000000000605",
+                agent_execution_id="00000000-0000-0000-0000-000000000611",
                 workflow_id=workflow_id,
                 agent_id="intake_agent",
                 prompt_id="intake-agent",
@@ -631,7 +670,7 @@ async def _seed_workflow_evidence(
                 created_at=now + timedelta(minutes=2),
             ),
             AgentExecutionRecord(
-                agent_execution_id="00000000-0000-0000-0000-000000000606",
+                agent_execution_id="00000000-0000-0000-0000-000000000612",
                 workflow_id=workflow_id,
                 agent_id="document_analysis_agent",
                 prompt_id="document-analysis-agent",
@@ -652,10 +691,10 @@ async def _seed_workflow_evidence(
                 created_at=now + timedelta(minutes=3),
             ),
             ToolInvocationRecord(
-                tool_invocation_id="00000000-0000-0000-0000-000000000607",
+                tool_invocation_id="00000000-0000-0000-0000-000000000613",
                 workflow_id=workflow_id,
                 correlation_id=correlation_id,
-                agent_execution_id="00000000-0000-0000-0000-000000000605",
+                agent_execution_id="00000000-0000-0000-0000-000000000611",
                 agent_id="intake_agent",
                 tool_id="borrower_profile_lookup",
                 status="COMPLETED",
@@ -672,10 +711,10 @@ async def _seed_workflow_evidence(
                 created_at=now + timedelta(minutes=2),
             ),
             ToolInvocationRecord(
-                tool_invocation_id="00000000-0000-0000-0000-000000000608",
+                tool_invocation_id="00000000-0000-0000-0000-000000000614",
                 workflow_id=workflow_id,
                 correlation_id=correlation_id,
-                agent_execution_id="00000000-0000-0000-0000-000000000606",
+                agent_execution_id="00000000-0000-0000-0000-000000000612",
                 agent_id="document_analysis_agent",
                 tool_id="document_fetch",
                 status="COMPLETED",
@@ -691,23 +730,134 @@ async def _seed_workflow_evidence(
                 completed_at=now + timedelta(minutes=3),
                 created_at=now + timedelta(minutes=3),
             ),
+            WorkflowEventOutbox(
+                event_id=f"{workflow_id}:workflow.state_changed:HUMAN_REVIEW_REQUIRED",
+                event_type="workflow.state_changed",
+                event_version="1",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                payload={"workflow_id": workflow_id, "new_state": "HUMAN_REVIEW_REQUIRED"},
+                publish_status="PUBLISHED",
+                retry_count=0,
+                last_error=None,
+                created_at=now + timedelta(minutes=4),
+                published_at=now + timedelta(minutes=4),
+            ),
+            WorkflowEventOutbox(
+                event_id=f"{workflow_id}:agent.execution_completed:document_analysis_agent",
+                event_type="agent.execution_completed",
+                event_version="1",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                payload={"workflow_id": workflow_id, "agent_id": "document_analysis_agent"},
+                publish_status="PUBLISHED",
+                retry_count=0,
+                last_error=None,
+                created_at=now + timedelta(minutes=3),
+                published_at=now + timedelta(minutes=3),
+            ),
+            WorkflowEventOutbox(
+                event_id=f"{workflow_id}:tool.invocation_completed:document_fetch",
+                event_type="tool.invocation_completed",
+                event_version="1",
+                workflow_id=workflow_id,
+                correlation_id=correlation_id,
+                payload={"workflow_id": workflow_id, "tool_id": "document_fetch"},
+                publish_status="PUBLISHED",
+                retry_count=0,
+                last_error=None,
+                created_at=now + timedelta(minutes=3),
+                published_at=now + timedelta(minutes=3),
+            ),
         ]
     )
 
     if decision is not None:
-        session.add(
-            ApprovalRecord(
-                approval_id="00000000-0000-0000-0000-000000000609",
-                workflow_id=workflow_id,
-                correlation_id=correlation_id,
-                decision=decision,
-                decision_reason="exception_review_completed",
-                comment=f"Operator {decision.lower()} the prepared exception review.",
-                reviewed_by="operator-1",
-                reviewed_at=now + timedelta(minutes=6),
-                approval_metadata={"review_channel": "operator_console"},
-                created_at=now + timedelta(minutes=6),
-            )
+        session.add_all(
+            [
+                WorkflowStateTransition(
+                    transition_id="00000000-0000-0000-0000-000000000605",
+                    workflow_id=workflow_id,
+                    prior_state="HUMAN_REVIEW_REQUIRED",
+                    new_state=decision,
+                    transition_reason="test_human_review_decision",
+                    correlation_id=correlation_id,
+                    created_by="workflow-engine",
+                    created_at=now + timedelta(minutes=6),
+                ),
+                WorkflowStateTransition(
+                    transition_id="00000000-0000-0000-0000-000000000606",
+                    workflow_id=workflow_id,
+                    prior_state=decision,
+                    new_state="COMPLETED",
+                    transition_reason="test_workflow_completed",
+                    correlation_id=correlation_id,
+                    created_by="workflow-engine",
+                    created_at=now + timedelta(minutes=7),
+                ),
+                WorkflowTimelineEntry(
+                    timeline_entry_id="00000000-0000-0000-0000-000000000624",
+                    workflow_id=workflow_id,
+                    entry_type="APPROVAL_DECISION_RECORDED",
+                    message="Human review decision recorded.",
+                    state=decision,
+                    correlation_id=correlation_id,
+                    created_by="workflow-engine",
+                    entry_metadata={"decision": decision},
+                    created_at=now + timedelta(minutes=6),
+                ),
+                ApprovalRecord(
+                    approval_id="00000000-0000-0000-0000-000000000609",
+                    workflow_id=workflow_id,
+                    correlation_id=correlation_id,
+                    decision=decision,
+                    decision_reason="exception_review_completed",
+                    comment=f"Operator {decision.lower()} the prepared exception review.",
+                    reviewed_by="operator-1",
+                    reviewed_at=now + timedelta(minutes=6),
+                    approval_metadata={"review_channel": "operator_console"},
+                    created_at=now + timedelta(minutes=6),
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:approval.decision_recorded:{decision}",
+                    event_type="approval.decision_recorded",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id=correlation_id,
+                    payload={"workflow_id": workflow_id, "decision": decision},
+                    publish_status="PUBLISHED",
+                    retry_count=0,
+                    last_error=None,
+                    created_at=now + timedelta(minutes=6),
+                    published_at=now + timedelta(minutes=6),
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:workflow.{decision.lower()}:{decision}",
+                    event_type=f"workflow.{decision.lower()}",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id=correlation_id,
+                    payload={"workflow_id": workflow_id, "new_state": decision},
+                    publish_status="PUBLISHED",
+                    retry_count=0,
+                    last_error=None,
+                    created_at=now + timedelta(minutes=6),
+                    published_at=now + timedelta(minutes=6),
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:workflow.completed:COMPLETED",
+                    event_type="workflow.completed",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id=correlation_id,
+                    payload={"workflow_id": workflow_id, "new_state": "COMPLETED"},
+                    publish_status="PUBLISHED",
+                    retry_count=0,
+                    last_error=None,
+                    created_at=now + timedelta(minutes=7),
+                    published_at=now + timedelta(minutes=7),
+                ),
+            ]
         )
 
     if include_evaluation:
@@ -868,6 +1018,143 @@ async def test_reconstruct_workflow_evidence_flags_human_review_in_progress(
     diagnostics = {diagnostic.code: diagnostic for diagnostic in snapshot.diagnostics}
     assert diagnostics["human_review_pending"].status == "WARN"
     assert diagnostics["human_review_pending"].artifact_type == "approval_record"
+
+
+async def test_validate_deterministic_replay_passes_completed_approval_workflow(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-validation-pass-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="replay-validation-pass-test",
+            final_state="COMPLETED",
+            decision="APPROVED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        before_replay_runs = len((await session.execute(select(WorkflowReplayRun))).scalars().all())
+        result = await WorkflowService(session).validate_deterministic_replay(UUID(workflow_id))
+        after_replay_runs = len((await session.execute(select(WorkflowReplayRun))).scalars().all())
+
+    assert before_replay_runs == after_replay_runs == 0
+    assert result.status == ReplayStepStatus.pass_
+    assert result.step_counts == {"PASS": 7}
+    assert [step.sequence_number for step in result.steps] == [1, 2, 3, 4, 5, 6, 7]
+    assert result.steps[0].metadata["expected_states"] == [
+        "NEW",
+        "INTAKE_IN_PROGRESS",
+        "DOCUMENT_ANALYSIS_PENDING",
+        "RISK_REVIEW_PENDING",
+        "HUMAN_REVIEW_REQUIRED",
+        "APPROVED",
+        "COMPLETED",
+    ]
+    replay_step_kwargs = result.steps[0].to_replay_step_kwargs()
+    assert replay_step_kwargs["status"] == ReplayStepStatus.pass_
+    assert replay_step_kwargs["metadata"]["sensitive_payloads_persisted"] is False
+
+
+async def test_validate_deterministic_replay_warns_for_human_review_in_progress(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-validation-warn-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="replay-validation-warn-test",
+            final_state="HUMAN_REVIEW_REQUIRED",
+            decision=None,
+            include_evaluation=False,
+        )
+
+    async with session_factory() as session:
+        result = await WorkflowService(session).validate_deterministic_replay(UUID(workflow_id))
+
+    assert result.status == ReplayStepStatus.warn
+    steps_by_type = {step.artifact_type: step for step in result.steps}
+    assert steps_by_type["approval_record"].status == ReplayStepStatus.warn
+    assert steps_by_type["approval_record"].message == (
+        "Workflow is waiting for human review and has no terminal approval record yet."
+    )
+    assert steps_by_type["evaluation_run"].status == ReplayStepStatus.skipped
+
+
+async def test_validate_deterministic_replay_fails_invalid_state_sequence(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "replay-validation-fail-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        await _seed_workflow_evidence(
+            session,
+            workflow_id,
+            correlation_id="replay-validation-fail-test",
+            final_state="COMPLETED",
+            decision="REJECTED",
+            include_evaluation=True,
+        )
+
+    async with session_factory() as session:
+        transition = (
+            await session.execute(
+                select(WorkflowStateTransition).where(
+                    WorkflowStateTransition.transition_reason == "test_risk_review_started"
+                )
+            )
+        ).scalar_one()
+        await session.delete(transition)
+        await session.commit()
+
+    async with session_factory() as session:
+        result = await WorkflowService(session).validate_deterministic_replay(UUID(workflow_id))
+
+    state_step = result.steps[0]
+    assert result.status == ReplayStepStatus.fail
+    assert state_step.status == ReplayStepStatus.fail
+    assert state_step.metadata["expected_states"] == [
+        "NEW",
+        "INTAKE_IN_PROGRESS",
+        "DOCUMENT_ANALYSIS_PENDING",
+        "RISK_REVIEW_PENDING",
+        "HUMAN_REVIEW_REQUIRED",
+        "REJECTED",
+        "COMPLETED",
+    ]
+    assert state_step.metadata["observed_states"] == [
+        "NEW",
+        "INTAKE_IN_PROGRESS",
+        "DOCUMENT_ANALYSIS_PENDING",
+        "HUMAN_REVIEW_REQUIRED",
+        "REJECTED",
+        "COMPLETED",
+    ]
 
 
 async def test_get_workflow_review_context_aggregates_review_records(

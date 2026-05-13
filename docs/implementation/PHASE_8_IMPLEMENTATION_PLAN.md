@@ -520,24 +520,24 @@ Completion criteria:
 
 ## Workstream 3 - Deterministic Replay Validator
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- implement state transition sequence validator for the local Mortgage Exception Review path
-- implement timeline milestone validator
-- implement agent evidence validator
-- implement tool evidence validator
-- implement human review evidence validator
-- implement event outbox evidence validator
-- implement evaluation evidence boundary validator
-- map validation results into replay step records
-- add unit tests for pass, warn, and fail scenarios
+- implement state transition sequence validator for the local Mortgage Exception Review path - Complete
+- implement timeline milestone validator - Complete
+- implement agent evidence validator - Complete
+- implement tool evidence validator - Complete
+- implement human review evidence validator - Complete
+- implement event outbox evidence validator - Complete
+- implement evaluation evidence boundary validator - Complete
+- map validation results into replay step records - Complete
+- add unit tests for pass, warn, and fail scenarios - Complete
 
 Completion criteria:
-- replay validation creates deterministic step results
-- replay mismatches are bounded and explainable
-- validator does not re-run agents, tools, approvals, events, or workflows
-- tests pass
+- replay validation creates deterministic step results - Met
+- replay mismatches are bounded and explainable - Met
+- validator does not re-run agents, tools, approvals, events, or workflows - Met
+- tests pass - Met
 
 ---
 
@@ -899,6 +899,36 @@ Boundary:
 
 Next step:
 - implement Workstream 3: Deterministic Replay Validator
+
+## 2026-05-12 - Workstream 3
+
+Status:
+- added gateway-api deterministic replay validation dataclasses for validation results and replay-step-shaped validation steps
+- added deterministic validation for local Mortgage Exception Review state transition sequences
+- added timeline milestone validation for workflow, state transition, agent, tool, and approval milestones
+- added agent execution and tool invocation evidence validation
+- added human review validation for completed approval or rejection workflows and pending human-review workflows
+- added event outbox validation for expected event families and pending or failed publication evidence
+- added evaluation boundary validation for completed and in-progress workflows
+- added gateway service method `validate_deterministic_replay`
+- updated workflow evidence test fixtures to seed a complete deterministic mortgage-review path
+- added tests for pass, warn, and fail replay validation scenarios
+
+Validation:
+- gateway-api pytest suite passed with 25 tests
+- Docker Compose configuration validated
+- gateway-api source compilation succeeded
+
+Completed workstream:
+- Workstream 3 - Deterministic Replay Validator
+
+Boundary:
+- Workstream 3 builds side-effect-free validation results from reconstructed evidence
+- no replay runs, replay steps, recovery actions, workflow state transitions, outbox retries, Temporal replay, agent execution, tool execution, or approval dispatch are created
+- validation metadata remains bounded to expected and observed identifiers, statuses, artifact families, and diagnostic counts
+
+Next step:
+- implement Workstream 4: Replay Run Orchestration
 
 ---
 

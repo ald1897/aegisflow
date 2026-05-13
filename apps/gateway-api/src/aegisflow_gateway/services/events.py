@@ -29,7 +29,10 @@ class WorkflowEventPublisher:
             select(WorkflowEventOutbox).where(WorkflowEventOutbox.event_id == event_id)
         )
         event = result.scalar_one_or_none()
-        if event is None or event.publish_status == OutboxPublishStatus.published.value:
+        if event is None or event.publish_status in {
+            OutboxPublishStatus.published.value,
+            OutboxPublishStatus.dead_lettered.value,
+        }:
             return
 
         producer = AIOKafkaProducer(bootstrap_servers=self.settings.kafka_bootstrap_servers)

@@ -31,6 +31,8 @@ from aegisflow_gateway.persistence.models import (
     WorkflowTimelineEntry,
 )
 from aegisflow_gateway.services.evidence import WorkflowEvidenceReconstructor, WorkflowEvidenceSnapshot
+from aegisflow_gateway.services.events import WorkflowEventPublisher
+from aegisflow_gateway.services.outbox_recovery import OutboxEventClassification, OutboxRecoveryService
 from aegisflow_gateway.services.replay import (
     DeterministicReplayValidationResult,
     DeterministicReplayValidator,
@@ -446,6 +448,77 @@ class WorkflowService:
         await self.session.commit()
         await self.session.refresh(recovery_action)
         return recovery_action
+
+    async def get_outbox_event(self, event_id: str) -> WorkflowEventOutbox:
+        result = await self.session.execute(
+            select(WorkflowEventOutbox).where(WorkflowEventOutbox.event_id == event_id)
+        )
+        event = result.scalar_one_or_none()
+        if event is None:
+            raise WorkflowReviewActionError(
+                error="outbox_event_not_found",
+                message=f"Outbox event {event_id} was not found",
+                status_code=404,
+            )
+        return event
+
+    async def classify_outbox_event(self, event_id: str) -> OutboxEventClassification:
+        event = await self.get_outbox_event(event_id)
+        return OutboxRecoveryService(self.session).classify(event)
+
+    async def list_outbox_event_classifications(self, workflow_id: UUID) -> list[OutboxEventClassification]:
+        await self.get_workflow(workflow_id)
+        result = await self.session.execute(
+            select(WorkflowEventOutbox)
+            .where(WorkflowEventOutbox.workflow_id == str(workflow_id))
+            .order_by(WorkflowEventOutbox.created_at.asc(), WorkflowEventOutbox.event_id.asc())
+        )
+        recovery_service = OutboxRecoveryService(self.session)
+        return [recovery_service.classify(event) for event in result.scalars().all()]
+
+    async def retry_outbox_event(
+        self,
+        event_id: str,
+        *,
+        requested_by: str,
+        reason: str,
+        publisher: WorkflowEventPublisher | None = None,
+    ) -> WorkflowRecoveryAction:
+        event = await self.get_outbox_event(event_id)
+        try:
+            return await OutboxRecoveryService(self.session).retry_event(
+                event,
+                requested_by=requested_by,
+                reason=reason,
+                publisher=publisher,
+            )
+        except ValueError as exc:
+            raise WorkflowReviewActionError(
+                error="outbox_event_not_retryable",
+                message=str(exc),
+                status_code=409,
+            ) from exc
+
+    async def mark_outbox_event_dead_lettered(
+        self,
+        event_id: str,
+        *,
+        requested_by: str,
+        reason: str,
+    ) -> WorkflowRecoveryAction:
+        event = await self.get_outbox_event(event_id)
+        try:
+            return await OutboxRecoveryService(self.session).mark_dead_lettered(
+                event,
+                requested_by=requested_by,
+                reason=reason,
+            )
+        except ValueError as exc:
+            raise WorkflowReviewActionError(
+                error="outbox_event_not_dead_letterable",
+                message=str(exc),
+                status_code=409,
+            ) from exc
 
     async def get_recovery_action(self, recovery_action_id: UUID) -> WorkflowRecoveryAction:
         result = await self.session.execute(

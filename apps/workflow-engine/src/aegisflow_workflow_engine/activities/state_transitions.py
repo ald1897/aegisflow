@@ -176,7 +176,10 @@ async def publish_workflow_event(event_id: str) -> None:
 
     async with SessionLocal() as session:
         event = await session.get(WorkflowEventOutbox, event_id)
-        if event is None or event.publish_status == OutboxPublishStatus.published.value:
+        if event is None or event.publish_status in {
+            OutboxPublishStatus.published.value,
+            OutboxPublishStatus.dead_lettered.value,
+        }:
             return
 
         producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap_servers)

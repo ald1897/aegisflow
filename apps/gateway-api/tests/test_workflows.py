@@ -10,6 +10,8 @@ from sqlalchemy.pool import StaticPool
 
 from aegisflow_gateway.config import Settings, get_settings
 from aegisflow_gateway.domain.workflows import (
+    OutboxFailureCategory,
+    OutboxPublishStatus,
     RecoveryActionStatus,
     RecoveryActionType,
     ReplayMode,
@@ -35,7 +37,7 @@ from aegisflow_gateway.persistence.models import (
 )
 from aegisflow_gateway.persistence.models import utc_now
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
-from aegisflow_gateway.services.workflows import WorkflowService
+from aegisflow_gateway.services.workflows import WorkflowReviewActionError, WorkflowService
 
 
 @pytest.fixture
@@ -546,6 +548,235 @@ async def test_recovery_action_can_be_persisted_and_listed(
         recovery_action_count = len((await session.execute(select(WorkflowRecoveryAction))).scalars().all())
 
     assert recovery_action_count == 1
+
+
+async def test_outbox_event_classification_covers_failure_categories(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "outbox-classification-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    now = utc_now()
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        pending_event = await session.get(WorkflowEventOutbox, f"{workflow_id}:workflow.created")
+        assert pending_event is not None
+        session.add_all(
+            [
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:published",
+                    event_type="workflow.state_changed",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id="outbox-classification-test",
+                    payload={"workflow_id": workflow_id},
+                    publish_status=OutboxPublishStatus.published.value,
+                    retry_count=1,
+                    last_error=None,
+                    created_at=now,
+                    published_at=now,
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:retryable",
+                    event_type="workflow.state_changed",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id="outbox-classification-test",
+                    payload={"workflow_id": workflow_id},
+                    publish_status=OutboxPublishStatus.failed.value,
+                    retry_count=1,
+                    last_error="Kafka timeout while publishing event.",
+                    created_at=now,
+                    published_at=None,
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:failed",
+                    event_type="workflow.state_changed",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id="outbox-classification-test",
+                    payload={"workflow_id": workflow_id},
+                    publish_status=OutboxPublishStatus.failed.value,
+                    retry_count=3,
+                    last_error="Kafka timeout while publishing event.",
+                    created_at=now,
+                    published_at=None,
+                ),
+                WorkflowEventOutbox(
+                    event_id=f"{workflow_id}:dead-lettered",
+                    event_type="workflow.state_changed",
+                    event_version="1",
+                    workflow_id=workflow_id,
+                    correlation_id="outbox-classification-test",
+                    payload={"workflow_id": workflow_id},
+                    publish_status=OutboxPublishStatus.dead_lettered.value,
+                    retry_count=4,
+                    last_error="Retries exhausted.",
+                    created_at=now,
+                    published_at=None,
+                ),
+            ]
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        classifications = await WorkflowService(session).list_outbox_event_classifications(UUID(workflow_id))
+
+    by_id = {classification.event_id: classification for classification in classifications}
+    assert by_id[f"{workflow_id}:workflow.created"].category == OutboxFailureCategory.informational
+    assert by_id[f"{workflow_id}:published"].category == OutboxFailureCategory.terminal
+    assert by_id[f"{workflow_id}:retryable"].category == OutboxFailureCategory.retryable
+    assert by_id[f"{workflow_id}:retryable"].can_retry is True
+    assert by_id[f"{workflow_id}:failed"].category == OutboxFailureCategory.dead_letterable
+    assert by_id[f"{workflow_id}:failed"].can_dead_letter is True
+    assert by_id[f"{workflow_id}:dead-lettered"].category == OutboxFailureCategory.terminal
+    assert by_id[f"{workflow_id}:dead-lettered"].can_retry is False
+
+
+async def test_retry_outbox_event_uses_publisher_boundary_and_records_recovery(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "outbox-retry-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    event_id = f"{workflow_id}:workflow.created"
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        event.publish_status = OutboxPublishStatus.failed.value
+        event.retry_count = 1
+        event.last_error = "Kafka timeout while publishing event."
+        await session.commit()
+
+    async with session_factory() as session:
+        publisher = _FakeWorkflowEventPublisher()
+        service = WorkflowService(session)
+        recovery_action = await service.retry_outbox_event(
+            event_id,
+            requested_by="operator-1",
+            reason="Retry transient local event publication failure.",
+            publisher=publisher,
+        )
+        event = await service.get_outbox_event(event_id)
+        actions = await service.list_recovery_actions(UUID(workflow_id))
+        outbox_event_count = len((await session.execute(select(WorkflowEventOutbox))).scalars().all())
+
+    assert publisher.published_event_ids == [event_id]
+    assert outbox_event_count == 1
+    assert event.publish_status == OutboxPublishStatus.published.value
+    assert event.last_error is None
+    assert recovery_action.status == RecoveryActionStatus.completed.value
+    assert recovery_action.action_type == RecoveryActionType.retry_outbox_event.value
+    assert recovery_action.result_metadata["classification"] == OutboxFailureCategory.retryable.value
+    assert recovery_action.result_metadata["previous_publish_status"] == OutboxPublishStatus.failed.value
+    assert recovery_action.result_metadata["final_publish_status"] == OutboxPublishStatus.published.value
+    assert recovery_action.result_metadata["sensitive_payloads_persisted"] is False
+    assert len(actions) == 1
+
+
+async def test_retry_outbox_event_rejects_published_event_without_duplicate_publication(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "outbox-published-retry-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    event_id = f"{workflow_id}:workflow.created"
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        event.publish_status = OutboxPublishStatus.published.value
+        event.published_at = utc_now()
+        await session.commit()
+
+    async with session_factory() as session:
+        publisher = _FakeWorkflowEventPublisher()
+        with pytest.raises(WorkflowReviewActionError) as error:
+            await WorkflowService(session).retry_outbox_event(
+                event_id,
+                requested_by="operator-1",
+                reason="Retry should not duplicate a published event.",
+                publisher=publisher,
+            )
+        recovery_action_count = len((await session.execute(select(WorkflowRecoveryAction))).scalars().all())
+        outbox_event_count = len((await session.execute(select(WorkflowEventOutbox))).scalars().all())
+
+    assert error.value.error == "outbox_event_not_retryable"
+    assert publisher.published_event_ids == []
+    assert recovery_action_count == 0
+    assert outbox_event_count == 1
+
+
+async def test_mark_outbox_event_dead_lettered_records_auditable_action(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "outbox-dead-letter-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+    event_id = f"{workflow_id}:workflow.created"
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        event.publish_status = OutboxPublishStatus.failed.value
+        event.retry_count = 3
+        event.last_error = "Kafka timeout while publishing event."
+        await session.commit()
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        recovery_action = await service.mark_outbox_event_dead_lettered(
+            event_id,
+            requested_by="operator-2",
+            reason="Retries exhausted during local failure testing.",
+        )
+        event = await service.get_outbox_event(event_id)
+        classification = await service.classify_outbox_event(event_id)
+
+    assert event.publish_status == OutboxPublishStatus.dead_lettered.value
+    assert classification.category == OutboxFailureCategory.terminal
+    assert recovery_action.status == RecoveryActionStatus.completed.value
+    assert recovery_action.action_type == RecoveryActionType.mark_outbox_event_dead_lettered.value
+    assert recovery_action.target_resource_type == "workflow_event_outbox"
+    assert recovery_action.target_resource_id == event_id
+    assert recovery_action.result_metadata["classification"] == OutboxFailureCategory.dead_letterable.value
+    assert recovery_action.result_metadata["final_publish_status"] == OutboxPublishStatus.dead_lettered.value
+
+
+class _FakeWorkflowEventPublisher:
+    def __init__(self) -> None:
+        self.published_event_ids: list[str] = []
+
+    async def publish_event_by_id(self, session: AsyncSession, event_id: str) -> None:
+        event = await session.get(WorkflowEventOutbox, event_id)
+        assert event is not None
+        assert event.publish_status == OutboxPublishStatus.pending.value
+        event.publish_status = OutboxPublishStatus.published.value
+        event.published_at = utc_now()
+        event.last_error = None
+        self.published_event_ids.append(event_id)
+        await session.commit()
 
 
 async def _seed_workflow_evidence(

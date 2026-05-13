@@ -59,6 +59,14 @@ class OutboxPublishStatus(StrEnum):
     pending = "PENDING"
     published = "PUBLISHED"
     failed = "FAILED"
+    dead_lettered = "DEAD_LETTERED"
+
+
+class OutboxFailureCategory(StrEnum):
+    informational = "informational"
+    retryable = "retryable"
+    dead_letterable = "dead_letterable"
+    terminal = "terminal"
 
 
 class ReplayMode(StrEnum):

@@ -567,23 +567,23 @@ Completion criteria:
 
 ## Workstream 5 - Failure Classification And Outbox Recovery
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define retryable, terminal, dead-letterable, and informational failure categories
-- classify workflow event outbox records by publish status, retry count, and last error
-- add safe outbox retry command for retryable local events
-- add dead-letter marking behavior for explicitly selected local outbox events
-- add recovery action records for outbox retry and dead-letter outcomes
-- ensure event retry uses existing event publication boundaries
-- add tests for pending, published, failed, retryable, and dead-lettered event cases
+- define retryable, terminal, dead-letterable, and informational failure categories - Complete
+- classify workflow event outbox records by publish status, retry count, and last error - Complete
+- add safe outbox retry command for retryable local events - Complete
+- add dead-letter marking behavior for explicitly selected local outbox events - Complete
+- add recovery action records for outbox retry and dead-letter outcomes - Complete
+- ensure event retry uses existing event publication boundaries - Complete
+- add tests for pending, published, failed, retryable, and dead-lettered event cases - Complete
 
 Completion criteria:
-- failed outbox events can be diagnosed
-- retryable outbox events can be retried explicitly
-- dead-letter action is explicit and auditable
-- event retry does not duplicate successful published events
-- tests pass
+- failed outbox events can be diagnosed - Met
+- retryable outbox events can be retried explicitly - Met
+- dead-letter action is explicit and auditable - Met
+- event retry does not duplicate successful published events - Met
+- tests pass - Met
 
 ---
 
@@ -959,6 +959,38 @@ Boundary:
 
 Next step:
 - implement Workstream 5: Failure Classification And Outbox Recovery
+
+## 2026-05-13 - Workstream 5
+
+Status:
+- added gateway-api outbox failure categories for informational, retryable, dead-letterable, and terminal events
+- added `DEAD_LETTERED` outbox publish status to gateway-api and workflow-engine domain models
+- added outbox classification for publish status, retry count, last error presence, retry threshold, and terminal-looking errors
+- added gateway service methods for outbox event retrieval, classification, workflow-level classification listing, retry, and dead-letter marking
+- added retry command that resets retryable failed events to pending and optionally invokes the existing event publisher boundary
+- added dead-letter command that marks explicitly selected failed local events as `DEAD_LETTERED`
+- added recovery action audit records for retry and dead-letter outcomes with bounded metadata
+- updated gateway and workflow-engine publishers to skip dead-lettered events
+- added tests for pending, published, retryable failed, retry-exhausted failed, and dead-lettered event classification
+- added tests for retry via publisher boundary, published-event retry rejection, and dead-letter audit behavior
+
+Validation:
+- gateway-api pytest suite passed with 33 tests
+- workflow-engine pytest suite passed with 12 tests
+- Docker Compose configuration validated
+- gateway-api and workflow-engine source compilation succeeded
+
+Completed workstream:
+- Workstream 5 - Failure Classification And Outbox Recovery
+
+Boundary:
+- Workstream 5 only classifies and recovers workflow event outbox records
+- retry uses the existing event publisher boundary and does not publish already published or dead-lettered events
+- no workflow state transitions, Temporal replay, agent execution, tool execution, approval dispatch, replay runs, or replay steps are created
+- recovery action metadata remains bounded to statuses, counts, classifications, and presence flags only
+
+Next step:
+- implement Workstream 6: Workflow Recovery Commands
 
 ---
 

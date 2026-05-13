@@ -764,6 +764,163 @@ async def test_mark_outbox_event_dead_lettered_records_auditable_action(
     assert recovery_action.result_metadata["final_publish_status"] == OutboxPublishStatus.dead_lettered.value
 
 
+async def test_workflow_recovery_check_detects_projection_mismatch(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "workflow-recovery-check-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        session.add(
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000001601",
+                workflow_id=workflow_id,
+                prior_state="NEW",
+                new_state="INTAKE_IN_PROGRESS",
+                transition_reason="engine_transition_completed_projection_stale",
+                correlation_id="workflow-recovery-check-test",
+                created_by="workflow-engine",
+                created_at=utc_now() + timedelta(minutes=1),
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        check = await WorkflowService(session).check_workflow_recovery(
+            UUID(workflow_id),
+            action_type=RecoveryActionType.reconcile_workflow_projection,
+        )
+
+    assert check.allowed is True
+    assert check.current_state == "NEW"
+    assert check.proposed_state == "INTAKE_IN_PROGRESS"
+    assert check.requires_engine_execution is True
+    assert check.metadata["sensitive_payloads_persisted"] is False
+
+
+async def test_request_workflow_recovery_creates_auditable_engine_owned_request(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "workflow-recovery-request-test"},
+        json={},
+    )
+    workflow_id = create_response.json()["workflow_id"]
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        session.add(
+            WorkflowStateTransition(
+                transition_id="00000000-0000-0000-0000-000000001602",
+                workflow_id=workflow_id,
+                prior_state="NEW",
+                new_state="INTAKE_IN_PROGRESS",
+                transition_reason="engine_transition_completed_projection_stale",
+                correlation_id="workflow-recovery-request-test",
+                created_by="workflow-engine",
+                created_at=utc_now() + timedelta(minutes=1),
+            )
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        recovery_action = await service.request_workflow_recovery(
+            UUID(workflow_id),
+            action_type=RecoveryActionType.reconcile_workflow_projection,
+            requested_by="operator-1",
+            reason="Projection is stale after local worker interruption.",
+        )
+        workflow = await service.get_workflow(UUID(workflow_id))
+        timeline_count = len((await session.execute(select(WorkflowTimelineEntry))).scalars().all())
+        outbox_count = len((await session.execute(select(WorkflowEventOutbox))).scalars().all())
+
+    assert workflow.state == "NEW"
+    assert recovery_action.status == RecoveryActionStatus.requested.value
+    assert recovery_action.action_type == RecoveryActionType.reconcile_workflow_projection.value
+    assert recovery_action.target_resource_type == "workflow_record"
+    assert recovery_action.result_metadata["engine_owned_mutation_required"] is True
+    assert recovery_action.result_metadata["current_state"] == "NEW"
+    assert recovery_action.result_metadata["proposed_state"] == "INTAKE_IN_PROGRESS"
+    assert recovery_action.result_metadata["sensitive_payloads_persisted"] is False
+    assert timeline_count == 1
+    assert outbox_count == 1
+
+
+async def test_workflow_recovery_requires_actor_and_reason(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "workflow-recovery-required-fields-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        with pytest.raises(WorkflowReviewActionError) as actor_error:
+            await service.request_workflow_recovery(
+                workflow_id,
+                action_type=RecoveryActionType.reconcile_workflow_projection,
+                requested_by=" ",
+                reason="Projection mismatch.",
+            )
+        with pytest.raises(WorkflowReviewActionError) as reason_error:
+            await service.request_workflow_recovery(
+                workflow_id,
+                action_type=RecoveryActionType.reconcile_workflow_projection,
+                requested_by="operator-1",
+                reason=" ",
+            )
+
+    assert actor_error.value.error == "recovery_actor_required"
+    assert reason_error.value.error == "recovery_reason_required"
+
+
+async def test_workflow_recovery_rejects_unsafe_or_dry_run_only_actions(
+    client: AsyncClient,
+    app_context: tuple[object, async_sessionmaker[AsyncSession]],
+) -> None:
+    create_response = await client.post(
+        "/api/v1/workflows",
+        headers={"X-Correlation-ID": "workflow-recovery-rejection-test"},
+        json={},
+    )
+    workflow_id = UUID(create_response.json()["workflow_id"])
+
+    _, session_factory = app_context
+    async with session_factory() as session:
+        service = WorkflowService(session)
+        with pytest.raises(WorkflowReviewActionError) as unsafe_error:
+            await service.request_workflow_recovery(
+                workflow_id,
+                action_type=RecoveryActionType.retry_outbox_event,
+                requested_by="operator-1",
+                reason="Unsafe workflow recovery command.",
+            )
+        with pytest.raises(WorkflowReviewActionError) as dry_run_error:
+            await service.request_workflow_recovery(
+                workflow_id,
+                action_type=RecoveryActionType.resume_stuck_workflow_check,
+                requested_by="operator-1",
+                reason="Check for a stuck workflow.",
+            )
+
+    assert unsafe_error.value.error == "workflow_recovery_not_allowed"
+    assert dry_run_error.value.error == "workflow_recovery_dry_run_only"
+
+
 class _FakeWorkflowEventPublisher:
     def __init__(self) -> None:
         self.published_event_ids: list[str] = []

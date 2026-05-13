@@ -39,6 +39,7 @@ from aegisflow_gateway.services.replay import (
     build_history_reconstruction_steps,
     replay_run_status_for_steps,
 )
+from aegisflow_gateway.services.workflow_recovery import WorkflowRecoveryCheck, WorkflowRecoveryPlanner
 
 
 class WorkflowNotFoundError(Exception):
@@ -519,6 +520,79 @@ class WorkflowService:
                 message=str(exc),
                 status_code=409,
             ) from exc
+
+    async def check_workflow_recovery(
+        self,
+        workflow_id: UUID,
+        *,
+        action_type: RecoveryActionType,
+    ) -> WorkflowRecoveryCheck:
+        workflow = await self.get_workflow(workflow_id)
+        return await WorkflowRecoveryPlanner(self.session).check(workflow, action_type=action_type)
+
+    async def request_workflow_recovery(
+        self,
+        workflow_id: UUID,
+        *,
+        action_type: RecoveryActionType,
+        requested_by: str,
+        reason: str,
+        correlation_id: str | None = None,
+        recovery_action_id: UUID | None = None,
+    ) -> WorkflowRecoveryAction:
+        if not requested_by.strip():
+            raise WorkflowReviewActionError(
+                error="recovery_actor_required",
+                message="Workflow recovery commands require a local actor identity",
+                status_code=400,
+            )
+        if not reason.strip():
+            raise WorkflowReviewActionError(
+                error="recovery_reason_required",
+                message="Workflow recovery commands require a reason",
+                status_code=400,
+            )
+
+        workflow = await self.get_workflow(workflow_id)
+        check = await WorkflowRecoveryPlanner(self.session).check(workflow, action_type=action_type)
+        if not check.allowed:
+            raise WorkflowReviewActionError(
+                error="workflow_recovery_not_allowed",
+                message=check.reason,
+                status_code=409,
+            )
+        if not check.requires_engine_execution:
+            raise WorkflowReviewActionError(
+                error="workflow_recovery_dry_run_only",
+                message=f"Recovery action {action_type.value} is a dry-run check and does not create a mutation request",
+                status_code=400,
+            )
+
+        recovery_action = WorkflowRecoveryAction(
+            recovery_action_id=str(recovery_action_id or uuid4()),
+            workflow_id=str(workflow_id),
+            correlation_id=correlation_id or workflow.correlation_id,
+            action_type=action_type.value,
+            target_resource_type=check.target_resource_type,
+            target_resource_id=check.target_resource_id,
+            status=RecoveryActionStatus.requested.value,
+            requested_by=requested_by,
+            reason=reason,
+            result_metadata={
+                "dry_run_allowed": check.allowed,
+                "dry_run_reason": check.reason,
+                "current_state": check.current_state,
+                "proposed_state": check.proposed_state,
+                "requires_engine_execution": check.requires_engine_execution,
+                "engine_owned_mutation_required": True,
+                "check_metadata": check.metadata,
+                "sensitive_payloads_persisted": False,
+            },
+        )
+        self.session.add(recovery_action)
+        await self.session.commit()
+        await self.session.refresh(recovery_action)
+        return recovery_action
 
     async def get_recovery_action(self, recovery_action_id: UUID) -> WorkflowRecoveryAction:
         result = await self.session.execute(

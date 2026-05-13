@@ -589,24 +589,24 @@ Completion criteria:
 
 ## Workstream 6 - Workflow Recovery Commands
 
-Status: Not Started
+Status: Completed
 
 Tasks:
-- define allowed local recovery commands for stuck or inconsistent workflows
-- require actor identity and recovery reason for every recovery command
-- route any workflow state mutation through workflow-engine-owned recovery activities or workflows
-- add dry-run recovery check before mutating commands
-- add timeline entries for accepted recovery actions
-- add outbox events for completed recovery actions where appropriate
-- reject unsafe recovery actions with structured errors
-- add workflow-engine and gateway-api tests
+- define allowed local recovery commands for stuck or inconsistent workflows - Complete
+- require actor identity and recovery reason for every recovery command - Complete
+- route any workflow state mutation through workflow-engine-owned recovery activities or workflows - Complete
+- add dry-run recovery check before mutating commands - Complete
+- add timeline entries for accepted recovery actions - Complete
+- add outbox events for completed recovery actions where appropriate - Complete
+- reject unsafe recovery actions with structured errors - Complete
+- add workflow-engine and gateway-api tests - Complete
 
 Completion criteria:
-- recovery commands are explicit and auditable
-- gateway-api does not directly mutate workflow state for recovery outcomes
-- unsafe or unsupported recovery actions are rejected
-- recovery actions preserve workflow history
-- tests pass
+- recovery commands are explicit and auditable - Met
+- gateway-api does not directly mutate workflow state for recovery outcomes - Met
+- unsafe or unsupported recovery actions are rejected - Met
+- recovery actions preserve workflow history - Met
+- tests pass - Met
 
 ---
 
@@ -991,6 +991,42 @@ Boundary:
 
 Next step:
 - implement Workstream 6: Workflow Recovery Commands
+
+## 2026-05-13 - Workstream 6
+
+Status:
+- added gateway-api workflow recovery planner for dry-run recovery checks
+- added allowed local workflow recovery actions for projection reconciliation and stuck-workflow dry-run checks
+- added gateway service method `check_workflow_recovery`
+- added gateway service method `request_workflow_recovery`
+- required local actor identity and recovery reason before recovery requests are accepted
+- made gateway recovery requests create auditable `REQUESTED` recovery actions without mutating workflow state
+- added workflow-engine recovery activity `reconcile_workflow_projection`
+- registered workflow-engine recovery activity with the Temporal worker
+- routed projection reconciliation state mutation through workflow-engine-owned logic
+- added workflow-engine recovery timeline entry and recovery completion outbox event
+- added rejection behavior for unsafe, unsupported, or incomplete recovery commands
+- added gateway-api tests for dry-run checks, auditable requests, required actor/reason, and unsafe command rejection
+- added workflow-engine tests for projection reconciliation mutation, dry-run non-mutation, and unsupported command rejection
+
+Validation:
+- gateway-api pytest suite passed with 37 tests
+- workflow-engine pytest suite passed with 15 tests
+- Docker Compose configuration validated
+- gateway-api and workflow-engine source compilation succeeded
+
+Completed workstream:
+- Workstream 6 - Workflow Recovery Commands
+
+Boundary:
+- gateway-api only performs dry-run checks and creates recovery request records
+- workflow state mutation is performed only by workflow-engine-owned recovery activity logic
+- workflow-engine writes recovery timeline and recovery completion outbox records for accepted recovery actions
+- unsafe workflow recovery actions are rejected with structured errors
+- recovery metadata remains bounded to statuses, states, transition identifiers, reason presence, and safety flags only
+
+Next step:
+- implement Workstream 7: Gateway API And Operator Visibility
 
 ---
 

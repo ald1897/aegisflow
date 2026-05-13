@@ -36,6 +36,7 @@ class WorkflowEventType(StrEnum):
     approved = "workflow.approved"
     rejected = "workflow.rejected"
     completed = "workflow.completed"
+    recovery_action_completed = "recovery.action_completed"
     agent_execution_completed = "agent.execution_completed"
     agent_execution_failed = "agent.execution_failed"
     tool_invocation_completed = "tool.invocation_completed"
@@ -46,6 +47,7 @@ class WorkflowEventType(StrEnum):
 class TimelineEntryType(StrEnum):
     workflow_created = "WORKFLOW_CREATED"
     state_transition = "STATE_TRANSITION"
+    recovery_action_recorded = "RECOVERY_ACTION_RECORDED"
     agent_execution_completed = "AGENT_EXECUTION_COMPLETED"
     agent_execution_failed = "AGENT_EXECUTION_FAILED"
     tool_invocation_completed = "TOOL_INVOCATION_COMPLETED"

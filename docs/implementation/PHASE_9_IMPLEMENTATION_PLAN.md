@@ -38,7 +38,8 @@ Repository directories exist but are currently empty and not deployed in local D
 - notification-service
 
 Current local governance controls:
-- approval, replay, and recovery creation require `X-Actor-ID`
+- approval, replay, and recovery creation require `X-Actor-ID` and local `X-Actor-Roles`
+- gateway-api maps local development roles to privileged action permissions before accepting approval, replay, and recovery creation
 - workflow-engine owns workflow state mutation
 - tool-runtime enforces registered tools, allowed agents, input validation, and output validation
 - evaluation-service is side-effect free with respect to workflow state
@@ -47,8 +48,8 @@ Current local governance controls:
 
 Current local hardening gaps:
 - production authentication is not implemented
-- production RBAC is not implemented
-- `X-Actor-ID` is a development actor boundary, not a security boundary
+- production identity-provider-backed RBAC is not implemented
+- `X-Actor-ID` and `X-Actor-Roles` are development headers, not production authentication credentials
 - policy-engine is not implemented as a runtime service
 - audit-service is not implemented as a runtime service
 - notification-service is not implemented as a runtime service
@@ -119,22 +120,32 @@ Implementation notes:
 
 ## Workstream 2 - Local Identity and RBAC Foundation
 
-Status: Not Started
+Status: Completed
 
 Goal:
 - replace ad hoc actor-only checks with a local development identity and role model suitable for future production identity provider integration
 
 Deliverables:
-- actor context parser for gateway-api requests
-- local role and permission definitions
-- authorization middleware or dependency helpers
-- structured authorization errors
-- tests for missing actor, missing role, insufficient permission, and allowed access
+- actor context parser for gateway-api requests - Complete
+- local role and permission definitions - Complete
+- authorization middleware or dependency helpers - Complete
+- structured authorization errors - Complete
+- tests for missing actor, missing role, insufficient permission, and allowed access - Complete
 
 Success criteria:
-- approval decisions, replay creation, recovery creation, and future policy/admin actions require role-based authorization
-- existing `X-Actor-ID` behavior remains usable locally when accompanied by local role context
-- documentation clearly states this is local RBAC scaffolding, not production authentication
+- approval decisions, replay creation, recovery creation, and future policy/admin actions require role-based authorization - Met for implemented gateway privileged actions and scaffolded future permissions
+- existing `X-Actor-ID` behavior remains usable locally when accompanied by local role context - Met
+- documentation clearly states this is local RBAC scaffolding, not production authentication - Met
+
+Implementation notes:
+- added `aegisflow_gateway.security` with local `ActorContext`, permission names, role-to-permission mapping, and structured local authorization errors
+- gateway-api now requires `X-Actor-ID` plus `X-Actor-Roles` for approval decision submission, replay run creation, and recovery action creation
+- approval decisions require `workflow:review_decide`
+- replay run creation requires `workflow:replay_create`
+- recovery action creation requires `workflow:recovery_execute` plus action-specific outbox or projection permissions where applicable
+- operator-console approval submissions now send the local `reviewer` role
+- Postman protected gateway requests now include reviewer, replay, or recovery role variables
+- gateway-api tests cover missing actor, missing role, insufficient permission, and allowed privileged access
 
 ## Workstream 3 - Policy Engine Foundation
 
@@ -365,5 +376,29 @@ Boundary:
 - Workstream 1 is documentation and inventory only
 - no RBAC behavior, policy-engine runtime, audit-service runtime, contract validation, or service-to-service authentication was implemented yet
 
-Next step:
+Next step at the time:
 - implement Workstream 2: Local Identity and RBAC Foundation
+
+## 2026-05-14 - Workstream 2
+
+Status:
+- completed the local gateway identity and RBAC foundation
+- added local actor context parsing from `X-Actor-ID` and `X-Actor-Roles`
+- added local role and permission definitions for reviewer, compliance analyst, recovery operator, observability reader, policy admin, workflow operator, and platform admin
+- enforced local permissions for approval decision submission, replay run creation, and recovery action creation
+- updated operator-console and Postman validation headers for protected gateway actions
+- updated security, API, current functionality, service boundary, and developer workflow documentation
+
+Validation:
+- rebuilt the gateway-api Docker image so tests exercised the updated source
+- gateway-api test suite passed with `46 passed`
+
+Completed workstream:
+- Workstream 2 - Local Identity and RBAC Foundation
+
+Boundary:
+- this is a local development RBAC scaffold only
+- production authentication, production identity-provider integration, policy-engine decisions, audit-service records, and service-to-service authentication are not implemented yet
+
+Next step:
+- implement Workstream 3: Policy Engine Foundation

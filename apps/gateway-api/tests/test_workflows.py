@@ -1777,7 +1777,11 @@ async def test_gateway_replay_endpoints_create_retrieve_list_and_diagnose_withou
 
     create_replay_response = await client.post(
         f"/api/v1/workflows/{workflow_id}/replay-runs",
-        headers={"X-Actor-ID": "operator-replay", "X-Correlation-ID": "gateway-replay-create-test"},
+        headers={
+            "X-Actor-ID": "operator-replay",
+            "X-Actor-Roles": "compliance_analyst",
+            "X-Correlation-ID": "gateway-replay-create-test",
+        },
         json={
             "replay_mode": "deterministic_validation",
             "replay_run_id": replay_run_id,
@@ -1816,6 +1820,34 @@ async def test_gateway_replay_creation_requires_actor_identity(client: AsyncClie
 
     assert response.status_code == 400
     assert response.json()["error"] == "actor_required"
+
+
+async def test_gateway_replay_creation_requires_actor_role(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/replay-runs",
+        headers={"X-Actor-ID": "operator-replay"},
+        json={"replay_mode": "deterministic_validation"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "actor_roles_required"
+
+
+async def test_gateway_replay_creation_rejects_insufficient_role(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/replay-runs",
+        headers={"X-Actor-ID": "operator-reviewer", "X-Actor-Roles": "reviewer"},
+        json={"replay_mode": "deterministic_validation"},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "actor_permission_denied"
 
 
 async def test_gateway_workflow_recovery_check_and_action_endpoints(
@@ -1858,7 +1890,11 @@ async def test_gateway_workflow_recovery_check_and_action_endpoints(
 
     action_response = await client.post(
         f"/api/v1/workflows/{workflow_id}/recovery-actions",
-        headers={"X-Actor-ID": "operator-recovery", "X-Correlation-ID": "gateway-recovery-action-test"},
+        headers={
+            "X-Actor-ID": "operator-recovery",
+            "X-Actor-Roles": "recovery_operator",
+            "X-Correlation-ID": "gateway-recovery-action-test",
+        },
         json={
             "action_type": "reconcile_workflow_projection",
             "reason": "Projection is stale after local worker interruption.",
@@ -1912,7 +1948,7 @@ async def test_gateway_outbox_recovery_action_endpoint_requires_explicit_target(
 
     missing_target_response = await client.post(
         f"/api/v1/workflows/{workflow_id}/recovery-actions",
-        headers={"X-Actor-ID": "operator-recovery"},
+        headers={"X-Actor-ID": "operator-recovery", "X-Actor-Roles": "recovery_operator"},
         json={"action_type": "retry_outbox_event", "reason": "Retry transient outbox failure."},
     )
 
@@ -1921,7 +1957,7 @@ async def test_gateway_outbox_recovery_action_endpoint_requires_explicit_target(
 
     retry_response = await client.post(
         f"/api/v1/workflows/{workflow_id}/recovery-actions",
-        headers={"X-Actor-ID": "operator-recovery"},
+        headers={"X-Actor-ID": "operator-recovery", "X-Actor-Roles": "recovery_operator"},
         json={
             "action_type": "retry_outbox_event",
             "target_resource_type": "workflow_event_outbox",
@@ -1942,7 +1978,24 @@ async def test_gateway_outbox_recovery_action_endpoint_requires_explicit_target(
     async with session_factory() as session:
         event = await session.get(WorkflowEventOutbox, event_id)
         assert event is not None
-        assert event.publish_status == OutboxPublishStatus.pending.value
+    assert event.publish_status == OutboxPublishStatus.pending.value
+
+
+async def test_gateway_recovery_action_rejects_insufficient_role(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/recovery-actions",
+        headers={"X-Actor-ID": "operator-reviewer", "X-Actor-Roles": "reviewer"},
+        json={
+            "action_type": "reconcile_workflow_projection",
+            "reason": "Projection is stale after local worker interruption.",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "actor_permission_denied"
 
 
 async def test_get_workflow_review_context_aggregates_review_records(
@@ -2081,7 +2134,7 @@ async def test_create_workflow_approval_dispatches_temporal_decision_workflow(
 
     response = await client.post(
         f"/api/v1/workflows/{workflow_id}/approvals",
-        headers={"X-Actor-ID": "operator-1"},
+        headers={"X-Actor-ID": "operator-1", "X-Actor-Roles": "reviewer"},
         json={
             "decision": "APPROVED",
             "decision_reason": "exception_review_completed",
@@ -2116,13 +2169,49 @@ async def test_create_workflow_approval_requires_actor_id(client: AsyncClient) -
     assert response.json()["error"] == "actor_required"
 
 
-async def test_create_workflow_approval_rejects_non_reviewable_workflow(client: AsyncClient) -> None:
+async def test_create_workflow_approval_requires_actor_role(client: AsyncClient) -> None:
     create_response = await client.post("/api/v1/workflows", json={})
     workflow_id = create_response.json()["workflow_id"]
 
     response = await client.post(
         f"/api/v1/workflows/{workflow_id}/approvals",
         headers={"X-Actor-ID": "operator-1"},
+        json={
+            "decision": "APPROVED",
+            "decision_reason": "exception_review_completed",
+            "comment": "Reviewed prepared case context.",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["error"] == "actor_roles_required"
+
+
+async def test_create_workflow_approval_rejects_insufficient_role(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/approvals",
+        headers={"X-Actor-ID": "operator-replay", "X-Actor-Roles": "compliance_analyst"},
+        json={
+            "decision": "APPROVED",
+            "decision_reason": "exception_review_completed",
+            "comment": "Reviewed prepared case context.",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "actor_permission_denied"
+
+
+async def test_create_workflow_approval_rejects_non_reviewable_workflow(client: AsyncClient) -> None:
+    create_response = await client.post("/api/v1/workflows", json={})
+    workflow_id = create_response.json()["workflow_id"]
+
+    response = await client.post(
+        f"/api/v1/workflows/{workflow_id}/approvals",
+        headers={"X-Actor-ID": "operator-1", "X-Actor-Roles": "reviewer"},
         json={
             "decision": "REJECTED",
             "decision_reason": "exception_review_incomplete",

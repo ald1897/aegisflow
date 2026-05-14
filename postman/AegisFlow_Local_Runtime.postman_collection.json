@@ -32,6 +32,21 @@
       "type": "string"
     },
     {
+      "key": "reviewerRole",
+      "value": "reviewer",
+      "type": "string"
+    },
+    {
+      "key": "replayRole",
+      "value": "compliance_analyst",
+      "type": "string"
+    },
+    {
+      "key": "recoveryRole",
+      "value": "recovery_operator",
+      "type": "string"
+    },
+    {
       "key": "workflowId",
       "value": "",
       "type": "string"
@@ -1165,6 +1180,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{reviewerRole}}"
           }
         ],
         "body": {
@@ -1521,6 +1540,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{replayRole}}"
           }
         ],
         "body": {
@@ -1784,6 +1807,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{reviewerRole}}"
           }
         ],
         "body": {
@@ -2137,6 +2164,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{replayRole}}"
           }
         ],
         "body": {
@@ -2288,6 +2319,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{recoveryRole}}"
           }
         ],
         "body": {
@@ -2475,6 +2510,10 @@
           {
             "key": "X-Actor-ID",
             "value": "{{actorId}}"
+          },
+          {
+            "key": "X-Actor-Roles",
+            "value": "{{recoveryRole}}"
           }
         ],
         "body": {

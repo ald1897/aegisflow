@@ -16,6 +16,7 @@ export const gatewayBaseUrl =
 interface RequestOptions {
   method?: "GET" | "POST";
   actorId?: string;
+  actorRoles?: string | string[];
   body?: unknown;
 }
 
@@ -27,6 +28,12 @@ async function requestJson<T>(path: string, options: RequestOptions = {}): Promi
 
   if (options.actorId) {
     headers["X-Actor-ID"] = options.actorId;
+  }
+
+  if (options.actorRoles) {
+    headers["X-Actor-Roles"] = Array.isArray(options.actorRoles)
+      ? options.actorRoles.join(",")
+      : options.actorRoles;
   }
 
   if (options.body !== undefined) {
@@ -76,6 +83,7 @@ export async function submitApprovalDecision(
   return requestJson<ApprovalDecisionResponse>(`/api/v1/workflows/${workflowId}/approvals`, {
     method: "POST",
     actorId,
+    actorRoles: "reviewer",
     body: payload,
   });
 }

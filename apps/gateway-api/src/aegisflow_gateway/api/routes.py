@@ -52,6 +52,7 @@ from aegisflow_gateway.persistence.models import (
     WorkflowReplayStep,
     WorkflowTimelineEntry,
 )
+from aegisflow_gateway.security import Permission, require_permission, require_permissions
 from aegisflow_gateway.services.events import WorkflowEventPublisher
 from aegisflow_gateway.services.replay import ReplayValidationStep
 from aegisflow_gateway.services.temporal import TemporalWorkflowStarter
@@ -510,13 +511,19 @@ async def create_workflow_replay_run(
     request: Request,
     session: AsyncSession = Depends(get_session),
     actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+    actor_roles: str | None = Header(default=None, alias="X-Actor-Roles"),
 ) -> ReplayRunResponse:
-    requested_by = require_actor_id(actor_id, action_name="Replay run creation")
+    actor = require_permission(
+        actor_id,
+        actor_roles,
+        Permission.workflow_replay_create,
+        action_name="Replay run creation",
+    )
     service = WorkflowService(session)
     replay_run = await service.create_orchestrated_replay_run(
         workflow_id,
         replay_mode=payload.replay_mode,
-        requested_by=requested_by,
+        requested_by=actor.actor_id,
         correlation_id=request.state.correlation_id,
         replay_run_id=payload.replay_run_id,
         metadata=payload.metadata,
@@ -606,8 +613,28 @@ async def create_workflow_recovery_action(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+    actor_roles: str | None = Header(default=None, alias="X-Actor-Roles"),
 ) -> RecoveryActionResponse:
-    requested_by = require_actor_id(actor_id, action_name="Recovery action creation")
+    required_permissions = {
+        RecoveryActionType.retry_outbox_event: (
+            Permission.workflow_recovery_execute,
+            Permission.events_outbox_retry,
+        ),
+        RecoveryActionType.mark_outbox_event_dead_lettered: (
+            Permission.workflow_recovery_execute,
+            Permission.events_outbox_dead_letter,
+        ),
+        RecoveryActionType.reconcile_workflow_projection: (
+            Permission.workflow_recovery_execute,
+            Permission.workflow_projection_reconcile,
+        ),
+    }.get(payload.action_type, (Permission.workflow_recovery_execute,))
+    actor = require_permissions(
+        actor_id,
+        actor_roles,
+        required_permissions,
+        action_name="Recovery action creation",
+    )
     service = WorkflowService(session)
     if payload.action_type == RecoveryActionType.retry_outbox_event:
         if payload.target_resource_type != "workflow_event_outbox" or not payload.target_resource_id:
@@ -619,7 +646,7 @@ async def create_workflow_recovery_action(
         publisher = WorkflowEventPublisher(settings) if settings.enable_event_publishing else None
         action = await service.retry_outbox_event(
             payload.target_resource_id,
-            requested_by=requested_by,
+            requested_by=actor.actor_id,
             reason=payload.reason,
             publisher=publisher,
         )
@@ -632,14 +659,14 @@ async def create_workflow_recovery_action(
             )
         action = await service.mark_outbox_event_dead_lettered(
             payload.target_resource_id,
-            requested_by=requested_by,
+            requested_by=actor.actor_id,
             reason=payload.reason,
         )
     else:
         action = await service.request_workflow_recovery(
             workflow_id,
             action_type=payload.action_type,
-            requested_by=requested_by,
+            requested_by=actor.actor_id,
             reason=payload.reason,
             correlation_id=request.state.correlation_id,
         )
@@ -700,8 +727,14 @@ async def create_workflow_approval(
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
     actor_id: str | None = Header(default=None, alias="X-Actor-ID"),
+    actor_roles: str | None = Header(default=None, alias="X-Actor-Roles"),
 ) -> ApprovalDecisionResponse:
-    actor_id = require_actor_id(actor_id, action_name="Approval decision submission")
+    actor = require_permission(
+        actor_id,
+        actor_roles,
+        Permission.workflow_review_decide,
+        action_name="Approval decision submission",
+    )
 
     service = WorkflowService(session)
     workflow = await service.require_human_reviewable_workflow(workflow_id)
@@ -714,7 +747,7 @@ async def create_workflow_approval(
         "decision": payload.decision.value,
         "decision_reason": payload.decision_reason,
         "comment": payload.comment,
-        "reviewed_by": actor_id,
+        "reviewed_by": actor.actor_id,
         "reviewed_at": reviewed_at.isoformat(),
         "approval_metadata": {
             **payload.metadata,

@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from aegisflow_gateway.api.routes import router
 from aegisflow_gateway.api.schemas import ErrorResponse
 from aegisflow_gateway.config import get_settings
+from aegisflow_gateway.security import LocalAuthorizationError
 from aegisflow_gateway.services.workflows import WorkflowNotFoundError, WorkflowReviewActionError
 from aegisflow_gateway.telemetry.correlation import CorrelationIdMiddleware
 from aegisflow_gateway.telemetry.logging import configure_logging
@@ -28,6 +29,7 @@ def create_app() -> FastAPI:
             "traceparent",
             "tracestate",
             "X-Actor-ID",
+            "X-Actor-Roles",
             "X-Correlation-ID",
         ],
     )
@@ -48,6 +50,17 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(WorkflowReviewActionError)
     async def workflow_review_action_handler(request: Request, exc: WorkflowReviewActionError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=ErrorResponse(
+                error=exc.error,
+                message=exc.message,
+                correlation_id=getattr(request.state, "correlation_id", None),
+            ).model_dump(),
+        )
+
+    @app.exception_handler(LocalAuthorizationError)
+    async def local_authorization_handler(request: Request, exc: LocalAuthorizationError) -> JSONResponse:
         return JSONResponse(
             status_code=exc.status_code,
             content=ErrorResponse(

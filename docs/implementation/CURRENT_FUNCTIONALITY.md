@@ -4,7 +4,7 @@
 
 This document summarizes the AegisFlow functionality currently implemented and describes how to manually validate it in the local development environment.
 
-The current implementation includes Phase 1 through Phase 8:
+The current implementation includes Phase 1 through Phase 8 plus Phase 9 Workstreams 1 and 2:
 - local runtime foundation
 - workflow persistence
 - Temporal workflow orchestration
@@ -35,6 +35,8 @@ The current implementation includes Phase 1 through Phase 8:
 - gateway-api retrieval of persisted workflow evaluation runs and results
 - gateway-api replay run creation, retrieval, workflow replay listing, and read-only replay diagnostics
 - gateway-api recovery checks, explicit recovery action creation, recovery action retrieval, and workflow recovery action listing
+- local gateway actor and role parsing for privileged approval, replay, and recovery creation
+- local role-to-permission checks for protected gateway actions
 - gateway-api replay and recovery traces, metrics, and bounded structured logs
 - Postman validation for approval and rejection workflow evaluation runs
 - Postman validation for approval and rejection workflow replay diagnostics and replay run retrieval
@@ -46,6 +48,7 @@ The current implementation includes Phase 1 through Phase 8:
 Phase 6 is complete for the local simulation boundary.
 Phase 7 is complete for the local evaluation boundary.
 Phase 8 is complete for the local replay and recovery boundary.
+Phase 9 Workstreams 1 and 2 are complete for service boundary inventory and local gateway RBAC scaffolding.
 
 ---
 
@@ -91,6 +94,7 @@ The gateway API currently supports:
 - read-only deterministic replay diagnostics
 - workflow recovery dry-run check retrieval
 - explicit recovery action creation and retrieval
+- local `X-Actor-ID` and `X-Actor-Roles` enforcement for approval, replay, and recovery creation
 - correlation ID propagation
 - structured JSON logs
 - Temporal workflow startup
@@ -128,9 +132,11 @@ GET /api/v1/workflows/{workflow_id}/recovery-actions
 
 The workflow evaluations endpoint is read-only. It returns persisted evaluation-service records for operator and Postman validation ergonomics, but it does not create evaluation runs, change workflow state, or participate in mortgage decisions.
 
-The replay endpoints expose bounded local replay records and diagnostics. Replay run creation requires `X-Actor-ID` and only persists replay run and replay step records. Replay retrieval, workflow replay listing, and replay diagnostics are read-only and do not create replay or recovery records, mutate workflow state, publish events, execute agents, execute tools, dispatch approvals, or call external systems.
+The replay endpoints expose bounded local replay records and diagnostics. Replay run creation requires `X-Actor-ID`, `X-Actor-Roles`, and the local `workflow:replay_create` permission. Replay creation only persists replay run and replay step records. Replay retrieval, workflow replay listing, and replay diagnostics are read-only and do not create replay or recovery records, mutate workflow state, publish events, execute agents, execute tools, dispatch approvals, or call external systems.
 
-The recovery endpoints expose bounded operator-facing recovery controls. Recovery checks are dry-run reads. Recovery action creation requires `X-Actor-ID` and a reason, and supports explicit outbox retry, explicit outbox dead-letter marking, and workflow projection reconciliation requests. Gateway workflow recovery requests are auditable records; workflow-engine remains responsible for any actual workflow state mutation.
+The recovery endpoints expose bounded operator-facing recovery controls. Recovery checks are dry-run reads. Recovery action creation requires `X-Actor-ID`, `X-Actor-Roles`, the local `workflow:recovery_execute` permission, and a reason. Outbox retry, outbox dead-letter marking, and workflow projection reconciliation each require their matching local permission as well. Gateway workflow recovery requests are auditable records; workflow-engine remains responsible for any actual workflow state mutation.
+
+The approval decision endpoint requires `X-Actor-ID`, `X-Actor-Roles`, and the local `workflow:review_decide` permission before routing approval or rejection decisions through workflow-engine-owned Temporal decision execution.
 
 Current replay and recovery observability:
 - replay run creation emits spans for request handling, evidence loading, step validation, and replay record persistence
@@ -308,8 +314,9 @@ Current Phase 5 operator-console boundary:
 - queue visibility is implemented
 - workflow detail review is implemented
 - approval and rejection form submission is implemented through gateway-api
+- approval and rejection submissions include local reviewer role context for gateway authorization
 - replay and recovery summaries are read-only and do not create replay runs, recovery actions, or workflow mutations
-- production authentication and RBAC are not yet implemented
+- production authentication and production RBAC administration are not yet implemented
 
 ---
 
@@ -468,7 +475,7 @@ DEAD_LETTERED
 # Not Implemented Yet
 
 The following capabilities are intentionally not implemented yet:
-- authentication and RBAC
+- production authentication, identity-provider integration, and production RBAC administration
 - policy-engine runtime service and policy decision enforcement
 - audit-service runtime service and append-only audit event API
 - service-to-service authentication and authorization
@@ -551,6 +558,9 @@ Recommended collection variables:
 - `grafanaPassword`: `aegisflow`
 - `correlationId`: `postman-manual-test`
 - `actorId`: `postman-operator`
+- `reviewerRole`: `reviewer`
+- `replayRole`: `compliance_analyst`
+- `recoveryRole`: `recovery_operator`
 - `enableRecoveryScenario`: `false` by default; set to `true` only after seeding the local retryable outbox failure
 
 The collection automatically captures:
@@ -1332,7 +1342,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected result:
 
 ```text
-41 passed
+46 passed
 ```
 
 ---

@@ -159,6 +159,17 @@ Examples may include:
 - platform_admin
 - observability_admin
 
+Implemented local development roles currently include:
+- workflow_operator
+- reviewer
+- compliance_analyst
+- recovery_operator
+- observability_reader
+- policy_admin
+- platform_admin
+
+These local roles are development scaffolding only. They are supplied through `X-Actor-Roles` and are not a substitute for production identity-provider-backed roles.
+
 ---
 
 # Permission Categories
@@ -170,6 +181,23 @@ Permissions may include:
 - audit inspection
 - replay execution
 - policy administration
+
+Implemented local development permissions currently include:
+- `workflow:create`
+- `workflow:review_decide`
+- `workflow:replay_create`
+- `workflow:replay_read`
+- `workflow:recovery_execute`
+- `events:outbox_retry`
+- `events:outbox_dead_letter`
+- `workflow:projection_reconcile`
+- `evaluation:run_create`
+- `evaluation:read`
+- `agent:execute`
+- `tool:invoke`
+- `observability:read`
+- `policy:admin`
+- `audit:read`
 
 ---
 
@@ -215,21 +243,41 @@ Critical workflow decisions must require:
 
 ## Implemented Local Human Review Controls
 
-The local Phase 5 gateway implementation requires `X-Actor-ID` for approval and rejection submission.
+The local gateway implementation requires `X-Actor-ID` and `X-Actor-Roles` for approval and rejection submission.
 
 Current enforced controls:
+- approval and rejection submissions require the local `workflow:review_decide` permission
 - only workflows in `HUMAN_REVIEW_REQUIRED` are accepted for human review decisions
 - approval and rejection requests must include a decision reason and comment
 - gateway-api routes decision execution through workflow-engine-owned Temporal decision workflow
 - approval records preserve reviewing operator identity and decision metadata
-- gateway-api returns structured errors for missing actor identity and non-reviewable workflows
-- operator-console captures operator identity, decision, and comment before submitting decisions to gateway-api
+- gateway-api returns structured errors for missing actor identity, missing local role context, insufficient permission, and non-reviewable workflows
+- operator-console captures operator identity, decision, and comment before submitting decisions to gateway-api with the local `reviewer` role
 
 Current local boundary:
 - production identity provider integration is not yet implemented
-- production RBAC policy enforcement is not yet implemented
-- `X-Actor-ID` is a local development actor boundary, not a substitute for production authentication
+- production RBAC policy enforcement and role administration are not yet implemented
+- `X-Actor-ID` and `X-Actor-Roles` are local development headers, not substitutes for production authentication
 - operator-console does not enforce production role policy locally
+
+## Implemented Local Privileged Action Authorization
+
+The Phase 9 gateway RBAC scaffold enforces local roles and permissions before accepting privileged gateway actions.
+
+Current enforced gateway permissions:
+- approval decision submission requires `workflow:review_decide`
+- replay run creation requires `workflow:replay_create`
+- recovery action creation requires `workflow:recovery_execute`
+- outbox retry recovery additionally requires `events:outbox_retry`
+- outbox dead-letter recovery additionally requires `events:outbox_dead_letter`
+- workflow projection reconciliation recovery additionally requires `workflow:projection_reconcile`
+
+Current structured authorization errors:
+- `actor_required` when `X-Actor-ID` is missing or blank
+- `actor_roles_required` when `X-Actor-Roles` is missing or blank
+- `actor_permission_denied` when the provided local roles do not grant the required permission
+
+This local authorization layer is intentionally small and deterministic so future production authentication, policy-engine decisions, and audit-service records can replace or extend it without changing the ownership boundary of workflow state.
 
 ---
 

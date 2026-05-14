@@ -158,7 +158,7 @@ The review context endpoint aggregates workflow-owned review data for an operato
 
 The approvals retrieval endpoint returns persisted approval records for a workflow through DTOs.
 
-The approval decision endpoint accepts approval or rejection decisions from a human operator. It must require `X-Actor-ID`, reject non-reviewable workflows with structured errors, and route workflow state changes through workflow-engine-owned Temporal decision execution. Gateway handlers must not directly mutate workflow state for approval outcomes.
+The approval decision endpoint accepts approval or rejection decisions from a human operator. It must require `X-Actor-ID` and `X-Actor-Roles`, enforce the local `workflow:review_decide` permission, reject non-reviewable workflows with structured errors, and route workflow state changes through workflow-engine-owned Temporal decision execution. Gateway handlers must not directly mutate workflow state for approval outcomes.
 
 Current approval decision behavior:
 - accepted decisions return the refreshed workflow record, persisted approval record, and workflow-engine decision result
@@ -169,13 +169,13 @@ Current approval decision behavior:
 
 The workflow evaluations endpoint returns persisted evaluation runs and bounded evaluation results associated with a workflow. It is read-only gateway access for operator and Postman ergonomics. It must not create evaluation runs, mutate workflow state, approve or reject workflows, or expose raw prompt content, document contents, borrower PII, secrets, approval comments, or full model outputs.
 
-The replay run endpoints expose local Phase 8 replay records through DTOs. `POST /api/v1/workflows/{workflow_id}/replay-runs` requires `X-Actor-ID`, creates side-effect-free replay run records, and supports `history_reconstruction` and `deterministic_validation` modes. Replay creation persists replay run and replay step diagnostics only; it does not rerun agents, tools, approvals, workflow activities, event publication, or external integrations. Replay retrieval and listing endpoints are read-only.
+The replay run endpoints expose local Phase 8 replay records through DTOs. `POST /api/v1/workflows/{workflow_id}/replay-runs` requires `X-Actor-ID`, `X-Actor-Roles`, and the local `workflow:replay_create` permission. It creates side-effect-free replay run records and supports `history_reconstruction` and `deterministic_validation` modes. Replay creation persists replay run and replay step diagnostics only; it does not rerun agents, tools, approvals, workflow activities, event publication, or external integrations. Replay retrieval and listing endpoints are read-only.
 
 The replay diagnostics endpoint performs read-only deterministic validation of persisted workflow evidence. It returns bounded diagnostic steps without creating replay run records or mutating workflow state.
 
 The recovery check endpoint returns dry-run workflow recovery eligibility for supported local recovery commands. It does not create recovery action records or mutate workflow state.
 
-The recovery action endpoints expose explicit operator-triggered recovery actions. `POST /api/v1/workflows/{workflow_id}/recovery-actions` requires `X-Actor-ID` and a reason. Supported local actions are bounded to retrying retryable outbox events, marking dead-letterable outbox events, and requesting workflow projection reconciliation. Outbox recovery requires an explicit `workflow_event_outbox` target. Workflow projection reconciliation requests are auditable gateway records only; any workflow state mutation remains owned by workflow-engine recovery logic. Recovery retrieval and listing endpoints are read-only.
+The recovery action endpoints expose explicit operator-triggered recovery actions. `POST /api/v1/workflows/{workflow_id}/recovery-actions` requires `X-Actor-ID`, `X-Actor-Roles`, the local `workflow:recovery_execute` permission, and a reason. Supported local actions are bounded to retrying retryable outbox events, marking dead-letterable outbox events, and requesting workflow projection reconciliation. Outbox retry additionally requires `events:outbox_retry`, outbox dead-letter additionally requires `events:outbox_dead_letter`, and projection reconciliation additionally requires `workflow:projection_reconcile`. Outbox recovery requires an explicit `workflow_event_outbox` target. Workflow projection reconciliation requests are auditable gateway records only; any workflow state mutation remains owned by workflow-engine recovery logic. Recovery retrieval and listing endpoints are read-only.
 
 Implemented replay modes:
 - `history_reconstruction`
@@ -188,7 +188,9 @@ Implemented local recovery action types:
 - `resume_stuck_workflow_check` as a dry-run check only
 
 Implemented structured recovery errors include:
-- `actor_required` for replay or recovery creation requests missing `X-Actor-ID`
+- `actor_required` for approval, replay, or recovery creation requests missing `X-Actor-ID`
+- `actor_roles_required` for approval, replay, or recovery creation requests missing `X-Actor-Roles`
+- `actor_permission_denied` for approval, replay, or recovery creation requests where local roles do not grant the required permission
 - `recovery_target_required` for outbox recovery requests without an explicit outbox target
 - `recovery_actor_required` for workflow recovery commands without a local actor
 - `recovery_reason_required` for workflow recovery commands without a reason

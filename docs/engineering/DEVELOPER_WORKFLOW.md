@@ -738,7 +738,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected current result:
 
 ```text
-41 passed
+46 passed
 ```
 
 Local Postman validation lives in:
@@ -748,6 +748,11 @@ postman/AegisFlow_Local_Runtime.postman_collection.json
 ```
 
 The collection includes evaluation-service health/readiness, dataset listing, approval and rejection dataset replay runs, evaluation run retrieval, workflow evaluation retrieval through gateway-api, Prometheus metric checks, Jaeger trace checks, Grafana dashboard checks, and bounded structured log checks.
+
+Protected gateway requests in the collection use local development role variables:
+- `reviewerRole`: `reviewer` for approval and rejection submission
+- `replayRole`: `compliance_analyst` for replay run creation
+- `recoveryRole`: `recovery_operator` for recovery action creation
 
 Useful local observability checks:
 - Prometheus query: `aegisflow_evaluation_service_evaluation_runs_total`
@@ -818,7 +823,7 @@ docker compose -f infrastructure/local-dev/docker-compose.yml run --rm --no-deps
 Expected current result:
 
 ```text
-41 passed
+46 passed
 ```
 
 Run workflow-engine tests when changing workflow-owned recovery behavior:

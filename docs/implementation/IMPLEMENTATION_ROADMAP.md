@@ -232,6 +232,7 @@ The platform currently supports:
 - workflow recovery dry-run checks and auditable workflow projection reconciliation requests
 - workflow-engine-owned projection reconciliation activity for accepted workflow recovery
 - gateway-api replay and recovery endpoints
+- local gateway role and permission checks for approval, replay, and recovery creation
 - operator-console read-only replay and recovery summaries
 - Postman validation for replay diagnostics, replay run creation/retrieval/listing, safe seeded outbox recovery, and unsupported recovery rejection
 - replay and recovery traces, metrics, structured logs, and Grafana dashboard
@@ -1326,6 +1327,7 @@ Current status:
 - in progress
 - sanity checked after Phase 8 completion on 2026-05-14
 - Workstream 1 - Service Boundary Inventory is completed
+- Workstream 2 - Local Identity and RBAC Foundation is completed
 
 Phase 9 is not a broad rewrite of the local platform. The Phase 8 baseline already runs gateway-api, workflow-engine, agent-runtime, tool-runtime, evaluation-service, and operator-console as separate local services. Empty repository directories also exist for audit-service, policy-engine, and notification-service, but those are not implemented services and are not part of the local Docker Compose runtime.
 
@@ -1348,7 +1350,7 @@ Harden:
 - operator-console
 
 Implement or formalize:
-- local authentication and RBAC scaffolding beyond `X-Actor-ID`
+- local role and permission scaffolding for privileged gateway actions
 - policy-engine contracts and a minimal policy decision boundary
 - audit-service contracts and append-only audit event ingestion
 - service-to-service actor, correlation, and authorization propagation
@@ -1372,8 +1374,8 @@ Defer:
 Implement:
 - service ownership inventory
 - dependency and trust-boundary map
-- local role and permission model
-- privileged operation authorization checks
+- local role and permission model for gateway approval, replay, and recovery creation
+- privileged operation authorization checks for gateway approval, replay, and recovery creation
 - service-to-service identity propagation
 - contract tests for gateway and internal services
 

@@ -469,6 +469,10 @@ DEAD_LETTERED
 
 The following capabilities are intentionally not implemented yet:
 - authentication and RBAC
+- policy-engine runtime service and policy decision enforcement
+- audit-service runtime service and append-only audit event API
+- service-to-service authentication and authorization
+- mechanical API and event contract validation beyond the current application tests
 - production autonomous recovery, broad activity replay, and Temporal history mutation tooling
 - production alerting and paging
 - production log aggregation

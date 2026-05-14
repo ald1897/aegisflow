@@ -663,7 +663,7 @@ Validation completed:
 - Docker logs contained bounded replay and recovery entries with correlation ID and trace ID
 
 Next deliverable:
-- Phase 9 - Service Separation and Hardening
+- Phase 9 - Service Hardening and Governance Boundaries
 
 ---
 
@@ -1310,54 +1310,101 @@ Current local boundary:
 
 ---
 
-# Phase 9 - Service Separation and Hardening
+# Phase 9 - Service Hardening and Governance Boundaries
 
 # Objective
 
-Evolve logical service boundaries into deployable runtime services.
+Harden the runtime services that already exist and implement the missing governance boundaries needed before production-oriented deployment work.
+
+Detailed planning is tracked in:
+
+```text
+docs/implementation/PHASE_9_IMPLEMENTATION_PLAN.md
+```
+
+Current status:
+- planned
+- sanity checked after Phase 8 completion on 2026-05-14
+- no Phase 9 implementation work has started
+
+Phase 9 is not a broad rewrite of the local platform. The Phase 8 baseline already runs gateway-api, workflow-engine, agent-runtime, tool-runtime, evaluation-service, and operator-console as separate local services. Empty repository directories also exist for audit-service, policy-engine, and notification-service, but those are not implemented services and are not part of the local Docker Compose runtime.
 
 ---
 
 # Goals
 
-Separate:
+Harden:
+- gateway-api
+- workflow-engine
+- agent-runtime
 - tool-runtime
-- audit-service
 - evaluation-service
-- policy-engine
+- operator-console
 
-where operational pressure justifies separation.
+Implement or formalize:
+- local authentication and RBAC scaffolding beyond `X-Actor-ID`
+- policy-engine contracts and a minimal policy decision boundary
+- audit-service contracts and append-only audit event ingestion
+- service-to-service actor, correlation, and authorization propagation
+- API and event contract validation
+- runtime readiness, health, configuration, and container hardening
+- local CI and validation gates for service-boundary changes
+
+Defer:
+- production identity provider integration
+- production Kubernetes or cloud infrastructure
+- production alerting and paging
+- production external mortgage system mutation
+- external judge-model provider integration
 
 ---
 
 # Deliverables
 
-## Service Hardening
+## Boundary Hardening
 
 Implement:
-- service isolation
-- deployment boundaries
-- independent scaling
-- contract enforcement
+- service ownership inventory
+- dependency and trust-boundary map
+- local role and permission model
+- privileged operation authorization checks
+- service-to-service identity propagation
+- contract tests for gateway and internal services
 
 ---
 
-## Infrastructure Improvements
+## Governance Service Foundations
 
 Implement:
-- container orchestration
-- infrastructure-as-code
-- deployment pipelines
+- minimal policy decision API and enforcement path
+- append-only audit event API and persistence path
+- audit events for approval, replay, recovery, and privileged admin operations
+- bounded DTOs that avoid raw borrower data, prompt content, secrets, and approval comments
+
+---
+
+## Runtime Hardening
+
+Implement:
+- stronger health and readiness checks
+- explicit environment configuration validation
+- non-root or least-privilege container defaults where practical
+- Docker Compose service wiring for new governance services
+- local validation commands and smoke tests
 
 ---
 
 # Success Criteria
 
-Services should:
-- deploy independently
-- scale independently
-- preserve observability
-- maintain replay compatibility
+Phase 9 is complete when:
+- local privileged actions are authorized by role, not only by presence of `X-Actor-ID`
+- policy decisions are explicit, observable, and testable
+- audit records are append-only and retrievable through a bounded service boundary
+- service contracts are validated in tests or documented snapshots
+- local compose includes every implemented service boundary
+- service health/readiness reflects real dependencies
+- replay, recovery, approval, evaluation, and tool execution behavior remains replay-safe
+- documentation accurately distinguishes local hardening from production identity, cloud, and external-system integrations
 
 ---
 

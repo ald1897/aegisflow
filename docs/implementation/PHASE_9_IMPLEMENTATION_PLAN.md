@@ -95,21 +95,27 @@ Phase 9 does not include:
 
 ## Workstream 1 - Service Boundary Inventory
 
-Status: Not Started
+Status: Completed
 
 Goal:
 - document the current service ownership, runtime dependencies, trust boundaries, data ownership, and privileged operations
 
 Deliverables:
-- service boundary matrix for gateway-api, workflow-engine, agent-runtime, tool-runtime, evaluation-service, operator-console, policy-engine, and audit-service
-- dependency map for synchronous calls, event publication, database access, and observability dependencies
-- explicit list of privileged actions requiring authorization
-- documentation update for any gap between architecture docs and implemented local runtime
+- service boundary matrix for gateway-api, workflow-engine, agent-runtime, tool-runtime, evaluation-service, operator-console, policy-engine, and audit-service - Complete
+- dependency map for synchronous calls, event publication, database access, and observability dependencies - Complete
+- explicit list of privileged actions requiring authorization - Complete
+- documentation update for any gap between architecture docs and implemented local runtime - Complete
 
 Success criteria:
-- current implemented services and placeholder service directories are clearly distinguished
-- every privileged action has an owning service and target permission
-- no Phase 9 implementation begins from stale service-separation assumptions
+- current implemented services and placeholder service directories are clearly distinguished - Met
+- every privileged action has an owning service and target permission - Met
+- no Phase 9 implementation begins from stale service-separation assumptions - Met
+
+Implementation notes:
+- added `docs/architecture/SERVICE_BOUNDARIES.md`
+- documented implemented services, placeholder service directories, runtime dependencies, data ownership, trust boundaries, and privileged actions
+- confirmed `audit-service`, `policy-engine`, and `notification-service` directories are placeholders only and are not wired into local Docker Compose
+- confirmed Workstream 1 changed documentation only and did not alter runtime behavior
 
 ## Workstream 2 - Local Identity and RBAC Foundation
 
@@ -334,3 +340,30 @@ Expected remaining future work:
 - broader autonomous recovery and Temporal activity replay
 
 These items should remain explicit future phases unless the product direction changes.
+
+---
+
+# Running Status Log
+
+## 2026-05-14 - Workstream 1
+
+Status:
+- completed the Phase 9 service boundary inventory
+- added a dedicated current-state service boundary document
+- mapped implemented services, placeholder service directories, data ownership, runtime dependencies, event publication, observability dependencies, and privileged actions
+- documented target permission names for later local RBAC and policy-engine work
+- updated architecture documentation to point readers to the current runtime boundary inventory
+
+Validation:
+- Docker Compose configuration validated
+- documentation diff check passed
+
+Completed workstream:
+- Workstream 1 - Service Boundary Inventory
+
+Boundary:
+- Workstream 1 is documentation and inventory only
+- no RBAC behavior, policy-engine runtime, audit-service runtime, contract validation, or service-to-service authentication was implemented yet
+
+Next step:
+- implement Workstream 2: Local Identity and RBAC Foundation

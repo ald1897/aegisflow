@@ -1323,11 +1323,17 @@ docs/implementation/PHASE_9_IMPLEMENTATION_PLAN.md
 ```
 
 Current status:
-- planned
+- in progress
 - sanity checked after Phase 8 completion on 2026-05-14
-- no Phase 9 implementation work has started
+- Workstream 1 - Service Boundary Inventory is completed
 
 Phase 9 is not a broad rewrite of the local platform. The Phase 8 baseline already runs gateway-api, workflow-engine, agent-runtime, tool-runtime, evaluation-service, and operator-console as separate local services. Empty repository directories also exist for audit-service, policy-engine, and notification-service, but those are not implemented services and are not part of the local Docker Compose runtime.
+
+Current service boundary inventory is tracked in:
+
+```text
+docs/architecture/SERVICE_BOUNDARIES.md
+```
 
 ---
 

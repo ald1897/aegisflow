@@ -18,6 +18,14 @@ This document should serve as the authoritative reference for:
 - orchestration responsibilities
 - runtime communication paths
 
+The current implemented local service boundary inventory is tracked in:
+
+```text
+docs/architecture/SERVICE_BOUNDARIES.md
+```
+
+That inventory distinguishes implemented local services from planned or placeholder services.
+
 ---
 
 # Architectural Philosophy
